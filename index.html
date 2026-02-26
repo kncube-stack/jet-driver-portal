@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#0a0e17" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="JET Driver Portal — Jason Edwards Travel" />
+  <meta name="description" content="JET Staff Portal — Jason Edwards Travel" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-  <title>JET Driver Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <title>JET Staff Portal</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { background: #0a0e17; overflow-y: scroll; -webkit-font-smoothing: antialiased; }
@@ -4445,7 +4446,7 @@ const DAILY_RUNOUT = {
       signOn: "01:20",
       handoverTo: {
         duty: 206,
-        driver: "Jomon Ponnappan",
+        driver: "Jomon Ponnapon",
         signOn: "12:05"
       }
     },
@@ -4481,7 +4482,7 @@ const DAILY_RUNOUT = {
     },
     205: {
       vehicle: "BV23 ZXT",
-      driver: "Frankie Goliath",
+      driver: "Frankie",
       signOn: "05:00",
       handoverTo: {
         duty: 210,
@@ -4492,7 +4493,7 @@ const DAILY_RUNOUT = {
     // A6 duties — afternoon (take over from morning)
     206: {
       vehicle: "BV23 ZXS",
-      driver: "Jomon Ponnappan",
+      driver: "Jomon Ponnapon",
       signOn: "12:05",
       takeoverFrom: {
         duty: 201,
@@ -4532,7 +4533,7 @@ const DAILY_RUNOUT = {
       signOn: "16:05",
       takeoverFrom: {
         duty: 205,
-        driver: "Frankie Goliath"
+        driver: "Frankie"
       }
     },
     // Network duties — morning
@@ -4899,16 +4900,9 @@ const C = {
 
 // ─── Helpers ────────────────────────────────────────────────────
 function getWeekCommencing() {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diff);
-  return monday.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  });
+  // Hardcoded to match current ROTA data sheet
+  // When connected to SharePoint, this will be parsed from the sheet tab name
+  return "23 Feb 2026";
 }
 function isDutyNumber(val) {
   return /^\d+$/.test(val);
@@ -4917,8 +4911,8 @@ function getSpecialDuty(val) {
   if (!val) return null;
   // Direct match
   if (SPECIAL_DUTIES[val]) return SPECIAL_DUTIES[val];
-  // AVRA variants (e.g. AVRA6, AVRA8, AVRA8&A9)
-  if (val.startsWith("AVRA")) return {
+  // AVRA variants (e.g. AVRA6, AVRA8, 6AVRA8&A6, 1AVRA9A8A6)
+  if (val.includes("AVR")) return {
     label: val,
     signOn: "—",
     signOff: "—",
@@ -5142,7 +5136,7 @@ function App() {
       textTransform: "uppercase",
       marginTop: "1px"
     }
-  }, "Jason Edwards Travel \u2014 Driver Portal")), /*#__PURE__*/React.createElement("div", {
+  }, "Jason Edwards Travel \u2014 Staff Portal")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: "11px",
       color: C.textMuted,
@@ -5944,7 +5938,7 @@ function App() {
       e.currentTarget.style.borderColor = "#ffffff25";
     }
   }, "\uD83D\uDD04 Request Shift Swap")), screen === "leave" && selectedDriver && (() => {
-    const LEAVE_EMAIL = "manager@example.com"; // ← REPLACE WITH ACTUAL EMAIL
+    const LEAVE_EMAIL = "operations@jet-travel.co.uk"; // ← UPDATE WITH REAL EMAIL // ← REPLACE WITH ACTUAL EMAIL
     const handleSubmit = () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo) return;
       const subject = encodeURIComponent(`Annual Leave Request — ${selectedDriver}`);
@@ -6198,7 +6192,7 @@ function App() {
       }
     }, "This will open your email app with the request ready to send. Your manager will receive the request and confirm by return.")));
   })(), screen === "swap" && selectedDriver && (() => {
-    const SWAP_EMAIL = "manager@example.com"; // ← REPLACE WITH ACTUAL EMAIL
+    const SWAP_EMAIL = "operations@jet-travel.co.uk"; // ← UPDATE WITH REAL EMAIL // ← REPLACE WITH ACTUAL EMAIL
     const myRota = ROTA[selectedDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
     const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
