@@ -5584,7 +5584,11 @@ function App() {
         letterSpacing: "1.5px",
         marginBottom: "10px"
       }
-    }, "TODAY \u2014 ", DAYS[today].toUpperCase()), dutyCard && /*#__PURE__*/React.createElement("div", {
+    }, SHORT_DAYS[today].toUpperCase(), " \u2014 ", new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    })), dutyCard && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -6635,8 +6639,8 @@ function App() {
       style: {
         background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
         border: `1px solid ${C.accent}33`,
-        borderRadius: "8px",
-        padding: "12px 14px",
+        borderRadius: "10px",
+        padding: "14px 16px",
         marginBottom: "12px"
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -6645,10 +6649,17 @@ function App() {
         fontWeight: 700,
         color: C.accent,
         letterSpacing: "1.5px",
-        marginBottom: "8px"
+        marginBottom: "10px"
       }
-    }, "TODAY'S ASSIGNMENT"), /*#__PURE__*/React.createElement("div", {
+    }, SHORT_DAYS[today].toUpperCase(), " \u2014 ", new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    })), /*#__PURE__*/React.createElement("div", {
       style: {
+        background: C.surface,
+        borderRadius: "8px",
+        padding: "10px 12px",
         display: "flex",
         flexDirection: "column",
         gap: "6px"
@@ -6663,16 +6674,17 @@ function App() {
       style: {
         fontSize: "10px",
         color: C.textMuted,
-        fontWeight: 600
+        fontWeight: 600,
+        letterSpacing: "0.5px"
       }
-    }, "VEHICLE"), /*#__PURE__*/React.createElement("span", {
+    }, "COACH"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: "14px",
         fontWeight: 700,
         color: C.white,
         letterSpacing: "1px"
       }
-    }, runout.vehicle)), /*#__PURE__*/React.createElement("div", {
+    }, runout.vehicle)), runout.destination && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -6682,25 +6694,8 @@ function App() {
       style: {
         fontSize: "10px",
         color: C.textMuted,
-        fontWeight: 600
-      }
-    }, "DRIVER"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "12px",
         fontWeight: 600,
-        color: C.white
-      }
-    }, runout.driver)), runout.destination && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        fontWeight: 600
+        letterSpacing: "0.5px"
       }
     }, "DESTINATION"), /*#__PURE__*/React.createElement("span", {
       style: {
@@ -6713,14 +6708,15 @@ function App() {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingTop: "6px",
+        paddingTop: "4px",
         borderTop: `1px solid ${C.border}`
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: "10px",
         color: C.textMuted,
-        fontWeight: 600
+        fontWeight: 600,
+        letterSpacing: "0.5px"
       }
     }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -6742,14 +6738,15 @@ function App() {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingTop: "6px",
+        paddingTop: "4px",
         borderTop: `1px solid ${C.border}`
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: "10px",
         color: C.textMuted,
-        fontWeight: 600
+        fontWeight: 600,
+        letterSpacing: "0.5px"
       }
     }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
       style: {
