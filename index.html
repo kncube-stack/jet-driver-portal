@@ -4935,7 +4935,7 @@ function getSpecialDuty(val) {
   };
   return null;
 }
-function getStatusStyle(val, driverName) {
+function getStatusStyle(val, driverName, showTimes) {
   if (val === null || val === undefined || val === "—") return {
     color: C.textDim,
     bg: "transparent",
@@ -4971,19 +4971,19 @@ function getStatusStyle(val, driverName) {
     if (sec === "cleaners") {
       const isDay = driverName === "Angelina Braganca";
       return {
-        color: "#22c55e",
-        bg: "#22c55e15",
-        label: isDay ? "WORK · 10:00–15:00" : "WORK · 22:00–05:00"
+        color: C.white,
+        bg: "transparent",
+        label: showTimes ? isDay ? "WORK · 10:00–15:00" : "WORK · 22:00–05:00" : "WORK"
       };
     }
     if (sec === "shunters") return {
-      color: "#22c55e",
-      bg: "#22c55e15",
-      label: "WORK · 22:00–05:00"
+      color: C.white,
+      bg: "transparent",
+      label: showTimes ? "WORK · 22:00–05:00" : "WORK"
     };
     return {
-      color: "#22c55e",
-      bg: "#22c55e15",
+      color: C.white,
+      bg: "transparent",
       label: "WORK"
     };
   }
@@ -5622,9 +5622,9 @@ function App() {
       style: {
         fontSize: "16px",
         fontWeight: 700,
-        color: getStatusStyle(todayVal, selectedDriver).color
+        color: getStatusStyle(todayVal, selectedDriver, true).color
       }
-    }, getStatusStyle(todayVal, selectedDriver).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+    }, getStatusStyle(todayVal, selectedDriver, true).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.textMuted,
@@ -5752,7 +5752,7 @@ function App() {
   }, DAYS.map((day, i) => {
     const val = ROTA[selectedDriver]?.[i] || "—";
     const isToday = i === today;
-    const st = getStatusStyle(val, selectedDriver);
+    const st = getStatusStyle(val, selectedDriver, true);
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
