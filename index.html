@@ -24,6 +24,7 @@
   <script>
     const { useState, useMemo, useRef } = React;
 
+
 // ═══════════════════════════════════════════════════════════════
 // JASON EDWARDS TRAVEL — DRIVER DUTY PORTAL
 // Real data from duty cards PDF and weekly rota
@@ -4686,7 +4687,266 @@ const SPECIAL_DUTIES = {
   }
 };
 
-// ─── WEEKLY ROTA (from photo) ───────────────────────────────────
+// ─── DAILY RUN OUT SHEET ────────────────────────────────────
+// Populated nightly by the night controller before midnight
+// Maps duty numbers to vehicle, driver, and changeover info
+// When connected to SharePoint, this data comes from the Daily Run Out Sheet
+
+const DAILY_RUNOUT = {
+  // Date key format: "YYYY-MM-DD" — currently hardcoded for demo
+  // When live, the serverless function reads today's tab from the run out Excel
+  "2026-02-26": {
+    // A6 duties — morning
+    201: {
+      vehicle: "BV23 ZXS",
+      driver: "Bruno Rodrigues",
+      signOn: "01:20",
+      handoverTo: {
+        duty: 206,
+        driver: "Jomon Ponnappan",
+        signOn: "12:05"
+      }
+    },
+    202: {
+      vehicle: "BV23 ZXO",
+      driver: "Afolabi Ajewole",
+      signOn: "02:10",
+      handoverTo: {
+        duty: 207,
+        driver: "Vusi Maziya",
+        signOn: "13:05"
+      }
+    },
+    203: {
+      vehicle: "BV72 XFE",
+      driver: "Harpatarp Sandhu",
+      signOn: "03:00",
+      handoverTo: {
+        duty: 208,
+        driver: "Amar Habib",
+        signOn: "14:05"
+      }
+    },
+    204: {
+      vehicle: "BV23 ZWE",
+      driver: "Habib Mohammed",
+      signOn: "04:00",
+      handoverTo: {
+        duty: 209,
+        driver: "Denver Bent",
+        signOn: "15:05"
+      }
+    },
+    205: {
+      vehicle: "BV23 ZXT",
+      driver: "Frankie Goliath",
+      signOn: "05:00",
+      handoverTo: {
+        duty: 210,
+        driver: "Said Garad",
+        signOn: "16:05"
+      }
+    },
+    // A6 duties — afternoon (take over from morning)
+    206: {
+      vehicle: "BV23 ZXS",
+      driver: "Jomon Ponnappan",
+      signOn: "12:05",
+      takeoverFrom: {
+        duty: 201,
+        driver: "Bruno Rodrigues"
+      }
+    },
+    207: {
+      vehicle: "BV23 ZXO",
+      driver: "Vusi Maziya",
+      signOn: "13:05",
+      takeoverFrom: {
+        duty: 202,
+        driver: "Afolabi Ajewole"
+      }
+    },
+    208: {
+      vehicle: "BV72 XFE",
+      driver: "Amar Habib",
+      signOn: "14:05",
+      takeoverFrom: {
+        duty: 203,
+        driver: "Harpatarp Sandhu"
+      }
+    },
+    209: {
+      vehicle: "BV23 ZWE",
+      driver: "Denver Bent",
+      signOn: "15:05",
+      takeoverFrom: {
+        duty: 204,
+        driver: "Habib Mohammed"
+      }
+    },
+    210: {
+      vehicle: "BV23 ZXT",
+      driver: "Said Garad",
+      signOn: "16:05",
+      takeoverFrom: {
+        duty: 205,
+        driver: "Frankie Goliath"
+      }
+    },
+    // Network duties — morning
+    301: {
+      vehicle: "BV72 XEW",
+      driver: "Mansoor Edris",
+      signOn: "03:30",
+      route: "025",
+      destination: "Brighton",
+      handoverTo: {
+        duty: 306,
+        driver: "Kevin Reid",
+        signOn: "12:35"
+      }
+    },
+    302: {
+      vehicle: "BV23 ZXR",
+      driver: "Gordon Jones",
+      signOn: "04:30",
+      route: "400",
+      destination: "Birmingham",
+      handoverTo: {
+        duty: 327,
+        driver: "Wegles Carter",
+        signOn: "12:35"
+      }
+    },
+    323: {
+      vehicle: "BV22 VSK",
+      driver: "Michael Jara",
+      signOn: "04:50",
+      route: "450",
+      destination: "Nottingham",
+      handoverTo: {
+        duty: 328,
+        driver: "Kennedy Ncube",
+        signOn: "13:35"
+      }
+    },
+    324: {
+      vehicle: "BV23 ZXP",
+      driver: "Mark Eke",
+      signOn: "05:45",
+      route: "400",
+      destination: "Birmingham",
+      handoverTo: {
+        duty: 329,
+        driver: "Sanjeev Rana",
+        signOn: "14:05"
+      }
+    },
+    // Network duties — afternoon
+    306: {
+      vehicle: "BV72 XEW",
+      driver: "Kevin Reid",
+      signOn: "12:35",
+      route: "025",
+      destination: "Brighton",
+      takeoverFrom: {
+        duty: 301,
+        driver: "Mansoor Edris"
+      }
+    },
+    327: {
+      vehicle: "BV23 ZXR",
+      driver: "Wegles Carter",
+      signOn: "12:35",
+      route: "400",
+      destination: "Birmingham",
+      takeoverFrom: {
+        duty: 302,
+        driver: "Gordon Jones"
+      }
+    },
+    328: {
+      vehicle: "BV22 VSK",
+      driver: "Kennedy Ncube",
+      signOn: "13:35",
+      route: "450",
+      destination: "Nottingham",
+      takeoverFrom: {
+        duty: 323,
+        driver: "Michael Jara"
+      }
+    },
+    329: {
+      vehicle: "BV23 ZXP",
+      driver: "Sanjeev Rana",
+      signOn: "14:05",
+      route: "400",
+      destination: "Birmingham",
+      takeoverFrom: {
+        duty: 324,
+        driver: "Mark Eke"
+      }
+    }
+  }
+};
+
+// Helper: get today's run out data for a given duty
+function getTodayRunout(dutyNum) {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const todayData = DAILY_RUNOUT[dateKey];
+  if (!todayData) return null;
+  return todayData[dutyNum] || null;
+}
+
+// Helper: get run out info for a driver by name (checks today's sheet)
+function getDriverRunout(driverName) {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const todayData = DAILY_RUNOUT[dateKey];
+  if (!todayData) return null;
+  for (const [dutyNum, info] of Object.entries(todayData)) {
+    if (info.driver === driverName) return {
+      duty: parseInt(dutyNum),
+      ...info
+    };
+  }
+  return null;
+}
+
+// ─── ROTA CELL NOTES ─────────────────────────────────────────
+// When managers add notes to cells (e.g. "AVR — sign on 05:00, Stansted cover")
+// the parser strips the duty code and stores the note separately
+// Format: ROTA_NOTES[driverName][dayIndex] = "note text"
+// When connected to SharePoint, these are extracted automatically from cell comments/extra text
+
+const ROTA_NOTES = {
+  // Example notes from manager annotations
+  "Ash Singh": {
+    3: "P2742 — Sign on 08:00, Cheltenham day trip",
+    5: "P2756 — Sign on 06:00, Southampton"
+  },
+  "Armaan Rana": {
+    5: "AVRA8&A9 — Cover both routes if needed",
+    6: "AVRA8 — On call from 04:00"
+  },
+  "Nash Bridges": {
+    5: "AVRA — Available from 03:30"
+  },
+  "Salomon Castro": {
+    5: "AVRA — Available from 03:30",
+    6: "AVRA — Available from 03:30"
+  },
+  "Gordon Jones": {
+    6: "TOUR — Edinburgh, 2-day trip, returns Monday"
+  },
+  "Joseph Goodwin": {
+    0: "RL308 — Shadowing Si Tun",
+    1: "RL327 — With Sanjeev Rana",
+    4: "RL306 — Final assessment"
+  },
+  "Piotr Gawrys": {
+    6: "P2756 — Sign on 06:00, Southampton"
+  }
+};
 // Columns: Mon, Tue, Wed, Thu, Fri, Sat, Sun
 
 const ROTA = {
@@ -5045,7 +5305,7 @@ function App() {
       letterSpacing: "0.5px",
       borderBottom: !showDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
     }
-  }, "My Rota"), /*#__PURE__*/React.createElement("button", {
+  }, "Rota"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDutyLookup(true),
     style: {
       flex: 1,
@@ -5297,7 +5557,216 @@ function App() {
       color: C.textMuted,
       margin: 0
     }
-  }, "Weekly Rota \u2014 w/c ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
+  }, "Weekly Rota \u2014 w/c ", getWeekCommencing())), (() => {
+    const todayVal = ROTA[selectedDriver]?.[today] || "—";
+    const runout = getDriverRunout(selectedDriver);
+    const todayNote = ROTA_NOTES[selectedDriver]?.[today];
+    const dutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
+    const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
+    const runoutForDuty = dutyNum ? getTodayRunout(dutyNum) : null;
+    const activeRunout = runout || runoutForDuty;
+
+    // Only show the summary card if there's useful info (duty, vehicle, or notes)
+    if (!dutyCard && !activeRunout && !todayNote && todayVal === "R") return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
+        border: `1px solid ${C.accent}33`,
+        borderRadius: "10px",
+        padding: "14px 16px",
+        marginBottom: "16px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        marginBottom: "10px"
+      }
+    }, "TODAY \u2014 ", DAYS[today].toUpperCase()), dutyCard && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "18px",
+        fontWeight: 700,
+        color: C.white
+      }
+    }, "Duty ", todayVal), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, dutyCard.route, " \xB7 ", dutyCard.signOn, " \u2013 ", dutyCard.signOff)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setSelectedDuty(dutyNum);
+        setScreen("duty");
+      },
+      style: {
+        background: C.accent,
+        color: C.bg,
+        border: "none",
+        borderRadius: "6px",
+        padding: "7px 14px",
+        fontSize: "11px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "View Card \u2192")), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: getStatusStyle(todayVal).color
+      }
+    }, getStatusStyle(todayVal).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, getSpecialDuty(todayVal).signOn, " \u2013 ", getSpecialDuty(todayVal).signOff)), activeRunout && activeRunout.vehicle && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        borderRadius: "8px",
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "COACH"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        color: C.white,
+        letterSpacing: "1px"
+      }
+    }, activeRunout.vehicle)), activeRunout.destination && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "DESTINATION"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.accent
+      }
+    }, activeRunout.destination)), activeRunout.handoverTo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, activeRunout.handoverTo.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", activeRunout.handoverTo.duty, " \xB7 ", activeRunout.handoverTo.signOn))), activeRunout.takeoverFrom && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, activeRunout.takeoverFrom.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", activeRunout.takeoverFrom.duty)))), todayNote && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "8px",
+        background: C.warnBg,
+        border: `1px solid ${C.warnBorder}`,
+        borderRadius: "6px",
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.warnText,
+        letterSpacing: "0.5px",
+        marginBottom: "2px"
+      }
+    }, "NOTE"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.text,
+        lineHeight: 1.4
+      }
+    }, todayNote)));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5310,6 +5779,7 @@ function App() {
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
+    const cellNote = ROTA_NOTES[selectedDriver]?.[i];
     // Route Learning: extract duty number from RL prefix (e.g. RL307 → 307)
     const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
     const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
@@ -5386,7 +5856,14 @@ function App() {
         color: st.color,
         fontWeight: 500
       }
-    }, st.label)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
+    }, st.label), cellNote && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.warnText,
+        marginTop: "3px",
+        lineHeight: 1.3
+      }
+    }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
         setScreen("duty");
@@ -6071,12 +6548,13 @@ function App() {
     }, "This sends a request to the manager. Both drivers must agree before any swap is confirmed.")));
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
+    const runout = getTodayRunout(selectedDuty);
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       ref: printRef,
       style: {
         display: "none"
       }
-    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       className: "warn"
     }, "\u26A0 ", r)), duty.tubeInfo && /*#__PURE__*/React.createElement("div", {
@@ -6153,7 +6631,142 @@ function App() {
       style: {
         color: C.white
       }
-    }, duty.dutyLength)))), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, duty.dutyLength)))), runout && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
+        border: `1px solid ${C.accent}33`,
+        borderRadius: "8px",
+        padding: "12px 14px",
+        marginBottom: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        marginBottom: "8px"
+      }
+    }, "TODAY'S ASSIGNMENT"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600
+      }
+    }, "VEHICLE"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        color: C.white,
+        letterSpacing: "1px"
+      }
+    }, runout.vehicle)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600
+      }
+    }, "DRIVER"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, runout.driver)), runout.destination && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600
+      }
+    }, "DESTINATION"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.accent
+      }
+    }, runout.destination)), runout.handoverTo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "6px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600
+      }
+    }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, runout.handoverTo.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", runout.handoverTo.duty, " \xB7 ", runout.handoverTo.signOn))), runout.takeoverFrom && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "6px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600
+      }
+    }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, runout.takeoverFrom.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", runout.takeoverFrom.duty))))), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
         background: C.warnBg,
@@ -6261,6 +6874,5 @@ function App() {
 
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
   </script>
-  <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </body>
 </html>
