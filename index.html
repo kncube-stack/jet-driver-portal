@@ -5026,8 +5026,155 @@ function getStatusStyle(val, driverName, showTimes) {
   };
 }
 
+// ─── AUTH GATE ─────────────────────────────────────────────────
+// SHA-256 hash of the site password (password never appears in source)
+// To change: generate new hash with: echo -n "NEWPASSWORD" | sha256sum
+const AUTH_HASH = "2f7c1c453971dbefacd8a0f3dd5d8b49d2cb91f688d88269f47c52dd93822da5";
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
+  const [authed, setAuthed] = useState(() => {
+    try {
+      return sessionStorage.getItem("jet_auth") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [authInput, setAuthInput] = useState("");
+  const [authError, setAuthError] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const handleLogin = async () => {
+    setAuthLoading(true);
+    setAuthError(false);
+    const hash = await sha256(authInput);
+    if (hash === AUTH_HASH) {
+      try {
+        sessionStorage.setItem("jet_auth", "1");
+      } catch {}
+      setAuthed(true);
+    } else {
+      setAuthError(true);
+    }
+    setAuthLoading(false);
+  };
+  if (!authed) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "2px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        letterSpacing: "1.5px",
+        color: "#ffffff",
+        textTransform: "uppercase",
+        marginBottom: "32px"
+      }
+    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "100%",
+        maxWidth: "320px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        marginBottom: "8px",
+        textAlign: "center"
+      }
+    }, "ENTER PASSWORD TO CONTINUE"), /*#__PURE__*/React.createElement("input", {
+      type: "password",
+      value: authInput,
+      onChange: e => {
+        setAuthInput(e.target.value);
+        setAuthError(false);
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter" && authInput) handleLogin();
+      },
+      placeholder: "Password",
+      autoFocus: true,
+      style: {
+        width: "100%",
+        padding: "14px 16px",
+        background: C.surface,
+        border: `1px solid ${authError ? "#ef4444" : C.border}`,
+        borderRadius: "8px",
+        color: C.white,
+        fontSize: "14px",
+        fontFamily: "inherit",
+        outline: "none",
+        boxSizing: "border-box",
+        textAlign: "center",
+        letterSpacing: "2px",
+        marginBottom: "10px"
+      },
+      onFocus: e => {
+        if (!authError) e.target.style.borderColor = C.accent;
+      },
+      onBlur: e => {
+        if (!authError) e.target.style.borderColor = C.border;
+      }
+    }), authError && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: "#ef4444",
+        textAlign: "center",
+        marginBottom: "8px"
+      }
+    }, "Incorrect password"), /*#__PURE__*/React.createElement("button", {
+      onClick: handleLogin,
+      disabled: !authInput || authLoading,
+      style: {
+        width: "100%",
+        padding: "13px",
+        background: !authInput || authLoading ? C.textDim + "44" : C.accent,
+        color: !authInput || authLoading ? C.textDim : C.bg,
+        border: "none",
+        borderRadius: "8px",
+        fontSize: "13px",
+        fontWeight: 700,
+        cursor: !authInput || authLoading ? "not-allowed" : "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px"
+      }
+    }, authLoading ? "Checking..." : "Log In"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        textAlign: "center",
+        lineHeight: 1.5,
+        marginTop: "16px"
+      }
+    }, "This portal contains staff data protected under UK GDPR.", /*#__PURE__*/React.createElement("br", null), "Authorised personnel only.")));
+  }
   const [screen, setScreen] = useState("home");
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDuty, setSelectedDuty] = useState(null);
