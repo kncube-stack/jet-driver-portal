@@ -6561,9 +6561,7 @@ function App() {
     }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       className: "warn"
-    }, "\u26A0 ", r)), duty.tubeInfo && /*#__PURE__*/React.createElement("div", {
-      className: "info"
-    }, "\uD83D\uDE87 ", duty.tubeInfo), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
+    }, "\u26A0 ", r)), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
       key: si
     }, /*#__PURE__*/React.createElement("h2", null, seg.title), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Stop"), /*#__PURE__*/React.createElement("th", null, "Time"), /*#__PURE__*/React.createElement("th", null, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, seg.stops.map((s, j) => /*#__PURE__*/React.createElement("tr", {
       key: j,
@@ -6775,18 +6773,18 @@ function App() {
         color: C.warnText,
         lineHeight: 1.4
       }
-    }, "\u26A0 ", r)), duty.tubeInfo && /*#__PURE__*/React.createElement("div", {
+    }, "\u26A0 ", r)), duty.segments?.[0]?.title?.startsWith("Travel to") && /*#__PURE__*/React.createElement("div", {
       style: {
-        background: C.blueBg,
-        border: `1px solid ${C.blueBorder}`,
+        background: C.warnBg,
+        border: `1px solid ${C.warnBorder}`,
         borderRadius: "6px",
         padding: "10px 14px",
-        marginBottom: "12px",
+        marginBottom: "6px",
         fontSize: "11px",
-        color: C.blue,
+        color: C.warnText,
         lineHeight: 1.4
       }
-    }, "\uD83D\uDE87 ", duty.tubeInfo), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
+    }, "\u26A0 Ensure seatbelts are done-up before returning to depot"), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
       key: si,
       style: {
         marginBottom: "12px"
