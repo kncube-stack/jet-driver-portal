@@ -5049,6 +5049,36 @@ function App() {
   const [authInput, setAuthInput] = useState("");
   const [authError, setAuthError] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [screen, setScreen] = useState("home");
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [selectedDuty, setSelectedDuty] = useState(null);
+  const [search, setSearch] = useState("");
+  const [dutySearch, setDutySearch] = useState("");
+  const [showDutyLookup, setShowDutyLookup] = useState(false);
+  const [dutyLookupSource, setDutyLookupSource] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({
+    dateFrom: "",
+    dateTo: "",
+    reason: "",
+    notes: ""
+  });
+  const [leaveSubmitted, setLeaveSubmitted] = useState(false);
+  const [swapForm, setSwapForm] = useState({
+    dayIndex: "",
+    targetDriver: "",
+    notes: ""
+  });
+  const [swapSubmitted, setSwapSubmitted] = useState(false);
+  const printRef = useRef(null);
+  const today = (() => {
+    const d = new Date().getDay();
+    return d === 0 ? 6 : d - 1;
+  })();
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return null;
+    return DRIVERS.filter(d => d.toLowerCase().includes(q));
+  }, [search]);
   const handleLogin = async () => {
     setAuthLoading(true);
     setAuthError(false);
@@ -5175,36 +5205,6 @@ function App() {
       }
     }, "This portal contains staff data protected under UK GDPR.", /*#__PURE__*/React.createElement("br", null), "Authorised personnel only.")));
   }
-  const [screen, setScreen] = useState("home");
-  const [selectedDriver, setSelectedDriver] = useState(null);
-  const [selectedDuty, setSelectedDuty] = useState(null);
-  const [search, setSearch] = useState("");
-  const [dutySearch, setDutySearch] = useState("");
-  const [showDutyLookup, setShowDutyLookup] = useState(false);
-  const [dutyLookupSource, setDutyLookupSource] = useState(false); // true if duty view came from lookup
-  const [leaveForm, setLeaveForm] = useState({
-    dateFrom: "",
-    dateTo: "",
-    reason: "",
-    notes: ""
-  });
-  const [leaveSubmitted, setLeaveSubmitted] = useState(false);
-  const [swapForm, setSwapForm] = useState({
-    dayIndex: "",
-    targetDriver: "",
-    notes: ""
-  });
-  const [swapSubmitted, setSwapSubmitted] = useState(false);
-  const printRef = useRef(null);
-  const today = (() => {
-    const d = new Date().getDay();
-    return d === 0 ? 6 : d - 1;
-  })();
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return null; // null means show all sections unfiltered
-    return DRIVERS.filter(d => d.toLowerCase().includes(q));
-  }, [search]);
   const handlePrint = () => {
     const el = printRef.current;
     if (!el) return;
