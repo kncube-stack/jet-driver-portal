@@ -4935,7 +4935,7 @@ function getSpecialDuty(val) {
   };
   return null;
 }
-function getStatusStyle(val) {
+function getStatusStyle(val, driverName) {
   if (val === null || val === undefined || val === "—") return {
     color: C.textDim,
     bg: "transparent",
@@ -4966,11 +4966,27 @@ function getStatusStyle(val) {
     bg: "#ef444415",
     label: "ABSENT"
   };
-  if (val === "WORK") return {
-    color: "#22c55e",
-    bg: "#22c55e15",
-    label: "WORK"
-  };
+  if (val === "WORK") {
+    const sec = driverName ? DRIVER_SECTION[driverName] : null;
+    if (sec === "cleaners") {
+      const isDay = driverName === "Angelina Braganca";
+      return {
+        color: "#22c55e",
+        bg: "#22c55e15",
+        label: isDay ? "WORK · 10:00–15:00" : "WORK · 22:00–05:00"
+      };
+    }
+    if (sec === "shunters") return {
+      color: "#22c55e",
+      bg: "#22c55e15",
+      label: "WORK · 22:00–05:00"
+    };
+    return {
+      color: "#22c55e",
+      bg: "#22c55e15",
+      label: "WORK"
+    };
+  }
   if (val?.startsWith("RL")) return {
     color: C.blue,
     bg: C.blue + "15",
@@ -5259,7 +5275,7 @@ function App() {
     }
   }, "No staff found matching \"", search, "\""), filtered.map(driver => {
     const todayVal = ROTA[driver]?.[today] || "—";
-    const st = getStatusStyle(todayVal);
+    const st = getStatusStyle(todayVal, driver);
     return /*#__PURE__*/React.createElement("button", {
       key: driver,
       onClick: () => {
@@ -5343,7 +5359,7 @@ function App() {
     }
   }, "(", section.drivers.length, ")")), section.drivers.map(driver => {
     const todayVal = ROTA[driver]?.[today] || "—";
-    const st = getStatusStyle(todayVal);
+    const st = getStatusStyle(todayVal, driver);
     return /*#__PURE__*/React.createElement("button", {
       key: driver,
       onClick: () => {
@@ -5606,9 +5622,9 @@ function App() {
       style: {
         fontSize: "16px",
         fontWeight: 700,
-        color: getStatusStyle(todayVal).color
+        color: getStatusStyle(todayVal, selectedDriver).color
       }
-    }, getStatusStyle(todayVal).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+    }, getStatusStyle(todayVal, selectedDriver).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.textMuted,
@@ -5736,7 +5752,7 @@ function App() {
   }, DAYS.map((day, i) => {
     const val = ROTA[selectedDriver]?.[i] || "—";
     const isToday = i === today;
-    const st = getStatusStyle(val);
+    const st = getStatusStyle(val, selectedDriver);
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
