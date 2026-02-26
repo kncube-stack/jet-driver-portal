@@ -4657,7 +4657,29 @@ function getDriverRunout(driverName) {
 
 // ─── ROTA CELL NOTES ─────────────────────────────────────────
 // Extracted automatically from Excel cell comments (manager annotations)
+// filterNote() strips sensitive manager-to-manager content from public view
+// Operational info (times, routes, coach assignments) passes through
 
+const SENSITIVE_PATTERNS = [/spoken\s*(and|&)\s*agreed/i, /agreed/i, /requested\b/i, /available\s*(for\s*ot)?/i, /holiday/i, /doc\s*letter/i, /showed\s*me/i, /talk\s*to\s*me/i];
+function filterNote(note) {
+  if (!note) return null;
+  // Split into lines, keep only operational ones
+  const lines = note.split("\n");
+  const kept = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    // Skip manager attribution lines (e.g. "Mahmudul Hoque:")
+    if (/^[A-Z][a-z]+\s+[A-Z][a-z]+:$/.test(trimmed)) continue;
+    // Also skip "JOAO —" or "Muhammed Ali:" style
+    if (/^[A-Z.\s]+[—\-:]/.test(trimmed) && trimmed.length < 40 && !trimmed.match(/\d{4}/)) continue;
+    // Skip sensitive lines
+    if (SENSITIVE_PATTERNS.some(p => p.test(trimmed))) continue;
+    kept.push(trimmed);
+  }
+  if (kept.length === 0) return null;
+  return kept.join("\n");
+}
 const ROTA_NOTES = {
   "Denver Bent": {
     2: "Mahmudul Hoque:\nspoken and agreed"
@@ -5545,7 +5567,7 @@ function App() {
   }, DRIVER_SECTION_LABEL[selectedDriver], " \u2014 w/c ", getWeekCommencing())), (() => {
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
     const runout = getDriverRunout(selectedDriver);
-    const todayNote = ROTA_NOTES[selectedDriver]?.[today];
+    const todayNote = filterNote(ROTA_NOTES[selectedDriver]?.[today]);
     const dutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
     const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
     const runoutForDuty = dutyNum ? getTodayRunout(dutyNum) : null;
@@ -5750,7 +5772,7 @@ function App() {
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
-    const cellNote = ROTA_NOTES[selectedDriver]?.[i];
+    const cellNote = filterNote(ROTA_NOTES[selectedDriver]?.[i]);
     // Route Learning: extract duty number from RL prefix (e.g. RL307 → 307)
     const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
     const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
