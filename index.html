@@ -1636,8 +1636,8 @@ const DUTY_CARDS = {
     days: "Monday to Friday",
     route: "Route A6 — Stansted Airport",
     signOn: "13:05",
-    signOff: "23:45",
-    dutyLength: "10:40",
+    signOff: "00:45",
+    dutyLength: "11:40",
     coach: "Coach 2",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Tube departs at 13:14",
@@ -1772,7 +1772,7 @@ const DUTY_CARDS = {
         time: "23:55"
       }, {
         stop: "Sign Off",
-        time: "23:45"
+        time: "00:45"
       }]
     }]
   },
@@ -1781,8 +1781,8 @@ const DUTY_CARDS = {
     days: "Saturday & Sunday",
     route: "Route A6 — Stansted Airport",
     signOn: "13:05",
-    signOff: "23:45",
-    dutyLength: "10:40",
+    signOff: "00:45",
+    dutyLength: "11:40",
     coach: "Coach 2",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Tube departs at 13:14",
@@ -1916,7 +1916,7 @@ const DUTY_CARDS = {
         time: "23:55"
       }, {
         stop: "Sign Off",
-        time: "23:45"
+        time: "00:45"
       }]
     }]
   },
@@ -2642,7 +2642,7 @@ const DUTY_CARDS = {
   },
   270: {
     number: 270,
-    days: "Monday to Friday",
+    days: "Saturday & Sunday",
     route: "Route A6 — Stansted Airport",
     signOn: "16:05",
     signOff: "03:35",
@@ -3451,6 +3451,150 @@ const DUTY_CARDS = {
       }, {
         stop: "Sign Off",
         time: "16:40"
+      }]
+    }]
+  },
+  305: {
+    number: 305,
+    days: "Friday & Monday",
+    route: "Route 440 — Milton Keynes",
+    signOn: "05:45",
+    signOff: "17:10",
+    dutyLength: "11:30",
+    coach: "Coach 10",
+    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
+    segments: [{
+      title: "Empty to Victoria",
+      stops: [{
+        stop: "Sign On",
+        time: "05:45"
+      }, {
+        stop: "Empty to Victoria Coach Station",
+        time: "06:05"
+      }, {
+        stop: "Arrive for loading by",
+        time: "07:20"
+      }]
+    }, {
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
+      stops: [{
+        stop: "Victoria Coach Station",
+        time: "07:30",
+        dep: true
+      }, {
+        stop: "Milton Keynes Coachway",
+        time: "09:00"
+      }, {
+        stop: "Leicester Braunstone",
+        time: "10:10"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "10:20",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "12:00",
+        dep: true
+      }, {
+        stop: "Leicester Braunstone",
+        time: "12:10"
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "14:10"
+      }, {
+        stop: "Marble Arch Park Lane",
+        time: "15:00"
+      }, {
+        stop: "Victoria Coach Station",
+        time: "15:05",
+        arr: true
+      }]
+    }, {
+      title: "Return to Depot",
+      stops: [{
+        stop: "Empty to Depot",
+        time: "15:10"
+      }, {
+        stop: "Travel on Tube back to Depot",
+        time: "16:07"
+      }, {
+        stop: "Sign Off",
+        time: "17:10"
+      }]
+    }]
+  },
+  365: {
+    number: 365,
+    days: "Saturday & Sunday",
+    route: "Route 440 — Milton Keynes",
+    signOn: "06:00",
+    signOff: "17:10",
+    dutyLength: "11:15",
+    coach: "Coach 10",
+    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
+    segments: [{
+      title: "Empty to Victoria",
+      stops: [{
+        stop: "Sign On",
+        time: "06:00"
+      }, {
+        stop: "Empty to Victoria Coach Station",
+        time: "06:20"
+      }, {
+        stop: "Arrive for loading by",
+        time: "07:20"
+      }]
+    }, {
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
+      stops: [{
+        stop: "Victoria Coach Station",
+        time: "07:30",
+        dep: true
+      }, {
+        stop: "Milton Keynes Coachway",
+        time: "08:50"
+      }, {
+        stop: "Leicester Braunstone",
+        time: "09:55"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "10:05",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "12:00",
+        dep: true
+      }, {
+        stop: "Leicester Braunstone",
+        time: "12:10"
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "14:10"
+      }, {
+        stop: "Marble Arch Park Lane",
+        time: "15:00"
+      }, {
+        stop: "Victoria Coach Station",
+        time: "15:05",
+        arr: true
+      }]
+    }, {
+      title: "Return to Depot",
+      stops: [{
+        stop: "Empty to Depot",
+        time: "15:10"
+      }, {
+        stop: "Travel on Tube back to Depot",
+        time: "16:07"
+      }, {
+        stop: "Sign Off",
+        time: "17:10"
       }]
     }]
   },
@@ -4340,17 +4484,193 @@ const DUTY_CARDS = {
   347: {
     number: 347,
     days: "Friday",
-    route: "Route (Relief)",
-    signOn: "—",
-    signOff: "—",
-    dutyLength: "—",
-    coach: "—",
-    reminders: ["Contact duty manager for details"],
+    route: "Route 400 — Birmingham",
+    signOn: "12:35",
+    signOff: "23:45",
+    dutyLength: "11:10",
+    coach: "Coach 7",
+    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
+    tubeInfo: "Tube departs at 12:45",
     segments: [{
-      title: "Relief Duty",
+      title: "Travel to Victoria Coach Station",
       stops: [{
-        stop: "See duty manager for assignment",
-        time: "—"
+        stop: "Sign On",
+        time: "12:35"
+      }, {
+        stop: "Travel on Tube to Victoria Coach Station",
+        time: "12:45",
+        notes: "Tube departs 12:45"
+      }]
+    }, {
+      title: "Trip 1 — Victoria → Birmingham",
+      stops: [{
+        stop: "Take over Coach 7 from Duty 302",
+        time: "13:40",
+        notes: "Takeover"
+      }, {
+        stop: "Victoria Coach Station",
+        time: "15:00",
+        dep: true
+      }, {
+        stop: "North Acton Friary Road",
+        time: "15:40"
+      }, {
+        stop: "Greenford Greenford Roundabout",
+        time: "15:48"
+      }, {
+        stop: "Birmingham Digbeth",
+        time: "18:35",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 — Birmingham → Victoria",
+      stops: [{
+        stop: "Birmingham Digbeth",
+        time: "19:40",
+        dep: true
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "22:00"
+      }, {
+        stop: "Marble Arch Park Lane",
+        time: "22:25"
+      }, {
+        stop: "Victoria Coach Station",
+        time: "22:35",
+        arr: true
+      }]
+    }, {
+      title: "Return to Depot",
+      stops: [{
+        stop: "Empty to Depot",
+        time: "22:40"
+      }, {
+        stop: "Sign Off",
+        time: "23:45"
+      }]
+    }]
+  },
+  310: {
+    number: 310,
+    days: "Friday & Monday",
+    route: "Route 440 — Milton Keynes",
+    signOn: "14:35",
+    signOff: "01:15",
+    dutyLength: "10:45",
+    coach: "Coach 10",
+    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
+    tubeInfo: "Tube departs at 14:40",
+    segments: [{
+      title: "Travel to Victoria",
+      stops: [{
+        stop: "Sign On",
+        time: "14:35"
+      }, {
+        stop: "Travel on Tube to Victoria Coach Station",
+        time: "14:40",
+        notes: "Tube departs 14:40"
+      }]
+    }, {
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
+      stops: [{
+        stop: "Victoria Coach Station",
+        time: "17:00",
+        dep: true
+      }, {
+        stop: "Milton Keynes Coachway",
+        time: "19:00"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "20:25",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:30",
+        dep: true
+      }, {
+        stop: "Milton Keynes Coachway",
+        time: "22:40"
+      }, {
+        stop: "Marble Arch Park Lane",
+        time: "23:55"
+      }, {
+        stop: "Victoria Coach Station",
+        time: "00:05",
+        arr: true
+      }]
+    }, {
+      title: "Return to Depot",
+      stops: [{
+        stop: "Empty to Depot",
+        time: "00:10"
+      }, {
+        stop: "Sign Off",
+        time: "01:15"
+      }]
+    }]
+  },
+  370: {
+    number: 370,
+    days: "Saturday & Sunday",
+    route: "Route 440 — Milton Keynes",
+    signOn: "14:35",
+    signOff: "01:15",
+    dutyLength: "10:45",
+    coach: "Coach 10",
+    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
+    tubeInfo: "Tube departs at 14:40",
+    segments: [{
+      title: "Travel to Victoria",
+      stops: [{
+        stop: "Sign On",
+        time: "14:35"
+      }, {
+        stop: "Travel on Tube to Victoria Coach Station",
+        time: "14:40",
+        notes: "Tube departs 14:40"
+      }]
+    }, {
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
+      stops: [{
+        stop: "Victoria Coach Station",
+        time: "17:00",
+        dep: true
+      }, {
+        stop: "Milton Keynes Coachway",
+        time: "18:40"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "20:05",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:30",
+        dep: true
+      }, {
+        stop: "Milton Keynes Coachway",
+        time: "22:40"
+      }, {
+        stop: "Marble Arch Park Lane",
+        time: "23:55"
+      }, {
+        stop: "Victoria Coach Station",
+        time: "00:05",
+        arr: true
+      }]
+    }, {
+      title: "Return to Depot",
+      stops: [{
+        stop: "Empty to Depot",
+        time: "00:10"
+      }, {
+        stop: "Sign Off",
+        time: "01:15"
       }]
     }]
   }
