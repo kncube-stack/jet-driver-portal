@@ -497,11 +497,8 @@ function App() {
     }, authName === name ? "\u2713" : "\u203A")))), /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: authName,
-      onChange: e => {
-        setAuthName(e.target.value);
-        setAuthError("");
-      },
       placeholder: "Name",
+      readOnly: true,
       style: {
         width: "100%",
         padding: "12px 14px",
@@ -513,10 +510,9 @@ function App() {
         fontFamily: "inherit",
         outline: "none",
         boxSizing: "border-box",
-        marginBottom: "8px"
-      },
-      onFocus: e => e.target.style.borderColor = C.accent,
-      onBlur: e => e.target.style.borderColor = C.border
+        marginBottom: "8px",
+        opacity: authName ? 1 : 0.9
+      }
     }), /*#__PURE__*/React.createElement("input", {
       type: "password",
       value: authPin,
