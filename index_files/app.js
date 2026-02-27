@@ -21,7 +21,7 @@ async function sha256(message) {
 }
 function readStoredSession() {
   try {
-    const raw = sessionStorage.getItem("jet_session");
+    const raw = localStorage.getItem("jet_session") || sessionStorage.getItem("jet_session");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.name) return null;
@@ -35,16 +35,23 @@ function readStoredSession() {
 }
 function writeSession(name, role) {
   try {
-    sessionStorage.setItem("jet_session", JSON.stringify({
+    const payload = JSON.stringify({
       name,
       role
-    }));
+    });
+    localStorage.setItem("jet_session", payload);
+    sessionStorage.setItem("jet_session", payload);
+    localStorage.setItem("jet_user", name);
+    localStorage.setItem("jet_auth", "1");
     sessionStorage.setItem("jet_user", name);
     sessionStorage.setItem("jet_auth", "1");
   } catch {}
 }
 function clearSession() {
   try {
+    localStorage.removeItem("jet_session");
+    localStorage.removeItem("jet_user");
+    localStorage.removeItem("jet_auth");
     sessionStorage.removeItem("jet_session");
     sessionStorage.removeItem("jet_user");
     sessionStorage.removeItem("jet_auth");
@@ -228,9 +235,8 @@ function App() {
   };
   React.useEffect(() => {
     if (!authed || isManager) return;
-    if (screen === "home") setScreen("week");
     if (selectedDriver !== currentUser) setSelectedDriver(currentUser);
-  }, [authed, isManager, screen, selectedDriver, currentUser]);
+  }, [authed, isManager, selectedDriver, currentUser]);
   if (!authed) {
     const nameQ = nameSearch.toLowerCase().trim();
     const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
@@ -383,7 +389,7 @@ function App() {
         setAuthName(e.target.value);
         setAuthError("");
       },
-      placeholder: "Selected name",
+      placeholder: "Name",
       style: {
         width: "100%",
         padding: "12px 14px",
@@ -409,7 +415,7 @@ function App() {
       onKeyDown: e => {
         if (e.key === "Enter" && authName && authPin) handleLogin();
       },
-      placeholder: authName ? `PIN for ${authName}` : "Select your name first",
+      placeholder: "PIN Number",
       disabled: !authName,
       style: {
         width: "100%",
@@ -618,6 +624,8 @@ function App() {
     const mm = String(monday.getMonth() + 1).padStart(2, "0");
     return currentTabName === `WC ${dd}.${mm}.${monday.getFullYear()}`;
   })();
+  const canBrowseStaff = isManager;
+  const showingDutyLookup = !canBrowseStaff || showDutyLookup;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -729,13 +737,13 @@ function App() {
       fontFamily: "inherit",
       textDecoration: "underline"
     }
-  }, "Not me?"))), /*#__PURE__*/React.createElement("main", {
+  }, "Log out"))), /*#__PURE__*/React.createElement("main", {
     style: {
       maxWidth: "640px",
       margin: "0 auto",
       padding: "16px"
     }
-  }, screen === "home" && isManager && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: "20px"
     }
@@ -752,7 +760,7 @@ function App() {
       margin: "0 0 4px",
       color: C.white
     }
-  }, "Staff Hub"), /*#__PURE__*/React.createElement("p", {
+  }, isManager ? "Staff Hub" : "Duty Cards"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: "11px",
       color: C.textMuted,
@@ -798,37 +806,38 @@ function App() {
       border: `1px solid ${C.border}`,
       overflow: "hidden"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, canBrowseStaff && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDutyLookup(false),
     style: {
       flex: 1,
       padding: "10px",
-      background: !showDutyLookup ? C.accent + "22" : "transparent",
-      color: !showDutyLookup ? C.accent : C.textMuted,
+      background: !showingDutyLookup ? C.accent + "22" : "transparent",
+      color: !showingDutyLookup ? C.accent : C.textMuted,
       border: "none",
       fontSize: "12px",
       fontWeight: 600,
       cursor: "pointer",
       fontFamily: "inherit",
       letterSpacing: "0.5px",
-      borderBottom: !showDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
+      borderBottom: !showingDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
     }
   }, "Rota"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDutyLookup(true),
     style: {
-      flex: 1,
+      flex: canBrowseStaff ? 1 : undefined,
+      width: canBrowseStaff ? undefined : "100%",
       padding: "10px",
-      background: showDutyLookup ? C.accent + "22" : "transparent",
-      color: showDutyLookup ? C.accent : C.textMuted,
+      background: showingDutyLookup ? C.accent + "22" : "transparent",
+      color: showingDutyLookup ? C.accent : C.textMuted,
       border: "none",
       fontSize: "12px",
       fontWeight: 600,
       cursor: "pointer",
       fontFamily: "inherit",
       letterSpacing: "0.5px",
-      borderBottom: showDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
+      borderBottom: showingDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
     }
-  }, "Duty Cards")), !showDutyLookup ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Duty Cards")), !showingDutyLookup ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
       marginBottom: "16px"
@@ -1549,6 +1558,36 @@ function App() {
     }));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
+      setShowDutyLookup(true);
+      setDutySearch("");
+      setScreen("home");
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      width: "100%",
+      marginTop: "20px",
+      padding: "14px",
+      background: "linear-gradient(135deg, #14b8a622, #0f766e22)",
+      border: "1px solid #14b8a633",
+      borderRadius: "10px",
+      color: "#2dd4bf",
+      fontSize: "13px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = "#14b8a666";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = "#14b8a633";
+    }
+  }, "\uD83D\uDCD8 Browse Duty Cards"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
       setLeaveSubmitted(false);
       setLeaveForm({
         dateFrom: "",
@@ -1564,7 +1603,7 @@ function App() {
       justifyContent: "center",
       gap: "8px",
       width: "100%",
-      marginTop: "20px",
+      marginTop: "8px",
       padding: "14px",
       background: "linear-gradient(135deg, #a78bfa22, #8b5cf622)",
       border: "1px solid #a78bfa33",
