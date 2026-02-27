@@ -1,0 +1,2530 @@
+(function (window) {
+  const { DUTY_CARDS, ROTA_NOTES } = window.JET_DATA;
+  const {
+    getTodayRunout,
+    getDriverRunout,
+    fetchLiveRota,
+    fetchWeekRota,
+    formatWeekCommencing,
+    buildDriverList,
+    buildSectionLookup,
+    DAYS,
+    SHORT_DAYS
+  } = window.JET_DATA_LAYER;
+  const { C, isDutyNumber, getSpecialDuty, getStatusStyle, filterNote } = window.JET_UI;
+
+// ─── AUTH GATE ─────────────────────────────────────────────────
+// SHA-256 hash of the site password (password never appears in source)
+// To change: generate new hash with: echo -n "NEWPASSWORD" | sha256sum
+const AUTH_HASH = "2f7c1c453971dbefacd8a0f3dd5d8b49d2cb91f688d88269f47c52dd93822da5";
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ─── APP ────────────────────────────────────────────────────────
+function App() {
+  const [authed, setAuthed] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_auth") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [authInput, setAuthInput] = React.useState("");
+  const [authError, setAuthError] = React.useState(false);
+  const [authLoading, setAuthLoading] = React.useState(false);
+  const [screen, setScreen] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_user") ? "week" : "home";
+    } catch {
+      return "home";
+    }
+  });
+  const [selectedDriver, setSelectedDriver] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_user") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [selectedDuty, setSelectedDuty] = React.useState(null);
+  const [search, setSearch] = React.useState("");
+  const [dutySearch, setDutySearch] = React.useState("");
+  const [showDutyLookup, setShowDutyLookup] = React.useState(false);
+  const [dutyLookupSource, setDutyLookupSource] = React.useState(false);
+  const [leaveForm, setLeaveForm] = React.useState({
+    dateFrom: "",
+    dateTo: "",
+    reason: "",
+    notes: ""
+  });
+  const [leaveSubmitted, setLeaveSubmitted] = React.useState(false);
+  const [swapForm, setSwapForm] = React.useState({
+    dayIndex: "",
+    targetDriver: "",
+    notes: ""
+  });
+  const [swapSubmitted, setSwapSubmitted] = React.useState(false);
+  const printRef = React.useRef(null);
+  const today = (() => {
+    const d = new Date().getDay();
+    return d === 0 ? 6 : d - 1;
+  })();
+
+  // ─── LIVE ROTA STATE ──────────────────────────────────────
+  const [STAFF_SECTIONS, setStaffSections] = React.useState([]);
+  const [ROTA, setRota] = React.useState({});
+  const [weekLabel, setWeekLabel] = React.useState("");
+  const [currentTabName, setCurrentTabName] = React.useState("");
+  const [availableWeeks, setAvailableWeeks] = React.useState([]);
+  const [allTabs, setAllTabs] = React.useState({});
+  const [rotaLoading, setRotaLoading] = React.useState(true);
+  const [rotaError, setRotaError] = React.useState(null);
+  const [lastFetchTime, setLastFetchTime] = React.useState(null);
+
+  // ─── USER IDENTITY ────────────────────────────────────────
+  const [currentUser, setCurrentUser] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_user") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [nameSearch, setNameSearch] = React.useState("");
+
+  // Derived data from live state
+  const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const {
+    DRIVER_SECTION,
+    DRIVER_SECTION_LABEL
+  } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+
+  // Fetch live rota on mount (after auth)
+  React.useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    setRotaLoading(true);
+    setRotaError(null);
+    fetchLiveRota().then(data => {
+      if (cancelled) return;
+      setStaffSections(data.sections);
+      setRota(data.rota);
+      setWeekLabel(formatWeekCommencing(data.tabName));
+      setCurrentTabName(data.tabName);
+      setAvailableWeeks(data.availableWeeks);
+      setAllTabs(data.tabs);
+      setLastFetchTime(new Date().toLocaleTimeString());
+      setRotaLoading(false);
+    }).catch(err => {
+      if (cancelled) return;
+      console.error("Rota fetch failed:", err);
+      setRotaError("Failed to load rota from Google Sheets. Check your connection.");
+      setRotaLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authed]);
+
+  // Week switcher
+  const switchWeek = async tabName => {
+    setRotaLoading(true);
+    setRotaError(null);
+    try {
+      const data = await fetchWeekRota(allTabs, tabName);
+      if (data) {
+        setStaffSections(data.sections);
+        setRota(data.rota);
+        setWeekLabel(formatWeekCommencing(tabName));
+        setCurrentTabName(tabName);
+        setLastFetchTime(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      console.error("Week switch failed:", err);
+      setRotaError("Failed to load week data.");
+    }
+    setRotaLoading(false);
+  };
+
+  // Refresh current week data
+  const refreshRota = async () => {
+    setRotaLoading(true);
+    setRotaError(null);
+    try {
+      const data = await fetchLiveRota();
+      setStaffSections(data.sections);
+      setRota(data.rota);
+      setWeekLabel(formatWeekCommencing(data.tabName));
+      setCurrentTabName(data.tabName);
+      setAvailableWeeks(data.availableWeeks);
+      setAllTabs(data.tabs);
+      setLastFetchTime(new Date().toLocaleTimeString());
+    } catch (err) {
+      setRotaError("Refresh failed.");
+    }
+    setRotaLoading(false);
+  };
+  const getWeekCommencing = () => weekLabel || "Loading...";
+  const filtered = React.useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return null;
+    return DRIVERS.filter(d => d.toLowerCase().includes(q));
+  }, [search, DRIVERS]);
+  const handleLogin = async () => {
+    setAuthLoading(true);
+    setAuthError(false);
+    const hash = await sha256(authInput);
+    if (hash === AUTH_HASH) {
+      try {
+        sessionStorage.setItem("jet_auth", "1");
+      } catch {}
+      setAuthed(true);
+    } else {
+      setAuthError(true);
+    }
+    setAuthLoading(false);
+  };
+  if (!authed) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "2px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        letterSpacing: "1.5px",
+        color: "#ffffff",
+        textTransform: "uppercase",
+        marginBottom: "32px"
+      }
+    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "100%",
+        maxWidth: "320px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        marginBottom: "8px",
+        textAlign: "center"
+      }
+    }, "ENTER PASSWORD TO CONTINUE"), /*#__PURE__*/React.createElement("input", {
+      type: "password",
+      value: authInput,
+      onChange: e => {
+        setAuthInput(e.target.value);
+        setAuthError(false);
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter" && authInput) handleLogin();
+      },
+      placeholder: "Password",
+      autoFocus: true,
+      style: {
+        width: "100%",
+        padding: "14px 16px",
+        background: C.surface,
+        border: `1px solid ${authError ? "#ef4444" : C.border}`,
+        borderRadius: "8px",
+        color: C.white,
+        fontSize: "14px",
+        fontFamily: "inherit",
+        outline: "none",
+        boxSizing: "border-box",
+        textAlign: "center",
+        letterSpacing: "2px",
+        marginBottom: "10px"
+      },
+      onFocus: e => {
+        if (!authError) e.target.style.borderColor = C.accent;
+      },
+      onBlur: e => {
+        if (!authError) e.target.style.borderColor = C.border;
+      }
+    }), authError && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: "#ef4444",
+        textAlign: "center",
+        marginBottom: "8px"
+      }
+    }, "Incorrect password"), /*#__PURE__*/React.createElement("button", {
+      onClick: handleLogin,
+      disabled: !authInput || authLoading,
+      style: {
+        width: "100%",
+        padding: "13px",
+        background: !authInput || authLoading ? C.textDim + "44" : C.accent,
+        color: !authInput || authLoading ? C.textDim : C.bg,
+        border: "none",
+        borderRadius: "8px",
+        fontSize: "13px",
+        fontWeight: 700,
+        cursor: !authInput || authLoading ? "not-allowed" : "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px"
+      }
+    }, authLoading ? "Checking..." : "Log In"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        textAlign: "center",
+        lineHeight: 1.5,
+        marginTop: "16px"
+      }
+    }, "This portal contains staff data protected under UK GDPR.", /*#__PURE__*/React.createElement("br", null), "Authorised personnel only.")));
+  }
+  const handlePrint = () => {
+    const el = printRef.current;
+    if (!el) return;
+    const w = window.open("", "_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>Duty Card</title><style>
+      body { font-family: 'Courier New', monospace; padding: 20px; color: #000; font-size: 12px; }
+      h1 { font-size: 18px; margin-bottom: 4px; } h2 { font-size: 14px; margin: 16px 0 8px; border-bottom: 1px solid #999; padding-bottom: 4px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 12px; } th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+      th { background: #f0f0f0; } .break-row { background: #e8f5e9; font-weight: bold; }
+      .warn { background: #fff8e1; padding: 8px; border: 1px solid #ffcc02; margin: 8px 0; }
+      .info { background: #e3f2fd; padding: 8px; border: 1px solid #42a5f5; margin: 8px 0; }
+      @media print { body { padding: 0; } }
+    </style></head><body>`);
+    w.document.write(el.innerHTML);
+    w.document.write("</body></html>");
+    w.document.close();
+    w.print();
+  };
+
+  // Loading screen while fetching rota data
+  if (rotaLoading && DRIVERS.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "2px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        letterSpacing: "1.5px",
+        color: "#ffffff",
+        textTransform: "uppercase",
+        marginBottom: "32px"
+      }
+    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.accent,
+        marginBottom: "8px"
+      }
+    }, "\u23F3 Loading rota from Google Sheets..."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim
+      }
+    }, "Fetching live data"));
+  }
+  if (rotaError && DRIVERS.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "16px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: "#ef4444",
+        marginBottom: "12px"
+      }
+    }, "\u26A0 ", rotaError), /*#__PURE__*/React.createElement("button", {
+      onClick: refreshRota,
+      style: {
+        padding: "10px 24px",
+        background: C.accent,
+        color: C.bg,
+        border: "none",
+        borderRadius: "6px",
+        fontSize: "12px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Retry"));
+  }
+
+  // ─── WEEK NAVIGATION ────────────────────────────────────
+  const weekIndex = availableWeeks.findIndex(w => w.tabName === currentTabName);
+  const canGoBack = weekIndex > 0;
+  const canGoForward = weekIndex < availableWeeks.length - 1;
+  const goWeek = dir => {
+    const nextIdx = weekIndex + dir;
+    if (nextIdx >= 0 && nextIdx < availableWeeks.length) {
+      switchWeek(availableWeeks[nextIdx].tabName);
+    }
+  };
+
+  // ─── USER SELECTION ─────────────────────────────────────
+  const selectUser = name => {
+    setCurrentUser(name);
+    try {
+      sessionStorage.setItem("jet_user", name);
+    } catch {}
+    setSelectedDriver(name);
+    setScreen("week");
+    setNameSearch("");
+  };
+  const switchUser = () => {
+    setCurrentUser(null);
+    try {
+      sessionStorage.removeItem("jet_user");
+    } catch {}
+    setScreen("home");
+    setSelectedDriver(null);
+    setNameSearch("");
+  };
+
+  // ─── NAME PICKER SCREEN ──────────────────────────────────
+  if (!currentUser) {
+    const nameQ = nameSearch.toLowerCase().trim();
+    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: "640px",
+        margin: "0 auto",
+        padding: "24px 16px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "2px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        letterSpacing: "1.5px",
+        color: "#ffffff",
+        textTransform: "uppercase",
+        marginBottom: "20px"
+      }
+    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "13px",
+        color: C.white,
+        fontWeight: 600,
+        marginBottom: "4px"
+      }
+    }, "Who are you?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Select your name to see your rota")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "relative",
+        marginBottom: "16px"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: nameSearch,
+      onChange: e => setNameSearch(e.target.value),
+      placeholder: "Search by name...",
+      autoFocus: true,
+      style: {
+        width: "100%",
+        padding: "13px 16px 13px 38px",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        color: C.white,
+        fontSize: "14px",
+        fontFamily: "inherit",
+        outline: "none",
+        boxSizing: "border-box"
+      },
+      onFocus: e => e.target.style.borderColor = C.accent,
+      onBlur: e => e.target.style.borderColor = C.border
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        left: "14px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        color: C.textDim,
+        fontSize: "14px"
+      }
+    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "4px",
+        maxHeight: "60vh",
+        overflowY: "auto"
+      }
+    }, nameQ ? nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "40px",
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "No staff found") : nameFiltered.map(name => /*#__PURE__*/React.createElement("button", {
+      key: name,
+      onClick: () => selectUser(name),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "12px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        marginTop: "1px"
+      }
+    }, DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A"))) : STAFF_SECTIONS.map(section => /*#__PURE__*/React.createElement("div", {
+      key: section.key,
+      style: {
+        marginBottom: "8px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        padding: "8px 4px 6px",
+        textTransform: "uppercase"
+      }
+    }, section.label), section.drivers.map(name => /*#__PURE__*/React.createElement("button", {
+      key: name,
+      onClick: () => selectUser(name),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "11px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        marginBottom: "3px",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A"))))))));
+  }
+
+  // Is the user viewing the current calendar week?
+  const isCurrentWeek = (() => {
+    const now = new Date();
+    const dow = now.getDay();
+    const diffToMon = dow === 0 ? 6 : dow - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diffToMon);
+    const dd = String(monday.getDate()).padStart(2, "0");
+    const mm = String(monday.getMonth() + 1).padStart(2, "0");
+    return currentTabName === `WC ${dd}.${mm}.${monday.getFullYear()}`;
+  })();
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: C.bg,
+      color: C.text,
+      fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
+    }
+  }, /*#__PURE__*/React.createElement("link", {
+    href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+    rel: "stylesheet"
+  }), /*#__PURE__*/React.createElement("header", {
+    style: {
+      background: C.surface,
+      borderBottom: `1px solid ${C.border}`,
+      padding: "14px 20px",
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      position: "sticky",
+      top: 0,
+      zIndex: 100
+    }
+  }, (screen !== "week" || selectedDriver !== currentUser) && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (screen === "duty" && dutyLookupSource) {
+        setScreen("home");
+        setSelectedDuty(null);
+        setDutyLookupSource(false);
+      } else if (screen === "duty") {
+        setScreen("week");
+        setSelectedDuty(null);
+      } else if (screen === "leave") {
+        setScreen("week");
+        setLeaveSubmitted(false);
+        setLeaveForm({
+          dateFrom: "",
+          dateTo: "",
+          reason: "",
+          notes: ""
+        });
+      } else if (screen === "swap") {
+        setScreen("week");
+        setSwapSubmitted(false);
+        setSwapForm({
+          dayIndex: "",
+          targetDriver: "",
+          notes: ""
+        });
+      } else if (screen === "home") {
+        setSelectedDriver(currentUser);
+        setScreen("week");
+        setSearch("");
+      } else if (screen === "week" && selectedDriver !== currentUser) {
+        setSelectedDriver(currentUser);
+      } else {
+        setScreen("home");
+        setSelectedDriver(null);
+        setSearch("");
+      }
+    },
+    style: {
+      background: "none",
+      border: "none",
+      color: C.accent,
+      fontSize: "16px",
+      cursor: "pointer",
+      padding: "4px 8px",
+      fontFamily: "inherit"
+    }
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "14px",
+      fontWeight: 700,
+      letterSpacing: "3px",
+      color: "#ef4444"
+    }
+  }, "JET"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "9px",
+      letterSpacing: "1.5px",
+      color: "#ffffff",
+      textTransform: "uppercase",
+      marginTop: "1px"
+    }
+  }, "Jason Edwards Travel \u2014 Staff Portal")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "11px",
+      color: C.textMuted,
+      textAlign: "right",
+      lineHeight: 1.4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600
+    }
+  }, currentUser), /*#__PURE__*/React.createElement("button", {
+    onClick: switchUser,
+    style: {
+      background: "none",
+      border: "none",
+      color: C.textDim,
+      fontSize: "9px",
+      cursor: "pointer",
+      padding: 0,
+      fontFamily: "inherit",
+      textDecoration: "underline"
+    }
+  }, "Not me?"))), /*#__PURE__*/React.createElement("main", {
+    style: {
+      maxWidth: "640px",
+      margin: "0 auto",
+      padding: "16px"
+    }
+  }, screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: "20px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontSize: "18px",
+      fontWeight: 600,
+      margin: "0 0 4px",
+      color: C.white
+    }
+  }, "Staff Hub"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: "11px",
+      color: C.textMuted,
+      margin: 0
+    }
+  }, "w/c ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px"
+    }
+  }, rotaLoading && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: C.accent
+    }
+  }, "\u23F3"), /*#__PURE__*/React.createElement("button", {
+    onClick: refreshRota,
+    disabled: rotaLoading,
+    title: "Refresh rota data",
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "6px 10px",
+      cursor: rotaLoading ? "not-allowed" : "pointer",
+      color: C.textMuted,
+      fontSize: "12px",
+      fontFamily: "inherit"
+    }
+  }, "\u21BB"))), lastFetchTime && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "9px",
+      color: C.textDim,
+      marginTop: "4px"
+    }
+  }, "\uD83D\uDFE2 Live from Google Sheets \xB7 Updated ", lastFetchTime)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      marginBottom: "14px",
+      background: C.surface,
+      borderRadius: "8px",
+      border: `1px solid ${C.border}`,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowDutyLookup(false),
+    style: {
+      flex: 1,
+      padding: "10px",
+      background: !showDutyLookup ? C.accent + "22" : "transparent",
+      color: !showDutyLookup ? C.accent : C.textMuted,
+      border: "none",
+      fontSize: "12px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px",
+      borderBottom: !showDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
+    }
+  }, "Rota"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowDutyLookup(true),
+    style: {
+      flex: 1,
+      padding: "10px",
+      background: showDutyLookup ? C.accent + "22" : "transparent",
+      color: showDutyLookup ? C.accent : C.textMuted,
+      border: "none",
+      fontSize: "12px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px",
+      borderBottom: showDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
+    }
+  }, "Duty Cards")), !showDutyLookup ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      marginBottom: "16px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "Search by name...",
+    autoFocus: true,
+    style: {
+      width: "100%",
+      padding: "13px 16px 13px 38px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "8px",
+      color: C.white,
+      fontSize: "14px",
+      fontFamily: "inherit",
+      outline: "none",
+      boxSizing: "border-box"
+    },
+    onFocus: e => e.target.style.borderColor = C.accent,
+    onBlur: e => e.target.style.borderColor = C.border
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      left: "14px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      color: C.textDim,
+      fontSize: "14px"
+    }
+  }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "4px"
+    }
+  }, filtered !== null ?
+  /*#__PURE__*/
+  /* Search results — flat list */
+  React.createElement(React.Fragment, null, filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "40px",
+      color: C.textDim,
+      fontSize: "12px"
+    }
+  }, "No staff found matching \"", search, "\""), filtered.map(driver => {
+    const todayVal = ROTA[driver]?.[today] || "—";
+    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION);
+    return /*#__PURE__*/React.createElement("button", {
+      key: driver,
+      onClick: () => {
+        setSelectedDriver(driver);
+        setScreen("week");
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "12px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        marginTop: "1px"
+      }
+    }, DRIVER_SECTION_LABEL[driver])), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "12px",
+        color: isDutyNumber(todayVal) ? C.white : st.color,
+        background: st.bg,
+        padding: "2px 8px",
+        borderRadius: "4px",
+        fontWeight: 600
+      }
+    }, st.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A")));
+  })) : (/* Default view — grouped by section */
+  STAFF_SECTIONS.map(section => /*#__PURE__*/React.createElement("div", {
+    key: section.key,
+    style: {
+      marginBottom: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      fontWeight: 700,
+      color: C.accent,
+      letterSpacing: "1.5px",
+      padding: "8px 4px 6px",
+      textTransform: "uppercase"
+    }
+  }, section.label, " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.textDim,
+      fontWeight: 400
+    }
+  }, "(", section.drivers.length, ")")), section.drivers.map(driver => {
+    const todayVal = ROTA[driver]?.[today] || "—";
+    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION);
+    return /*#__PURE__*/React.createElement("button", {
+      key: driver,
+      onClick: () => {
+        setSelectedDriver(driver);
+        setScreen("week");
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "12px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        marginBottom: "4px",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, isCurrentWeek ? "Today:" : SHORT_DAYS[today] + ":"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "12px",
+        color: isDutyNumber(todayVal) ? C.white : st.color,
+        background: st.bg,
+        padding: "2px 8px",
+        borderRadius: "4px",
+        fontWeight: 600
+      }
+    }, st.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A")));
+  })))))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      marginBottom: "16px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: dutySearch,
+    onChange: e => setDutySearch(e.target.value),
+    placeholder: "Search duty number or route...",
+    autoFocus: true,
+    style: {
+      width: "100%",
+      padding: "13px 16px 13px 38px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "8px",
+      color: C.white,
+      fontSize: "14px",
+      fontFamily: "inherit",
+      outline: "none",
+      boxSizing: "border-box"
+    },
+    onFocus: e => e.target.style.borderColor = C.accent,
+    onBlur: e => e.target.style.borderColor = C.border
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      left: "14px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      color: C.textDim,
+      fontSize: "14px"
+    }
+  }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "4px"
+    }
+  }, (() => {
+    const allDuties = Object.values(DUTY_CARDS).sort((a, b) => a.number - b.number);
+    const q = dutySearch.toLowerCase().trim();
+    const matchedDuties = q ? allDuties.filter(d => String(d.number).includes(q) || d.route.toLowerCase().includes(q) || d.days.toLowerCase().includes(q)) : allDuties;
+    if (matchedDuties.length === 0) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "40px",
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "No duties found matching \"", dutySearch, "\"");
+    return matchedDuties.map(duty => /*#__PURE__*/React.createElement("button", {
+      key: duty.number,
+      onClick: () => {
+        setSelectedDuty(duty.number);
+        setDutyLookupSource(true);
+        setScreen("duty");
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "12px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "14px",
+        fontWeight: 700
+      }
+    }, duty.number), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, duty.route, " \xB7 ", duty.days)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "11px",
+        color: C.textDim
+      }
+    }, duty.signOn, "\u2013", duty.signOff), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A"))));
+  })()))), screen === "week" && selectedDriver && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: "20px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: "4px"
+    }
+  }, /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontSize: "17px",
+      fontWeight: 600,
+      margin: 0,
+      color: C.white
+    }
+  }, selectedDriver), selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setScreen("home");
+      setSelectedDriver(null);
+    },
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "5px 10px",
+      cursor: "pointer",
+      color: C.textMuted,
+      fontSize: "10px",
+      fontWeight: 600,
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    }
+  }, "All Staff")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "11px",
+      color: C.textMuted,
+      margin: 0
+    }
+  }, DRIVER_SECTION_LABEL[selectedDriver]), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      marginTop: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => goWeek(-1),
+    disabled: !canGoBack || rotaLoading,
+    style: {
+      background: "none",
+      border: "none",
+      color: canGoBack && !rotaLoading ? C.accent : C.textDim,
+      fontSize: "16px",
+      cursor: canGoBack && !rotaLoading ? "pointer" : "not-allowed",
+      padding: "2px 6px",
+      fontFamily: "inherit"
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "12px",
+      color: C.white,
+      fontWeight: 600,
+      letterSpacing: "0.5px"
+    }
+  }, "w/c ", getWeekCommencing()), /*#__PURE__*/React.createElement("button", {
+    onClick: () => goWeek(1),
+    disabled: !canGoForward || rotaLoading,
+    style: {
+      background: "none",
+      border: "none",
+      color: canGoForward && !rotaLoading ? C.accent : C.textDim,
+      fontSize: "16px",
+      cursor: canGoForward && !rotaLoading ? "pointer" : "not-allowed",
+      padding: "2px 6px",
+      fontFamily: "inherit"
+    }
+  }, "\u203A"), rotaLoading && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: C.accent
+    }
+  }, "\u23F3"))), (() => {
+    if (!isCurrentWeek) return null;
+    const todayVal = ROTA[selectedDriver]?.[today] || "—";
+    const runout = getDriverRunout(selectedDriver);
+    const todayNote = filterNote(ROTA_NOTES[selectedDriver]?.[today]);
+    const dutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
+    const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
+    const runoutForDuty = dutyNum ? getTodayRunout(dutyNum) : null;
+    const activeRunout = runout || runoutForDuty;
+
+    // Only show the summary card if there's useful info (duty, vehicle, or notes)
+    if (!dutyCard && !activeRunout && !todayNote && todayVal === "R") return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
+        border: `1px solid ${C.accent}33`,
+        borderRadius: "10px",
+        padding: "14px 16px",
+        marginBottom: "16px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        marginBottom: "10px"
+      }
+    }, SHORT_DAYS[today].toUpperCase(), " \u2014 ", new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    })), dutyCard && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "18px",
+        fontWeight: 700,
+        color: C.white
+      }
+    }, "Duty ", todayVal), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, dutyCard.route, " \xB7 ", dutyCard.signOn, " \u2013 ", dutyCard.signOff)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setSelectedDuty(dutyNum);
+        setScreen("duty");
+      },
+      style: {
+        background: C.accent,
+        color: C.bg,
+        border: "none",
+        borderRadius: "6px",
+        padding: "7px 14px",
+        fontSize: "11px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "View Card \u2192")), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).color
+      }
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, getSpecialDuty(todayVal).signOn, " \u2013 ", getSpecialDuty(todayVal).signOff)), activeRunout && activeRunout.vehicle && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        borderRadius: "8px",
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "COACH"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        color: C.white,
+        letterSpacing: "1px"
+      }
+    }, activeRunout.vehicle)), activeRunout.handoverTo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, activeRunout.handoverTo.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", activeRunout.handoverTo.duty, " \xB7 ", activeRunout.handoverTo.signOn))), activeRunout.takeoverFrom && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, activeRunout.takeoverFrom.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", activeRunout.takeoverFrom.duty)))), todayNote && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "8px",
+        background: C.warnBg,
+        border: `1px solid ${C.warnBorder}`,
+        borderRadius: "6px",
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.warnText,
+        letterSpacing: "0.5px",
+        marginBottom: "2px"
+      }
+    }, "NOTE"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.white,
+        lineHeight: 1.4,
+        whiteSpace: "pre-line"
+      }
+    }, todayNote)));
+  })(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "5px"
+    }
+  }, DAYS.map((day, i) => {
+    const val = ROTA[selectedDriver]?.[i] || "—";
+    const isToday = isCurrentWeek && i === today;
+    const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION);
+    const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
+    const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
+    const special = getSpecialDuty(val);
+    const cellNote = isCurrentWeek ? filterNote(ROTA_NOTES[selectedDriver]?.[i]) : null;
+    // Route Learning: extract duty number from RL prefix (e.g. RL307 → 307)
+    const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
+    const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: day,
+      style: {
+        background: isToday ? C.accent + "08" : C.surface,
+        border: `1px solid ${isToday ? C.accent + "33" : C.border}`,
+        borderRadius: "8px",
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        padding: "12px 14px",
+        gap: "10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "38px",
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        fontWeight: 700,
+        color: C.textMuted,
+        letterSpacing: "1px"
+      }
+    }, SHORT_DAYS[i])), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, isDutyNumber(val) ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "15px",
+        fontWeight: 700,
+        color: C.white
+      }
+    }, "Duty ", val), dutyCard && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, dutyCard.route, " \xB7 ", dutyCard.signOn, " sign on")) : rlDutyCard ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "15px",
+        fontWeight: 700,
+        color: C.blue
+      }
+    }, "Route Learning ", rlDutyNum), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, rlDutyCard.route, " \xB7 ", rlDutyCard.signOn, " sign on")) : special ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "13px",
+        color: special.color,
+        fontWeight: 600
+      }
+    }, special.label), special.signOn !== "—" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, special.signOn, " \u2013 ", special.signOff)) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "13px",
+        color: st.color,
+        fontWeight: 500
+      }
+    }, st.label), cellNote && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.white,
+        marginTop: "3px",
+        lineHeight: 1.3,
+        whiteSpace: "pre-line"
+      }
+    }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
+        setScreen("duty");
+      },
+      style: {
+        background: isToday ? C.accent : C.accent + "22",
+        color: isToday ? C.bg : C.accent,
+        border: "none",
+        borderRadius: "6px",
+        padding: "7px 12px",
+        fontSize: "11px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.accent;
+        e.currentTarget.style.color = C.bg;
+      },
+      onMouseLeave: e => {
+        if (!isToday) {
+          e.currentTarget.style.background = C.accent + "22";
+          e.currentTarget.style.color = C.accent;
+        }
+      }
+    }, "View Card \u2192")), isToday && /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: "2px",
+        background: `linear-gradient(90deg, ${C.accent}, transparent)`
+      }
+    }));
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setLeaveSubmitted(false);
+      setLeaveForm({
+        dateFrom: "",
+        dateTo: "",
+        reason: "",
+        notes: ""
+      });
+      setScreen("leave");
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      width: "100%",
+      marginTop: "20px",
+      padding: "14px",
+      background: "linear-gradient(135deg, #a78bfa22, #8b5cf622)",
+      border: "1px solid #a78bfa33",
+      borderRadius: "10px",
+      color: "#a78bfa",
+      fontSize: "13px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = "#a78bfa66";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = "#a78bfa33";
+    }
+  }, "\uD83D\uDCCB Request Annual Leave"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setSwapSubmitted(false);
+      setSwapForm({
+        dayIndex: "",
+        targetDriver: "",
+        notes: ""
+      });
+      setScreen("swap");
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      width: "100%",
+      marginTop: "8px",
+      padding: "14px",
+      background: "linear-gradient(135deg, #ffffff12, #ffffff08)",
+      border: "1px solid #ffffff25",
+      borderRadius: "10px",
+      color: "#ffffff",
+      fontSize: "13px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = "#ffffff44";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = "#ffffff25";
+    }
+  }, "\uD83D\uDD04 Request Shift Swap")), screen === "leave" && selectedDriver && (() => {
+    const LEAVE_EMAIL = "operations@jet-travel.co.uk"; // ← UPDATE WITH REAL EMAIL // ← REPLACE WITH ACTUAL EMAIL
+    const handleSubmit = () => {
+      if (!leaveForm.dateFrom || !leaveForm.dateTo) return;
+      const subject = encodeURIComponent(`Annual Leave Request — ${selectedDriver}`);
+      const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      const toDate = new Date(leaveForm.dateTo).toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      const startD = new Date(leaveForm.dateFrom);
+      const endD = new Date(leaveForm.dateTo);
+      const diffDays = Math.max(1, Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1);
+      const body = encodeURIComponent(`ANNUAL LEAVE REQUEST\n` + `━━━━━━━━━━━━━━━━━━━\n\n` + `Driver: ${selectedDriver}\n` + `From: ${fromDate}\n` + `To: ${toDate}\n` + `Total days: ${diffDays}\n` + `Reason: ${leaveForm.reason || "Annual leave"}\n` + (leaveForm.notes ? `Notes: ${leaveForm.notes}\n` : "") + `\n━━━━━━━━━━━━━━━━━━━\n` + `Submitted: ${new Date().toLocaleString("en-GB")}\n` + `via JET Driver Portal`);
+      window.open(`mailto:${LEAVE_EMAIL}?subject=${subject}&body=${body}`, "_self");
+      setLeaveSubmitted(true);
+    };
+    const inputStyle = {
+      width: "100%",
+      padding: "12px 14px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "8px",
+      color: C.white,
+      fontSize: "13px",
+      fontFamily: "inherit",
+      outline: "none",
+      boxSizing: "border-box"
+    };
+    if (leaveSubmitted) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "40px 20px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "48px",
+        marginBottom: "16px"
+      }
+    }, "\u2705"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "18px",
+        fontWeight: 600,
+        color: C.white,
+        margin: "0 0 8px"
+      }
+    }, "Request Sent"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "12px",
+        color: C.textMuted,
+        margin: "0 0 24px",
+        lineHeight: 1.5
+      }
+    }, "Your annual leave request has been emailed for approval. You'll be contacted with a decision."), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setScreen("week");
+        setLeaveSubmitted(false);
+        setLeaveForm({
+          dateFrom: "",
+          dateTo: "",
+          reason: "",
+          notes: ""
+        });
+      },
+      style: {
+        background: C.accent,
+        color: C.bg,
+        border: "none",
+        borderRadius: "8px",
+        padding: "12px 24px",
+        fontSize: "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Back to Rota"));
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: "20px"
+      }
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "17px",
+        fontWeight: 600,
+        margin: "0 0 2px",
+        color: C.white
+      }
+    }, "Request Annual Leave"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        margin: 0
+      }
+    }, selectedDriver)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "FIRST DAY OF LEAVE"), /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: leaveForm.dateFrom,
+      onChange: e => {
+        const v = e.target.value;
+        setLeaveForm(f => ({
+          ...f,
+          dateFrom: v,
+          dateTo: f.dateTo && f.dateTo < v ? v : f.dateTo
+        }));
+      },
+      style: {
+        ...inputStyle,
+        colorScheme: "dark"
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "LAST DAY OF LEAVE"), /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: leaveForm.dateTo,
+      min: leaveForm.dateFrom || undefined,
+      onChange: e => setLeaveForm(f => ({
+        ...f,
+        dateTo: e.target.value
+      })),
+      style: {
+        ...inputStyle,
+        colorScheme: "dark"
+      }
+    })), leaveForm.dateFrom && leaveForm.dateTo && (() => {
+      const d1 = new Date(leaveForm.dateFrom);
+      const d2 = new Date(leaveForm.dateTo);
+      const diff = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: C.accent + "11",
+          border: `1px solid ${C.accent}22`,
+          borderRadius: "8px",
+          padding: "10px 14px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "12px",
+          color: C.textMuted
+        }
+      }, "Total days requested"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "18px",
+          fontWeight: 700,
+          color: C.accent
+        }
+      }, diff));
+    })(), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "REASON (OPTIONAL)"), /*#__PURE__*/React.createElement("select", {
+      value: leaveForm.reason,
+      onChange: e => setLeaveForm(f => ({
+        ...f,
+        reason: e.target.value
+      })),
+      style: {
+        ...inputStyle,
+        colorScheme: "dark",
+        appearance: "auto"
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Annual leave"), /*#__PURE__*/React.createElement("option", {
+      value: "Family commitment"
+    }, "Family commitment"), /*#__PURE__*/React.createElement("option", {
+      value: "Medical appointment"
+    }, "Medical appointment"), /*#__PURE__*/React.createElement("option", {
+      value: "Personal"
+    }, "Personal"), /*#__PURE__*/React.createElement("option", {
+      value: "Other"
+    }, "Other"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "ADDITIONAL NOTES (OPTIONAL)"), /*#__PURE__*/React.createElement("textarea", {
+      value: leaveForm.notes,
+      onChange: e => setLeaveForm(f => ({
+        ...f,
+        notes: e.target.value
+      })),
+      rows: 3,
+      placeholder: "Any extra info...",
+      style: {
+        ...inputStyle,
+        resize: "vertical"
+      }
+    })), /*#__PURE__*/React.createElement("button", {
+      onClick: handleSubmit,
+      disabled: !leaveForm.dateFrom || !leaveForm.dateTo,
+      style: {
+        width: "100%",
+        padding: "14px",
+        background: !leaveForm.dateFrom || !leaveForm.dateTo ? C.textDim + "44" : C.accent,
+        color: !leaveForm.dateFrom || !leaveForm.dateTo ? C.textDim : C.bg,
+        border: "none",
+        borderRadius: "8px",
+        fontSize: "14px",
+        fontWeight: 700,
+        cursor: !leaveForm.dateFrom || !leaveForm.dateTo ? "not-allowed" : "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px",
+        marginTop: "6px"
+      }
+    }, "Submit Leave Request"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "4px 0 0"
+      }
+    }, "This will open your email app with the request ready to send. Your manager will receive the request and confirm by return.")));
+  })(), screen === "swap" && selectedDriver && (() => {
+    const SWAP_EMAIL = "operations@jet-travel.co.uk"; // ← UPDATE WITH REAL EMAIL // ← REPLACE WITH ACTUAL EMAIL
+    const myRota = ROTA[selectedDriver] || [];
+    const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
+    const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
+    const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
+    const targetDayDuty = swapForm.dayIndex !== "" && swapForm.targetDriver ? targetRota[parseInt(swapForm.dayIndex)] || "—" : null;
+    const handleSwapSubmit = () => {
+      if (swapForm.dayIndex === "" || !swapForm.targetDriver) return;
+      const dayName = DAYS[parseInt(swapForm.dayIndex)];
+      const subject = encodeURIComponent(`Shift Swap Request — ${selectedDriver} ↔ ${swapForm.targetDriver}`);
+      const body = encodeURIComponent(`SHIFT SWAP REQUEST\n` + `━━━━━━━━━━━━━━━━━━━\n\n` + `Requesting Driver: ${selectedDriver}\n` + `Current duty (${dayName}): ${selectedDayDuty}\n\n` + `Swap With: ${swapForm.targetDriver}\n` + `Their duty (${dayName}): ${targetDayDuty}\n\n` + (swapForm.notes ? `Notes: ${swapForm.notes}\n\n` : "") + `━━━━━━━━━━━━━━━━━━━\n` + `Both drivers must agree to this swap.\n` + `Submitted: ${new Date().toLocaleString("en-GB")}\n` + `via JET Driver Portal`);
+      window.open(`mailto:${SWAP_EMAIL}?subject=${subject}&body=${body}`, "_self");
+      setSwapSubmitted(true);
+    };
+    const inputStyle = {
+      width: "100%",
+      padding: "12px 14px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "8px",
+      color: C.white,
+      fontSize: "13px",
+      fontFamily: "inherit",
+      outline: "none",
+      boxSizing: "border-box"
+    };
+    if (swapSubmitted) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "40px 20px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "48px",
+        marginBottom: "16px"
+      }
+    }, "\uD83D\uDD04"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "18px",
+        fontWeight: 600,
+        color: C.white,
+        margin: "0 0 8px"
+      }
+    }, "Swap Request Sent"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "12px",
+        color: C.textMuted,
+        margin: "0 0 24px",
+        lineHeight: 1.5
+      }
+    }, "Your shift swap request has been emailed to the manager. Both drivers will need to agree before the swap is confirmed."), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setScreen("week");
+        setSwapSubmitted(false);
+        setSwapForm({
+          dayIndex: "",
+          targetDriver: "",
+          notes: ""
+        });
+      },
+      style: {
+        background: "#06b6d4",
+        color: C.bg,
+        border: "none",
+        borderRadius: "8px",
+        padding: "12px 24px",
+        fontSize: "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Back to Rota"));
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: "20px"
+      }
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "17px",
+        fontWeight: 600,
+        margin: "0 0 2px",
+        color: C.white
+      }
+    }, "Request Shift Swap"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        margin: 0
+      }
+    }, selectedDriver)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "WHICH DAY?"), /*#__PURE__*/React.createElement("select", {
+      value: swapForm.dayIndex,
+      onChange: e => setSwapForm(f => ({
+        ...f,
+        dayIndex: e.target.value
+      })),
+      style: {
+        ...inputStyle,
+        colorScheme: "dark",
+        appearance: "auto"
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select a day..."), DAYS.map((day, i) => {
+      const val = myRota[i] || "—";
+      return /*#__PURE__*/React.createElement("option", {
+        key: i,
+        value: i
+      }, day, " \u2014 ", val);
+    }))), selectedDayDuty && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#06b6d411",
+        border: "1px solid #06b6d422",
+        borderRadius: "8px",
+        padding: "12px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        marginBottom: "4px"
+      }
+    }, "YOUR DUTY (", DAYS[parseInt(swapForm.dayIndex)], ")"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#06b6d4"
+      }
+    }, selectedDayDuty), (() => {
+      const sp = getSpecialDuty(selectedDayDuty);
+      const dc = isDutyNumber(selectedDayDuty) ? DUTY_CARDS[parseInt(selectedDayDuty)] : null;
+      if (dc) return /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, dc.route, " \xB7 ", dc.signOn, "\u2013", dc.signOff);
+      if (sp && sp.signOn !== "—") return /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, sp.label, " \xB7 ", sp.signOn, "\u2013", sp.signOff);
+      return null;
+    })()), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "SWAP WITH"), /*#__PURE__*/React.createElement("select", {
+      value: swapForm.targetDriver,
+      onChange: e => setSwapForm(f => ({
+        ...f,
+        targetDriver: e.target.value
+      })),
+      style: {
+        ...inputStyle,
+        colorScheme: "dark",
+        appearance: "auto"
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select a driver..."), otherDrivers.map(d => {
+      const theirDuty = swapForm.dayIndex !== "" ? ROTA[d]?.[parseInt(swapForm.dayIndex)] || "—" : "";
+      return /*#__PURE__*/React.createElement("option", {
+        key: d,
+        value: d
+      }, d, theirDuty ? ` — ${theirDuty}` : "");
+    }))), targetDayDuty && swapForm.targetDriver && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#f9731611",
+        border: "1px solid #f9731622",
+        borderRadius: "8px",
+        padding: "12px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        marginBottom: "4px"
+      }
+    }, swapForm.targetDriver.toUpperCase(), "'S DUTY (", DAYS[parseInt(swapForm.dayIndex)], ")"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#f97316"
+      }
+    }, targetDayDuty), (() => {
+      const sp = getSpecialDuty(targetDayDuty);
+      const dc = isDutyNumber(targetDayDuty) ? DUTY_CARDS[parseInt(targetDayDuty)] : null;
+      if (dc) return /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, dc.route, " \xB7 ", dc.signOn, "\u2013", dc.signOff);
+      if (sp && sp.signOn !== "—") return /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, sp.label, " \xB7 ", sp.signOn, "\u2013", sp.signOff);
+      return null;
+    })()), selectedDayDuty && targetDayDuty && swapForm.targetDriver && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "14px",
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        marginBottom: "10px"
+      }
+    }, "SWAP PREVIEW \u2014 ", DAYS[parseInt(swapForm.dayIndex)]), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted
+      }
+    }, selectedDriver.split(" ")[0]), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "15px",
+        fontWeight: 700,
+        color: "#06b6d4"
+      }
+    }, selectedDayDuty)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "20px",
+        color: C.accent
+      }
+    }, "\u21C4"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted
+      }
+    }, swapForm.targetDriver.split(" ")[0]), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "15px",
+        fontWeight: 700,
+        color: "#f97316"
+      }
+    }, targetDayDuty)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "REASON / NOTES (OPTIONAL)"), /*#__PURE__*/React.createElement("textarea", {
+      value: swapForm.notes,
+      onChange: e => setSwapForm(f => ({
+        ...f,
+        notes: e.target.value
+      })),
+      rows: 2,
+      placeholder: "Why do you want to swap?",
+      style: {
+        ...inputStyle,
+        resize: "vertical"
+      }
+    })), /*#__PURE__*/React.createElement("button", {
+      onClick: handleSwapSubmit,
+      disabled: swapForm.dayIndex === "" || !swapForm.targetDriver,
+      style: {
+        width: "100%",
+        padding: "14px",
+        background: swapForm.dayIndex === "" || !swapForm.targetDriver ? C.textDim + "44" : "#06b6d4",
+        color: swapForm.dayIndex === "" || !swapForm.targetDriver ? C.textDim : C.bg,
+        border: "none",
+        borderRadius: "8px",
+        fontSize: "14px",
+        fontWeight: 700,
+        cursor: swapForm.dayIndex === "" || !swapForm.targetDriver ? "not-allowed" : "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px",
+        marginTop: "6px"
+      }
+    }, "Submit Swap Request"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "4px 0 0"
+      }
+    }, "This sends a request to the manager. Both drivers must agree before any swap is confirmed.")));
+  })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
+    const duty = DUTY_CARDS[selectedDuty];
+    const runout = getTodayRunout(selectedDuty);
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      ref: printRef,
+      style: {
+        display: "none"
+      }
+    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      className: "warn"
+    }, "\u26A0 ", r)), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
+      key: si
+    }, /*#__PURE__*/React.createElement("h2", null, seg.title), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Stop"), /*#__PURE__*/React.createElement("th", null, "Time"), /*#__PURE__*/React.createElement("th", null, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, seg.stops.map((s, j) => /*#__PURE__*/React.createElement("tr", {
+      key: j,
+      className: s.notes?.includes("BREAK") ? "break-row" : ""
+    }, /*#__PURE__*/React.createElement("td", null, s.stop), /*#__PURE__*/React.createElement("td", null, s.time), /*#__PURE__*/React.createElement("td", null, s.dep ? "DEP" : s.arr ? "ARR" : "", " ", s.notes || "")))))))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "10px",
+        padding: "18px",
+        marginBottom: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "26px",
+        fontWeight: 700,
+        color: C.white,
+        lineHeight: 1
+      }
+    }, "Duty ", duty.number), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "13px",
+        color: C.white,
+        marginTop: "5px",
+        fontWeight: 500
+      }
+    }, duty.route), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "4px"
+      }
+    }, duty.days, " \xB7 ", duty.coach)), /*#__PURE__*/React.createElement("button", {
+      onClick: handlePrint,
+      style: {
+        background: C.accent + "22",
+        color: C.accent,
+        border: "none",
+        borderRadius: "6px",
+        padding: "8px 12px",
+        fontSize: "11px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "\uD83D\uDDA8 Print")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: "16px",
+        marginTop: "12px",
+        fontSize: "11px",
+        color: C.textMuted
+      }
+    }, /*#__PURE__*/React.createElement("span", null, "Sign On: ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.white
+      }
+    }, duty.signOn)), /*#__PURE__*/React.createElement("span", null, "Sign Off: ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.white
+      }
+    }, duty.signOff)), /*#__PURE__*/React.createElement("span", null, "Length: ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.white
+      }
+    }, duty.dutyLength)))), runout && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
+        border: `1px solid ${C.accent}33`,
+        borderRadius: "10px",
+        padding: "14px 16px",
+        marginBottom: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        marginBottom: "10px"
+      }
+    }, SHORT_DAYS[today].toUpperCase(), " \u2014 ", new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        borderRadius: "8px",
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "COACH"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        color: C.white,
+        letterSpacing: "1px"
+      }
+    }, runout.vehicle)), runout.handoverTo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, runout.handoverTo.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", runout.handoverTo.duty, " \xB7 ", runout.handoverTo.signOn))), runout.takeoverFrom && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, runout.takeoverFrom.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", runout.takeoverFrom.duty))))), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        background: C.warnBg,
+        border: `1px solid ${C.warnBorder}`,
+        borderRadius: "6px",
+        padding: "10px 14px",
+        marginBottom: "6px",
+        fontSize: "11px",
+        color: C.warnText,
+        lineHeight: 1.4
+      }
+    }, "\u26A0 ", r)), duty.segments?.[0]?.title?.startsWith("Travel to") && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.warnBg,
+        border: `1px solid ${C.warnBorder}`,
+        borderRadius: "6px",
+        padding: "10px 14px",
+        marginBottom: "6px",
+        fontSize: "11px",
+        color: C.warnText,
+        lineHeight: 1.4
+      }
+    }, "\u26A0 Ensure seatbelts are done-up before returning to depot"), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
+      key: si,
+      style: {
+        marginBottom: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 700,
+        color: C.accent,
+        padding: "8px 0 6px",
+        letterSpacing: "0.5px"
+      }
+    }, seg.title), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        overflow: "hidden"
+      }
+    }, seg.stops.map((s, j) => {
+      const isBreak = s.stop.includes("Pull on stand") || s.notes?.toLowerCase().includes("break");
+      const isTakeover = s.notes?.includes("Takeover");
+      const isSignal = s.dep || s.arr;
+      return /*#__PURE__*/React.createElement("div", {
+        key: j,
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          padding: "10px 14px",
+          borderBottom: j < seg.stops.length - 1 ? `1px solid ${C.border}22` : "none",
+          background: isBreak ? C.breakBg + "44" : isTakeover ? C.blueBg : "transparent"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: "50px",
+          fontSize: "13px",
+          fontWeight: 600,
+          color: isBreak ? C.breakText : C.textMuted,
+          fontVariantNumeric: "tabular-nums",
+          flexShrink: 0
+        }
+      }, s.time), /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "12px",
+          color: isSignal ? C.white : isBreak ? C.breakText : isTakeover ? C.blue : C.text,
+          fontWeight: isSignal || isBreak || isTakeover ? 600 : 400
+        }
+      }, s.dep && /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.green,
+          marginRight: "6px",
+          fontSize: "10px"
+        }
+      }, "DEP"), s.arr && /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#ef4444",
+          marginRight: "6px",
+          fontSize: "10px"
+        }
+      }, "ARR"), s.stop), s.notes && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: isTakeover ? C.blue : C.textMuted,
+          marginTop: "2px"
+        }
+      }, s.notes)));
+    })))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "12px",
+        fontSize: "10px",
+        color: C.textDim,
+        lineHeight: 1.5
+      }
+    }, "If your actual duty differs from this card, contact the duty manager immediately."));
+  })()));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+})(window);

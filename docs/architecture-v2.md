@@ -17,10 +17,14 @@ Modernize the codebase without changing the current UI/UX behavior.
 - Added deterministic week sorting via `sortAvailableWeeks(...)`.
 - Added local date-key helper for runout lookups to avoid UTC day-shift edge cases.
 
-## Phase 2 (Next)
-- Move data access/parsing code into `index_files/rota-data.js`.
-- Move status/formatting helpers into `index_files/rota-helpers.js`.
-- Keep `App()` UI in `index.html` initially, then split by screen modules.
+## Phase 2 (Implemented)
+- Split the monolithic inline script into modular files under `index_files/`:
+  - `jet-data.js` (domain data/constants and temporary overrides)
+  - `jet-data-layer.js` (runout/date helpers, sheet parsing, adapter + live fetch)
+  - `jet-ui-helpers.js` (status/style/note filtering helpers)
+  - `app.js` (auth + React app UI/screens)
+- Replaced inline script in `index.html` with ordered script includes.
+- Kept UI behavior and visual styling unchanged while reducing merge/conflict surface area.
 
 ## Phase 3 (Optional Build Tooling)
 - Introduce Vite + TypeScript in parallel, then migrate screen-by-screen.

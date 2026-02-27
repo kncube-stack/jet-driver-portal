@@ -1,5 +1,13 @@
-const CACHE_NAME = 'jet-portal-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHE_NAME = 'jet-portal-v2';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/index_files/jet-data.js',
+  '/index_files/jet-data-layer.js',
+  '/index_files/jet-ui-helpers.js',
+  '/index_files/app.js'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
