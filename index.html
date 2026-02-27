@@ -5281,8 +5281,20 @@ function App() {
   const [authInput, setAuthInput] = React.useState("");
   const [authError, setAuthError] = React.useState(false);
   const [authLoading, setAuthLoading] = React.useState(false);
-  const [screen, setScreen] = React.useState("home");
-  const [selectedDriver, setSelectedDriver] = React.useState(null);
+  const [screen, setScreen] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_user") ? "week" : "home";
+    } catch {
+      return "home";
+    }
+  });
+  const [selectedDriver, setSelectedDriver] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_user") || null;
+    } catch {
+      return null;
+    }
+  });
   const [selectedDuty, setSelectedDuty] = React.useState(null);
   const [search, setSearch] = React.useState("");
   const [dutySearch, setDutySearch] = React.useState("");
@@ -5311,11 +5323,22 @@ function App() {
   const [STAFF_SECTIONS, setStaffSections] = React.useState([]);
   const [ROTA, setRota] = React.useState({});
   const [weekLabel, setWeekLabel] = React.useState("");
+  const [currentTabName, setCurrentTabName] = React.useState("");
   const [availableWeeks, setAvailableWeeks] = React.useState([]);
   const [allTabs, setAllTabs] = React.useState({});
   const [rotaLoading, setRotaLoading] = React.useState(true);
   const [rotaError, setRotaError] = React.useState(null);
   const [lastFetchTime, setLastFetchTime] = React.useState(null);
+
+  // ─── USER IDENTITY ────────────────────────────────────────
+  const [currentUser, setCurrentUser] = React.useState(() => {
+    try {
+      return sessionStorage.getItem("jet_user") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [nameSearch, setNameSearch] = React.useState("");
 
   // Derived data from live state
   const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
@@ -5335,6 +5358,7 @@ function App() {
       setStaffSections(data.sections);
       setRota(data.rota);
       setWeekLabel(formatWeekCommencing(data.tabName));
+      setCurrentTabName(data.tabName);
       setAvailableWeeks(data.availableWeeks);
       setAllTabs(data.tabs);
       setLastFetchTime(new Date().toLocaleTimeString());
@@ -5360,6 +5384,7 @@ function App() {
         setStaffSections(data.sections);
         setRota(data.rota);
         setWeekLabel(formatWeekCommencing(tabName));
+        setCurrentTabName(tabName);
         setLastFetchTime(new Date().toLocaleTimeString());
       }
     } catch (err) {
@@ -5378,6 +5403,7 @@ function App() {
       setStaffSections(data.sections);
       setRota(data.rota);
       setWeekLabel(formatWeekCommencing(data.tabName));
+      setCurrentTabName(data.tabName);
       setAvailableWeeks(data.availableWeeks);
       setAllTabs(data.tabs);
       setLastFetchTime(new Date().toLocaleTimeString());
@@ -5628,6 +5654,235 @@ function App() {
       }
     }, "Retry"));
   }
+
+  // ─── WEEK NAVIGATION ────────────────────────────────────
+  const weekIndex = availableWeeks.findIndex(w => w.tabName === currentTabName);
+  const canGoBack = weekIndex > 0;
+  const canGoForward = weekIndex < availableWeeks.length - 1;
+  const goWeek = dir => {
+    const nextIdx = weekIndex + dir;
+    if (nextIdx >= 0 && nextIdx < availableWeeks.length) {
+      switchWeek(availableWeeks[nextIdx].tabName);
+    }
+  };
+
+  // ─── USER SELECTION ─────────────────────────────────────
+  const selectUser = name => {
+    setCurrentUser(name);
+    try {
+      sessionStorage.setItem("jet_user", name);
+    } catch {}
+    setSelectedDriver(name);
+    setScreen("week");
+    setNameSearch("");
+  };
+  const switchUser = () => {
+    setCurrentUser(null);
+    try {
+      sessionStorage.removeItem("jet_user");
+    } catch {}
+    setScreen("home");
+    setSelectedDriver(null);
+    setNameSearch("");
+  };
+
+  // ─── NAME PICKER SCREEN ──────────────────────────────────
+  if (!currentUser) {
+    const nameQ = nameSearch.toLowerCase().trim();
+    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: "640px",
+        margin: "0 auto",
+        padding: "24px 16px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "2px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        letterSpacing: "1.5px",
+        color: "#ffffff",
+        textTransform: "uppercase",
+        marginBottom: "20px"
+      }
+    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "13px",
+        color: C.white,
+        fontWeight: 600,
+        marginBottom: "4px"
+      }
+    }, "Who are you?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Select your name to see your rota")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "relative",
+        marginBottom: "16px"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: nameSearch,
+      onChange: e => setNameSearch(e.target.value),
+      placeholder: "Search by name...",
+      autoFocus: true,
+      style: {
+        width: "100%",
+        padding: "13px 16px 13px 38px",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        color: C.white,
+        fontSize: "14px",
+        fontFamily: "inherit",
+        outline: "none",
+        boxSizing: "border-box"
+      },
+      onFocus: e => e.target.style.borderColor = C.accent,
+      onBlur: e => e.target.style.borderColor = C.border
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        left: "14px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        color: C.textDim,
+        fontSize: "14px"
+      }
+    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "4px",
+        maxHeight: "60vh",
+        overflowY: "auto"
+      }
+    }, nameQ ? nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "40px",
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "No staff found") : nameFiltered.map(name => /*#__PURE__*/React.createElement("button", {
+      key: name,
+      onClick: () => selectUser(name),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "12px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        marginTop: "1px"
+      }
+    }, DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A"))) : STAFF_SECTIONS.map(section => /*#__PURE__*/React.createElement("div", {
+      key: section.key,
+      style: {
+        marginBottom: "8px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        padding: "8px 4px 6px",
+        textTransform: "uppercase"
+      }
+    }, section.label), section.drivers.map(name => /*#__PURE__*/React.createElement("button", {
+      key: name,
+      onClick: () => selectUser(name),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "11px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        marginBottom: "3px",
+        transition: "all 0.1s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = C.surfaceHover;
+        e.currentTarget.style.borderColor = C.accent + "33";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.borderColor = C.border;
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "\u203A"))))))));
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -5650,7 +5905,7 @@ function App() {
       top: 0,
       zIndex: 100
     }
-  }, screen !== "home" && /*#__PURE__*/React.createElement("button", {
+  }, (screen !== "week" || selectedDriver !== currentUser) && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if (screen === "duty" && dutyLookupSource) {
         setScreen("home");
@@ -5676,6 +5931,12 @@ function App() {
           targetDriver: "",
           notes: ""
         });
+      } else if (screen === "home") {
+        setSelectedDriver(currentUser);
+        setScreen("week");
+        setSearch("");
+      } else if (screen === "week" && selectedDriver !== currentUser) {
+        setSelectedDriver(currentUser);
       } else {
         setScreen("home");
         setSelectedDriver(null);
@@ -5721,15 +5982,19 @@ function App() {
     style: {
       fontWeight: 600
     }
-  }, DAYS[today]), /*#__PURE__*/React.createElement("div", {
+  }, currentUser), /*#__PURE__*/React.createElement("button", {
+    onClick: switchUser,
     style: {
-      color: C.textDim
+      background: "none",
+      border: "none",
+      color: C.textDim,
+      fontSize: "9px",
+      cursor: "pointer",
+      padding: 0,
+      fontFamily: "inherit",
+      textDecoration: "underline"
     }
-  }, new Date().toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  })))), /*#__PURE__*/React.createElement("main", {
+  }, "Not me?"))), /*#__PURE__*/React.createElement("main", {
     style: {
       maxWidth: "640px",
       margin: "0 auto",
@@ -6140,20 +6405,87 @@ function App() {
     style: {
       marginBottom: "20px"
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: "4px"
+    }
   }, /*#__PURE__*/React.createElement("h2", {
     style: {
       fontSize: "17px",
       fontWeight: 600,
-      margin: "0 0 2px",
+      margin: 0,
       color: C.white
     }
-  }, selectedDriver), /*#__PURE__*/React.createElement("p", {
+  }, selectedDriver), selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setScreen("home");
+      setSelectedDriver(null);
+    },
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "5px 10px",
+      cursor: "pointer",
+      color: C.textMuted,
+      fontSize: "10px",
+      fontWeight: 600,
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    }
+  }, "All Staff")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: "11px",
       color: C.textMuted,
       margin: 0
     }
-  }, DRIVER_SECTION_LABEL[selectedDriver], " \u2014 w/c ", getWeekCommencing())), (() => {
+  }, DRIVER_SECTION_LABEL[selectedDriver]), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      marginTop: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => goWeek(-1),
+    disabled: !canGoBack || rotaLoading,
+    style: {
+      background: "none",
+      border: "none",
+      color: canGoBack && !rotaLoading ? C.accent : C.textDim,
+      fontSize: "16px",
+      cursor: canGoBack && !rotaLoading ? "pointer" : "not-allowed",
+      padding: "2px 6px",
+      fontFamily: "inherit"
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "12px",
+      color: C.white,
+      fontWeight: 600,
+      letterSpacing: "0.5px"
+    }
+  }, "w/c ", getWeekCommencing()), /*#__PURE__*/React.createElement("button", {
+    onClick: () => goWeek(1),
+    disabled: !canGoForward || rotaLoading,
+    style: {
+      background: "none",
+      border: "none",
+      color: canGoForward && !rotaLoading ? C.accent : C.textDim,
+      fontSize: "16px",
+      cursor: canGoForward && !rotaLoading ? "pointer" : "not-allowed",
+      padding: "2px 6px",
+      fontFamily: "inherit"
+    }
+  }, "\u203A"), rotaLoading && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: C.accent
+    }
+  }, "\u23F3"))), (() => {
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
     const runout = getDriverRunout(selectedDriver);
     const todayNote = filterNote(ROTA_NOTES[selectedDriver]?.[today]);
