@@ -5883,6 +5883,18 @@ function App() {
       }
     }, "\u203A"))))))));
   }
+
+  // Is the user viewing the current calendar week?
+  const isCurrentWeek = (() => {
+    const now = new Date();
+    const dow = now.getDay();
+    const diffToMon = dow === 0 ? 6 : dow - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diffToMon);
+    const dd = String(monday.getDate()).padStart(2, "0");
+    const mm = String(monday.getMonth() + 1).padStart(2, "0");
+    return currentTabName === `WC ${dd}.${mm}.${monday.getFullYear()}`;
+  })();
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -6276,7 +6288,7 @@ function App() {
         fontSize: "10px",
         color: C.textDim
       }
-    }, "Today:"), /*#__PURE__*/React.createElement("span", {
+    }, isCurrentWeek ? "Today:" : SHORT_DAYS[today] + ":"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: "12px",
         color: isDutyNumber(todayVal) ? C.white : st.color,
@@ -6486,6 +6498,7 @@ function App() {
       color: C.accent
     }
   }, "\u23F3"))), (() => {
+    if (!isCurrentWeek) return null;
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
     const runout = getDriverRunout(selectedDriver);
     const todayNote = filterNote(ROTA_NOTES[selectedDriver]?.[today]);
@@ -6688,12 +6701,12 @@ function App() {
     }
   }, DAYS.map((day, i) => {
     const val = ROTA[selectedDriver]?.[i] || "—";
-    const isToday = i === today;
+    const isToday = isCurrentWeek && i === today;
     const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION);
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
-    const cellNote = filterNote(ROTA_NOTES[selectedDriver]?.[i]);
+    const cellNote = isCurrentWeek ? filterNote(ROTA_NOTES[selectedDriver]?.[i]) : null;
     // Route Learning: extract duty number from RL prefix (e.g. RL307 → 307)
     const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
     const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
