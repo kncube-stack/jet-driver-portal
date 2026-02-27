@@ -2924,14 +2924,22 @@ const DUTY_CARDS = {
         time: "05:50"
       }]
     }, {
-      title: "Trip 1 — Victoria → Birmingham",
+      title: "Trip 1 — Victoria → Coventry → Birmingham",
       stops: [{
         stop: "Victoria Coach Station departures",
         time: "06:00",
         dep: true
       }, {
         stop: "Coventry Pool Meadow Bus Station",
-        time: "08:15"
+        time: "08:15",
+        arr: true
+      }]
+    }, {
+      title: "Trip 1 continues — Coventry → Birmingham",
+      stops: [{
+        stop: "Coventry Pool Meadow Bus Station",
+        time: "08:20",
+        dep: true
       }, {
         stop: "Birmingham Digbeth",
         time: "09:10",
@@ -2992,14 +3000,22 @@ const DUTY_CARDS = {
         time: "05:50"
       }]
     }, {
-      title: "Trip 1 — Victoria → Birmingham",
+      title: "Trip 1 — Victoria → Coventry → Birmingham",
       stops: [{
         stop: "Victoria Coach Station departures",
         time: "06:00",
         dep: true
       }, {
         stop: "Coventry Pool Meadow Bus Station",
-        time: "08:10"
+        time: "08:10",
+        arr: true
+      }]
+    }, {
+      title: "Trip 1 continues — Coventry → Birmingham",
+      stops: [{
+        stop: "Coventry Pool Meadow Bus Station",
+        time: "08:15",
+        dep: true
       }, {
         stop: "Birmingham Digbeth",
         time: "08:55",
@@ -3025,7 +3041,7 @@ const DUTY_CARDS = {
     }, {
       title: "Handover & Return",
       stops: [{
-        stop: "Hand over Coach 7 to Duty 307",
+        stop: "Hand over Coach 7 to Duty 367",
         time: "13:40"
       }, {
         stop: "Travel on Tube back to Depot",
@@ -3041,9 +3057,9 @@ const DUTY_CARDS = {
     number: 303,
     days: "Friday & Monday",
     route: "Route 450 — Nottingham",
-    signOn: "05:00",
+    signOn: "04:50",
     signOff: "16:10",
-    dutyLength: "11:10",
+    dutyLength: "11:20",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Elizabeth Line departs at 15:32",
@@ -3051,50 +3067,64 @@ const DUTY_CARDS = {
       title: "Preparation",
       stops: [{
         stop: "Sign On — Walk round check Coach 9",
-        time: "05:00"
+        time: "04:50"
       }, {
         stop: "Empty to Victoria Coach Station",
-        time: "05:20"
+        time: "05:10"
       }, {
         stop: "Arrive for loading",
         time: "06:20"
       }]
     }, {
-      title: "Trip 1 — Victoria → Nottingham",
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester → Nottingham",
       stops: [{
         stop: "Victoria Coach Station departures",
         time: "06:30",
         dep: true
       }, {
-        stop: "Golders Green Bus Station Stop GE",
-        time: "07:05"
+        stop: "Milton Keynes Coachway",
+        time: "07:50"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "09:15",
+        arr: true
+      }]
+    }, {
+      title: "Trip 1 continues — Leicester → Nottingham",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "09:20",
+        dep: true
       }, {
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "09:45",
+        time: "10:15",
         arr: true
       }]
     }, {
       title: "Trip 2 — Nottingham → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "11:00",
+        time: "11:30",
         dep: true
       }, {
-        stop: "Nottingham Trent University",
-        time: "11:10"
+        stop: "Nottingham University University Boulevard",
+        time: "11:40"
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "14:00"
       }, {
         stop: "Marble Arch Park Lane",
-        time: "14:20"
+        time: "14:35"
       }, {
         stop: "Victoria Coach Station arrivals",
-        time: "14:35",
+        time: "14:50",
         arr: true
       }]
     }, {
       title: "Handover & Return",
       stops: [{
         stop: "Hand over Coach 9 to Duty 308",
-        time: "14:45"
+        time: "15:00"
       }, {
         stop: "Travel on Tube back to Depot",
         time: "15:32",
@@ -3109,33 +3139,44 @@ const DUTY_CARDS = {
     number: 323,
     days: "Tuesday to Thursday",
     route: "Route 450 — Nottingham",
-    signOn: "05:30",
-    signOff: "16:40",
-    dutyLength: "11:10",
+    signOn: "04:50",
+    signOff: "16:10",
+    dutyLength: "11:20",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
-    tubeInfo: "Elizabeth Line departs at 16:02",
+    tubeInfo: "Elizabeth Line departs at 15:32",
     segments: [{
       title: "Preparation",
       stops: [{
         stop: "Sign On — Walk round check Coach 9",
-        time: "05:30"
+        time: "04:50"
       }, {
         stop: "Empty to Victoria Coach Station",
-        time: "05:50"
+        time: "05:10"
       }, {
         stop: "Arrive for loading",
-        time: "06:50"
+        time: "06:20"
       }]
     }, {
-      title: "Trip 1 — Victoria → Nottingham",
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester → Nottingham",
       stops: [{
         stop: "Victoria Coach Station departures",
-        time: "07:00",
+        time: "06:30",
         dep: true
       }, {
         stop: "Milton Keynes Coachway",
-        time: "08:20"
+        time: "07:50"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "09:15",
+        arr: true
+      }]
+    }, {
+      title: "Trip 1 continues — Leicester → Nottingham",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "09:20",
+        dep: true
       }, {
         stop: "Nottingham Broad Marsh Bus Station",
         time: "10:15",
@@ -3145,11 +3186,14 @@ const DUTY_CARDS = {
       title: "Trip 2 — Nottingham → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "11:15",
+        time: "11:30",
         dep: true
       }, {
-        stop: "Nottingham Trent University",
-        time: "11:25"
+        stop: "Nottingham University University Boulevard",
+        time: "11:40"
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "14:00"
       }, {
         stop: "Marble Arch Park Lane",
         time: "14:35"
@@ -3165,11 +3209,11 @@ const DUTY_CARDS = {
         time: "15:00"
       }, {
         stop: "Travel on Tube back to Depot",
-        time: "16:02",
-        notes: "Elizabeth Line 16:02"
+        time: "15:32",
+        notes: "Elizabeth Line 15:32"
       }, {
         stop: "Sign Off",
-        time: "16:40"
+        time: "16:10"
       }]
     }]
   },
@@ -3177,9 +3221,9 @@ const DUTY_CARDS = {
     number: 363,
     days: "Saturday & Sunday",
     route: "Route 450 — Nottingham",
-    signOn: "05:00",
+    signOn: "04:50",
     signOff: "16:10",
-    dutyLength: "11:10",
+    dutyLength: "11:20",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Elizabeth Line departs at 15:32",
@@ -3187,50 +3231,64 @@ const DUTY_CARDS = {
       title: "Preparation",
       stops: [{
         stop: "Sign On — Walk round check Coach 9",
-        time: "05:00"
+        time: "04:50"
       }, {
         stop: "Empty to Victoria Coach Station",
-        time: "05:20"
+        time: "05:10"
       }, {
         stop: "Arrive for loading",
         time: "06:20"
       }]
     }, {
-      title: "Trip 1 — Victoria → Nottingham",
+      title: "Trip 1 — Victoria → Milton Keynes → Leicester → Nottingham",
       stops: [{
         stop: "Victoria Coach Station departures",
         time: "06:30",
         dep: true
       }, {
-        stop: "Golders Green Bus Station Stop GE",
-        time: "07:05"
+        stop: "Milton Keynes Coachway",
+        time: "07:50"
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "09:00",
+        arr: true
+      }]
+    }, {
+      title: "Trip 1 continues — Leicester → Nottingham",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "09:05",
+        dep: true
       }, {
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "09:35",
+        time: "09:55",
         arr: true
       }]
     }, {
       title: "Trip 2 — Nottingham → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "11:00",
+        time: "11:30",
         dep: true
       }, {
-        stop: "Nottingham Trent University",
-        time: "11:10"
+        stop: "Nottingham University University Boulevard",
+        time: "11:40"
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "14:00"
       }, {
         stop: "Marble Arch Park Lane",
-        time: "14:20"
+        time: "14:35"
       }, {
         stop: "Victoria Coach Station arrivals",
-        time: "14:35",
+        time: "14:50",
         arr: true
       }]
     }, {
       title: "Handover & Return",
       stops: [{
         stop: "Hand over Coach 9 to Duty 368",
-        time: "14:45"
+        time: "15:00"
       }, {
         stop: "Travel on Tube back to Depot",
         time: "15:32",
@@ -3387,9 +3445,9 @@ const DUTY_CARDS = {
     number: 364,
     days: "Saturday & Sunday",
     route: "Route 400 — Birmingham",
-    signOn: "06:00",
+    signOn: "05:45",
     signOff: "16:40",
-    dutyLength: "10:40",
+    dutyLength: "10:55",
     coach: "Coach 8",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Elizabeth Line departs at 16:02",
@@ -3397,7 +3455,7 @@ const DUTY_CARDS = {
       title: "Preparation",
       stops: [{
         stop: "Sign On — Walk round check Coach 8",
-        time: "06:00"
+        time: "05:45"
       }, {
         stop: "Empty to Victoria Coach Station",
         time: "06:20"
@@ -3451,150 +3509,6 @@ const DUTY_CARDS = {
       }, {
         stop: "Sign Off",
         time: "16:40"
-      }]
-    }]
-  },
-  305: {
-    number: 305,
-    days: "Friday & Monday",
-    route: "Route 440 — Milton Keynes",
-    signOn: "05:45",
-    signOff: "17:10",
-    dutyLength: "11:30",
-    coach: "Coach 10",
-    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
-    segments: [{
-      title: "Empty to Victoria",
-      stops: [{
-        stop: "Sign On",
-        time: "05:45"
-      }, {
-        stop: "Empty to Victoria Coach Station",
-        time: "06:05"
-      }, {
-        stop: "Arrive for loading by",
-        time: "07:20"
-      }]
-    }, {
-      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
-      stops: [{
-        stop: "Victoria Coach Station",
-        time: "07:30",
-        dep: true
-      }, {
-        stop: "Milton Keynes Coachway",
-        time: "09:00"
-      }, {
-        stop: "Leicester Braunstone",
-        time: "10:10"
-      }, {
-        stop: "Leicester St Margaret's Bus Station",
-        time: "10:20",
-        arr: true
-      }]
-    }, {
-      title: "Trip 2 — Leicester → Victoria",
-      stops: [{
-        stop: "Leicester St Margaret's Bus Station",
-        time: "12:00",
-        dep: true
-      }, {
-        stop: "Leicester Braunstone",
-        time: "12:10"
-      }, {
-        stop: "Golders Green Bus Station Stop GE",
-        time: "14:10"
-      }, {
-        stop: "Marble Arch Park Lane",
-        time: "15:00"
-      }, {
-        stop: "Victoria Coach Station",
-        time: "15:05",
-        arr: true
-      }]
-    }, {
-      title: "Return to Depot",
-      stops: [{
-        stop: "Empty to Depot",
-        time: "15:10"
-      }, {
-        stop: "Travel on Tube back to Depot",
-        time: "16:07"
-      }, {
-        stop: "Sign Off",
-        time: "17:10"
-      }]
-    }]
-  },
-  365: {
-    number: 365,
-    days: "Saturday & Sunday",
-    route: "Route 440 — Milton Keynes",
-    signOn: "06:00",
-    signOff: "17:10",
-    dutyLength: "11:15",
-    coach: "Coach 10",
-    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
-    segments: [{
-      title: "Empty to Victoria",
-      stops: [{
-        stop: "Sign On",
-        time: "06:00"
-      }, {
-        stop: "Empty to Victoria Coach Station",
-        time: "06:20"
-      }, {
-        stop: "Arrive for loading by",
-        time: "07:20"
-      }]
-    }, {
-      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
-      stops: [{
-        stop: "Victoria Coach Station",
-        time: "07:30",
-        dep: true
-      }, {
-        stop: "Milton Keynes Coachway",
-        time: "08:50"
-      }, {
-        stop: "Leicester Braunstone",
-        time: "09:55"
-      }, {
-        stop: "Leicester St Margaret's Bus Station",
-        time: "10:05",
-        arr: true
-      }]
-    }, {
-      title: "Trip 2 — Leicester → Victoria",
-      stops: [{
-        stop: "Leicester St Margaret's Bus Station",
-        time: "12:00",
-        dep: true
-      }, {
-        stop: "Leicester Braunstone",
-        time: "12:10"
-      }, {
-        stop: "Golders Green Bus Station Stop GE",
-        time: "14:10"
-      }, {
-        stop: "Marble Arch Park Lane",
-        time: "15:00"
-      }, {
-        stop: "Victoria Coach Station",
-        time: "15:05",
-        arr: true
-      }]
-    }, {
-      title: "Return to Depot",
-      stops: [{
-        stop: "Empty to Depot",
-        time: "15:10"
-      }, {
-        stop: "Travel on Tube back to Depot",
-        time: "16:07"
-      }, {
-        stop: "Sign Off",
-        time: "17:10"
       }]
     }]
   },
@@ -3827,7 +3741,7 @@ const DUTY_CARDS = {
   },
   307: {
     number: 307,
-    days: "Monday & Friday",
+    days: "Monday",
     route: "Route 400 — Birmingham",
     signOn: "12:35",
     signOff: "23:45",
@@ -4031,8 +3945,8 @@ const DUTY_CARDS = {
     days: "Monday",
     route: "Route 450 — Nottingham",
     signOn: "13:35",
-    signOff: "00:40",
-    dutyLength: "11:05",
+    signOff: "01:05",
+    dutyLength: "11:30",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Tube departs at 13:45",
@@ -4049,45 +3963,59 @@ const DUTY_CARDS = {
       title: "Trip 1 — Victoria → Nottingham",
       stops: [{
         stop: "Take over Coach 9 from Duty 303",
-        time: "14:45",
+        time: "15:00",
         notes: "Takeover"
       }, {
         stop: "Victoria Coach Station departures",
         time: "15:30",
         dep: true
       }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "16:15"
+      }, {
         stop: "Nottingham University University Boulevard",
-        time: "19:05"
+        time: "19:00"
       }, {
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "19:15",
+        time: "19:10",
         arr: true
       }]
     }, {
-      title: "Trip 2 — Nottingham → Victoria",
+      title: "Trip 2 — Nottingham → Leicester → Milton Keynes → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "20:20",
+        time: "20:35",
+        dep: true
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:20",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 continues — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:30",
         dep: true
       }, {
         stop: "Milton Keynes Coachway",
-        time: "22:05"
+        time: "22:40"
       }, {
         stop: "Marble Arch Park Lane",
-        time: "23:20"
+        time: "23:55"
       }, {
         stop: "Victoria Coach Station arrivals",
-        time: "23:30",
+        time: "00:05",
         arr: true
       }]
     }, {
       title: "Return to Depot",
       stops: [{
         stop: "Empty to Depot",
-        time: "23:30"
+        time: "00:05"
       }, {
         stop: "Sign Off",
-        time: "00:40"
+        time: "01:05"
       }]
     }]
   },
@@ -4096,8 +4024,8 @@ const DUTY_CARDS = {
     days: "Tuesday to Thursday",
     route: "Route 450 — Nottingham",
     signOn: "13:35",
-    signOff: "00:55",
-    dutyLength: "11:20",
+    signOff: "01:05",
+    dutyLength: "11:30",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Tube departs at 13:45",
@@ -4114,45 +4042,59 @@ const DUTY_CARDS = {
       title: "Trip 1 — Victoria → Nottingham",
       stops: [{
         stop: "Take over Coach 9 from Duty 323",
-        time: "14:45",
+        time: "15:00",
         notes: "Takeover"
       }, {
         stop: "Victoria Coach Station departures",
         time: "15:30",
         dep: true
       }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "16:15"
+      }, {
         stop: "Nottingham University University Boulevard",
-        time: "19:05"
+        time: "18:45"
       }, {
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "19:15",
+        time: "18:55",
         arr: true
       }]
     }, {
-      title: "Trip 2 — Nottingham → Victoria",
+      title: "Trip 2 — Nottingham → Leicester → Milton Keynes → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
         time: "20:35",
         dep: true
       }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:20",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 continues — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:30",
+        dep: true
+      }, {
         stop: "Milton Keynes Coachway",
-        time: "22:20"
+        time: "22:40"
       }, {
         stop: "Marble Arch Park Lane",
-        time: "23:35"
+        time: "23:55"
       }, {
         stop: "Victoria Coach Station arrivals",
-        time: "23:45",
+        time: "00:05",
         arr: true
       }]
     }, {
       title: "Return to Depot",
       stops: [{
         stop: "Empty to Depot",
-        time: "23:45"
+        time: "00:05"
       }, {
         stop: "Sign Off",
-        time: "00:55"
+        time: "01:05"
       }]
     }]
   },
@@ -4161,8 +4103,8 @@ const DUTY_CARDS = {
     days: "Friday",
     route: "Route 450 — Nottingham",
     signOn: "13:35",
-    signOff: "00:40",
-    dutyLength: "11:05",
+    signOff: "01:05",
+    dutyLength: "11:30",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Tube departs at 13:45",
@@ -4178,43 +4120,60 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Victoria → Nottingham",
       stops: [{
-        stop: "Take over Coach 9 from Duty 343",
-        time: "14:45",
+        stop: "Take over Coach 9 from Duty 303",
+        time: "15:00",
         notes: "Takeover"
       }, {
         stop: "Victoria Coach Station departures",
         time: "15:30",
         dep: true
       }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "16:20"
+      }, {
+        stop: "Nottingham University University Boulevard",
+        time: "19:05"
+      }, {
         stop: "Nottingham Broad Marsh Bus Station",
         time: "19:15",
         arr: true
       }]
     }, {
-      title: "Trip 2 — Nottingham → Victoria",
+      title: "Trip 2 — Nottingham → Leicester → Milton Keynes → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "20:20",
+        time: "20:35",
+        dep: true
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:20",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 continues — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:30",
         dep: true
       }, {
         stop: "Milton Keynes Coachway",
-        time: "22:05"
+        time: "22:40"
       }, {
         stop: "Marble Arch Park Lane",
-        time: "23:20"
+        time: "23:55"
       }, {
         stop: "Victoria Coach Station arrivals",
-        time: "23:30",
+        time: "00:05",
         arr: true
       }]
     }, {
       title: "Return to Depot",
       stops: [{
         stop: "Empty to Depot",
-        time: "23:30"
+        time: "00:05"
       }, {
         stop: "Sign Off",
-        time: "00:40"
+        time: "01:05"
       }]
     }]
   },
@@ -4223,8 +4182,8 @@ const DUTY_CARDS = {
     days: "Saturday & Sunday",
     route: "Route 450 — Nottingham",
     signOn: "13:35",
-    signOff: "00:40",
-    dutyLength: "11:05",
+    signOff: "01:05",
+    dutyLength: "11:30",
     coach: "Coach 9",
     reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
     tubeInfo: "Tube departs at 13:45",
@@ -4241,12 +4200,15 @@ const DUTY_CARDS = {
       title: "Trip 1 — Victoria → Nottingham",
       stops: [{
         stop: "Take over Coach 9 from Duty 363",
-        time: "14:45",
+        time: "15:00",
         notes: "Takeover"
       }, {
         stop: "Victoria Coach Station departures",
         time: "15:30",
         dep: true
+      }, {
+        stop: "Golders Green Bus Station Stop GE",
+        time: "16:15"
       }, {
         stop: "Nottingham University University Boulevard",
         time: "18:45"
@@ -4256,30 +4218,41 @@ const DUTY_CARDS = {
         arr: true
       }]
     }, {
-      title: "Trip 2 — Nottingham → Victoria",
+      title: "Trip 2 — Nottingham → Leicester → Milton Keynes → Victoria",
       stops: [{
         stop: "Nottingham Broad Marsh Bus Station",
-        time: "20:20",
+        time: "20:35",
+        dep: true
+      }, {
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:20",
+        arr: true
+      }]
+    }, {
+      title: "Trip 2 continues — Leicester → Victoria",
+      stops: [{
+        stop: "Leicester St Margaret's Bus Station",
+        time: "21:30",
         dep: true
       }, {
         stop: "Milton Keynes Coachway",
-        time: "22:05"
+        time: "22:40"
       }, {
         stop: "Marble Arch Park Lane",
-        time: "23:20"
+        time: "23:55"
       }, {
         stop: "Victoria Coach Station arrivals",
-        time: "23:30",
+        time: "00:05",
         arr: true
       }]
     }, {
       title: "Return to Depot",
       stops: [{
         stop: "Empty to Depot",
-        time: "23:30"
+        time: "00:05"
       }, {
         stop: "Sign Off",
-        time: "00:40"
+        time: "01:05"
       }]
     }]
   },
@@ -4547,130 +4520,6 @@ const DUTY_CARDS = {
       }, {
         stop: "Sign Off",
         time: "23:45"
-      }]
-    }]
-  },
-  310: {
-    number: 310,
-    days: "Friday & Monday",
-    route: "Route 440 — Milton Keynes",
-    signOn: "14:35",
-    signOff: "01:15",
-    dutyLength: "10:45",
-    coach: "Coach 10",
-    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
-    tubeInfo: "Tube departs at 14:40",
-    segments: [{
-      title: "Travel to Victoria",
-      stops: [{
-        stop: "Sign On",
-        time: "14:35"
-      }, {
-        stop: "Travel on Tube to Victoria Coach Station",
-        time: "14:40",
-        notes: "Tube departs 14:40"
-      }]
-    }, {
-      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
-      stops: [{
-        stop: "Victoria Coach Station",
-        time: "17:00",
-        dep: true
-      }, {
-        stop: "Milton Keynes Coachway",
-        time: "19:00"
-      }, {
-        stop: "Leicester St Margaret's Bus Station",
-        time: "20:25",
-        arr: true
-      }]
-    }, {
-      title: "Trip 2 — Leicester → Victoria",
-      stops: [{
-        stop: "Leicester St Margaret's Bus Station",
-        time: "21:30",
-        dep: true
-      }, {
-        stop: "Milton Keynes Coachway",
-        time: "22:40"
-      }, {
-        stop: "Marble Arch Park Lane",
-        time: "23:55"
-      }, {
-        stop: "Victoria Coach Station",
-        time: "00:05",
-        arr: true
-      }]
-    }, {
-      title: "Return to Depot",
-      stops: [{
-        stop: "Empty to Depot",
-        time: "00:10"
-      }, {
-        stop: "Sign Off",
-        time: "01:15"
-      }]
-    }]
-  },
-  370: {
-    number: 370,
-    days: "Saturday & Sunday",
-    route: "Route 440 — Milton Keynes",
-    signOn: "14:35",
-    signOff: "01:15",
-    dutyLength: "10:45",
-    coach: "Coach 10",
-    reminders: ["Ensure you have a 45 minute break", "Record travel movement as other work on tachograph", "When on a motorway you are in control of your excess speed"],
-    tubeInfo: "Tube departs at 14:40",
-    segments: [{
-      title: "Travel to Victoria",
-      stops: [{
-        stop: "Sign On",
-        time: "14:35"
-      }, {
-        stop: "Travel on Tube to Victoria Coach Station",
-        time: "14:40",
-        notes: "Tube departs 14:40"
-      }]
-    }, {
-      title: "Trip 1 — Victoria → Milton Keynes → Leicester",
-      stops: [{
-        stop: "Victoria Coach Station",
-        time: "17:00",
-        dep: true
-      }, {
-        stop: "Milton Keynes Coachway",
-        time: "18:40"
-      }, {
-        stop: "Leicester St Margaret's Bus Station",
-        time: "20:05",
-        arr: true
-      }]
-    }, {
-      title: "Trip 2 — Leicester → Victoria",
-      stops: [{
-        stop: "Leicester St Margaret's Bus Station",
-        time: "21:30",
-        dep: true
-      }, {
-        stop: "Milton Keynes Coachway",
-        time: "22:40"
-      }, {
-        stop: "Marble Arch Park Lane",
-        time: "23:55"
-      }, {
-        stop: "Victoria Coach Station",
-        time: "00:05",
-        arr: true
-      }]
-    }, {
-      title: "Return to Depot",
-      stops: [{
-        stop: "Empty to Depot",
-        time: "00:10"
-      }, {
-        stop: "Sign Off",
-        time: "01:15"
       }]
     }]
   }
