@@ -57,6 +57,27 @@ function clearSession() {
     sessionStorage.removeItem("jet_auth");
   } catch {}
 }
+const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
+async function submitPortalRequest(kind, payload) {
+  const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    cache: "no-store",
+    body: JSON.stringify({
+      kind,
+      payload
+    })
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {}
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || "Unable to send request right now.");
+  }
+}
 
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
@@ -85,12 +106,16 @@ function App() {
     notes: ""
   });
   const [leaveSubmitted, setLeaveSubmitted] = React.useState(false);
+  const [leaveSending, setLeaveSending] = React.useState(false);
+  const [leaveError, setLeaveError] = React.useState("");
   const [swapForm, setSwapForm] = React.useState({
     dayIndex: "",
     targetDriver: "",
     notes: ""
   });
   const [swapSubmitted, setSwapSubmitted] = React.useState(false);
+  const [swapSending, setSwapSending] = React.useState(false);
+  const [swapError, setSwapError] = React.useState("");
   const printRef = React.useRef(null);
   const today = (() => {
     const d = new Date().getDay();
@@ -1589,6 +1614,8 @@ function App() {
   }, "\uD83D\uDCD8 Browse Duty Cards"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setLeaveSubmitted(false);
+      setLeaveSending(false);
+      setLeaveError("");
       setLeaveForm({
         dateFrom: "",
         dateTo: "",
@@ -1624,6 +1651,8 @@ function App() {
   }, "\uD83D\uDCCB Request Annual Leave"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setSwapSubmitted(false);
+      setSwapSending(false);
+      setSwapError("");
       setSwapForm({
         dayIndex: "",
         targetDriver: "",
@@ -1656,10 +1685,8 @@ function App() {
       e.currentTarget.style.borderColor = "#ffffff25";
     }
   }, "\uD83D\uDD04 Request Shift Swap")), screen === "leave" && selectedDriver && (() => {
-    const LEAVE_EMAIL = "operations@jet-travel.co.uk"; // ← UPDATE WITH REAL EMAIL // ← REPLACE WITH ACTUAL EMAIL
-    const handleSubmit = () => {
-      if (!leaveForm.dateFrom || !leaveForm.dateTo) return;
-      const subject = encodeURIComponent(`Annual Leave Request — ${selectedDriver}`);
+    const handleSubmit = async () => {
+      if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
         weekday: "long",
         day: "numeric",
@@ -1675,9 +1702,25 @@ function App() {
       const startD = new Date(leaveForm.dateFrom);
       const endD = new Date(leaveForm.dateTo);
       const diffDays = Math.max(1, Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1);
-      const body = encodeURIComponent(`ANNUAL LEAVE REQUEST\n` + `━━━━━━━━━━━━━━━━━━━\n\n` + `Driver: ${selectedDriver}\n` + `From: ${fromDate}\n` + `To: ${toDate}\n` + `Total days: ${diffDays}\n` + `Reason: ${leaveForm.reason || "Annual leave"}\n` + (leaveForm.notes ? `Notes: ${leaveForm.notes}\n` : "") + `\n━━━━━━━━━━━━━━━━━━━\n` + `Submitted: ${new Date().toLocaleString("en-GB")}\n` + `via JET Driver Portal`);
-      window.open(`mailto:${LEAVE_EMAIL}?subject=${subject}&body=${body}`, "_self");
-      setLeaveSubmitted(true);
+      setLeaveSending(true);
+      setLeaveError("");
+      try {
+        await submitPortalRequest("leave", {
+          driverName: selectedDriver,
+          dateFrom: leaveForm.dateFrom,
+          dateTo: leaveForm.dateTo,
+          fromDateLabel: fromDate,
+          toDateLabel: toDate,
+          totalDays: diffDays,
+          reason: leaveForm.reason || "Annual leave",
+          notes: leaveForm.notes || "",
+          submittedAtIso: new Date().toISOString()
+        });
+        setLeaveSubmitted(true);
+      } catch (err) {
+        setLeaveError(err?.message || "Unable to send leave request.");
+      }
+      setLeaveSending(false);
     };
     const inputStyle = {
       width: "100%",
@@ -1719,6 +1762,8 @@ function App() {
       onClick: () => {
         setScreen("week");
         setLeaveSubmitted(false);
+        setLeaveError("");
+        setLeaveSending(false);
         setLeaveForm({
           dateFrom: "",
           dateTo: "",
@@ -1885,22 +1930,30 @@ function App() {
       }
     })), /*#__PURE__*/React.createElement("button", {
       onClick: handleSubmit,
-      disabled: !leaveForm.dateFrom || !leaveForm.dateTo,
+      disabled: !leaveForm.dateFrom || !leaveForm.dateTo || leaveSending,
       style: {
         width: "100%",
         padding: "14px",
-        background: !leaveForm.dateFrom || !leaveForm.dateTo ? C.textDim + "44" : C.accent,
-        color: !leaveForm.dateFrom || !leaveForm.dateTo ? C.textDim : C.bg,
+        background: !leaveForm.dateFrom || !leaveForm.dateTo || leaveSending ? C.textDim + "44" : C.accent,
+        color: !leaveForm.dateFrom || !leaveForm.dateTo || leaveSending ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "14px",
         fontWeight: 700,
-        cursor: !leaveForm.dateFrom || !leaveForm.dateTo ? "not-allowed" : "pointer",
+        cursor: !leaveForm.dateFrom || !leaveForm.dateTo || leaveSending ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px",
         marginTop: "6px"
       }
-    }, "Submit Leave Request"), /*#__PURE__*/React.createElement("p", {
+    }, leaveSending ? "Sending..." : "Submit Leave Request"), leaveError && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: "#fda4af",
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "2px 0 0"
+      }
+    }, leaveError), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "10px",
         color: C.textDim,
@@ -1908,21 +1961,34 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This will open your email app with the request ready to send. Your manager will receive the request and confirm by return.")));
+    }, "This sends directly to office staff for approval. You'll be contacted with a decision.")));
   })(), screen === "swap" && selectedDriver && (() => {
-    const SWAP_EMAIL = "operations@jet-travel.co.uk"; // ← UPDATE WITH REAL EMAIL // ← REPLACE WITH ACTUAL EMAIL
     const myRota = ROTA[selectedDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
     const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
     const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
     const targetDayDuty = swapForm.dayIndex !== "" && swapForm.targetDriver ? targetRota[parseInt(swapForm.dayIndex)] || "—" : null;
-    const handleSwapSubmit = () => {
-      if (swapForm.dayIndex === "" || !swapForm.targetDriver) return;
+    const handleSwapSubmit = async () => {
+      if (swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending) return;
       const dayName = DAYS[parseInt(swapForm.dayIndex)];
-      const subject = encodeURIComponent(`Shift Swap Request — ${selectedDriver} ↔ ${swapForm.targetDriver}`);
-      const body = encodeURIComponent(`SHIFT SWAP REQUEST\n` + `━━━━━━━━━━━━━━━━━━━\n\n` + `Requesting Driver: ${selectedDriver}\n` + `Current duty (${dayName}): ${selectedDayDuty}\n\n` + `Swap With: ${swapForm.targetDriver}\n` + `Their duty (${dayName}): ${targetDayDuty}\n\n` + (swapForm.notes ? `Notes: ${swapForm.notes}\n\n` : "") + `━━━━━━━━━━━━━━━━━━━\n` + `Both drivers must agree to this swap.\n` + `Submitted: ${new Date().toLocaleString("en-GB")}\n` + `via JET Driver Portal`);
-      window.open(`mailto:${SWAP_EMAIL}?subject=${subject}&body=${body}`, "_self");
-      setSwapSubmitted(true);
+      setSwapSending(true);
+      setSwapError("");
+      try {
+        await submitPortalRequest("swap", {
+          requestingDriver: selectedDriver,
+          targetDriver: swapForm.targetDriver,
+          dayIndex: parseInt(swapForm.dayIndex),
+          dayName,
+          requestingDuty: selectedDayDuty || "—",
+          targetDuty: targetDayDuty || "—",
+          notes: swapForm.notes || "",
+          submittedAtIso: new Date().toISOString()
+        });
+        setSwapSubmitted(true);
+      } catch (err) {
+        setSwapError(err?.message || "Unable to send swap request.");
+      }
+      setSwapSending(false);
     };
     const inputStyle = {
       width: "100%",
@@ -1964,6 +2030,8 @@ function App() {
       onClick: () => {
         setScreen("week");
         setSwapSubmitted(false);
+        setSwapError("");
+        setSwapSending(false);
         setSwapForm({
           dayIndex: "",
           targetDriver: "",
@@ -2212,22 +2280,30 @@ function App() {
       }
     })), /*#__PURE__*/React.createElement("button", {
       onClick: handleSwapSubmit,
-      disabled: swapForm.dayIndex === "" || !swapForm.targetDriver,
+      disabled: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending,
       style: {
         width: "100%",
         padding: "14px",
-        background: swapForm.dayIndex === "" || !swapForm.targetDriver ? C.textDim + "44" : "#06b6d4",
-        color: swapForm.dayIndex === "" || !swapForm.targetDriver ? C.textDim : C.bg,
+        background: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending ? C.textDim + "44" : "#06b6d4",
+        color: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "14px",
         fontWeight: 700,
-        cursor: swapForm.dayIndex === "" || !swapForm.targetDriver ? "not-allowed" : "pointer",
+        cursor: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px",
         marginTop: "6px"
       }
-    }, "Submit Swap Request"), /*#__PURE__*/React.createElement("p", {
+    }, swapSending ? "Sending..." : "Submit Swap Request"), swapError && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: "#fda4af",
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "2px 0 0"
+      }
+    }, swapError), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "10px",
         color: C.textDim,
