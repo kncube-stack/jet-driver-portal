@@ -4556,6 +4556,13 @@ const SPECIAL_DUTIES = {
     dutyLength: "12:00",
     color: "#8b5cf6"
   },
+  "OPM": {
+    label: "Operational Management",
+    signOn: "07:00",
+    signOff: "17:00",
+    dutyLength: "10:00",
+    color: "#14b8a6"
+  },
   "DTO": {
     label: "Driver Training / Office",
     signOn: "—",
@@ -4789,9 +4796,16 @@ const DAILY_RUNOUT = {
   }
 };
 
+function getLocalDateKey(date = new Date()) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 // Helper: get today's run out data for a given duty
 function getTodayRunout(dutyNum) {
-  const dateKey = new Date().toISOString().slice(0, 10);
+  const dateKey = getLocalDateKey();
   const todayData = DAILY_RUNOUT[dateKey];
   if (!todayData) return null;
   return todayData[dutyNum] || null;
@@ -4799,7 +4813,7 @@ function getTodayRunout(dutyNum) {
 
 // Helper: get run out info for a driver by name (checks today's sheet)
 function getDriverRunout(driverName) {
-  const dateKey = new Date().toISOString().slice(0, 10);
+  const dateKey = getLocalDateKey();
   const todayData = DAILY_RUNOUT[dateKey];
   if (!todayData) return null;
   for (const [dutyNum, info] of Object.entries(todayData)) {
@@ -4955,10 +4969,18 @@ const SECTION_LABEL_MAP = {
   late_network: "Late Network",
   part_time: "Part Time",
   spare: "Spare / Private Hire / Tour",
+  management: "Operational Management",
   controllers: "Controllers",
   cleaners: "Cleaners",
   shunters: "Shunters"
 };
+
+// Manual staff overrides stay in-code while external source integration is in progress.
+const MANUAL_STAFF_OVERRIDES = [{
+  name: "Errol Thomas",
+  sectionKey: "management",
+  week: ["OPM", "OPM", "OPM", "OPM", "OPM", "R", "R"]
+}];
 async function discoverSheetTabs() {
   const res = await fetch(GSHEET_PUB_BASE + "/pubhtml");
   const html = await res.text();
@@ -5075,28 +5097,99 @@ function parseRotaCSV(csvText) {
     rota
   };
 }
+function applyManualStaffOverrides(parsed) {
+  const sections = parsed.sections.map(s => ({
+    ...s,
+    drivers: [...s.drivers]
+  }));
+  const rota = {
+    ...parsed.rota
+  };
+  const sectionIdxByKey = {};
+  sections.forEach((s, idx) => {
+    sectionIdxByKey[s.key] = idx;
+  });
+  MANUAL_STAFF_OVERRIDES.forEach(override => {
+    if (!override?.name || !override?.sectionKey || !Array.isArray(override.week)) return;
+    const name = override.name;
+    sections.forEach(s => {
+      s.drivers = s.drivers.filter(d => d !== name);
+    });
+    rota[name] = override.week.slice(0, 7);
+    if (sectionIdxByKey[override.sectionKey] === undefined) {
+      sections.push({
+        key: override.sectionKey,
+        label: SECTION_LABEL_MAP[override.sectionKey] || override.sectionKey,
+        drivers: [name]
+      });
+      sectionIdxByKey[override.sectionKey] = sections.length - 1;
+    } else if (!sections[sectionIdxByKey[override.sectionKey]].drivers.includes(name)) {
+      sections[sectionIdxByKey[override.sectionKey]].drivers.push(name);
+    }
+  });
+  sections.forEach(s => {
+    s.drivers.sort((a, b) => a.localeCompare(b, undefined, {
+      sensitivity: "base"
+    }));
+  });
+  return {
+    sections,
+    rota
+  };
+}
+function parseWeekTabDate(tabName) {
+  const m = tabName.match(/WC (\d{2})\.(\d{2})\.(\d{4})/);
+  if (!m) return null;
+  return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+}
+function sortAvailableWeeks(weeks) {
+  return [...weeks].sort((a, b) => {
+    const da = parseWeekTabDate(a.tabName);
+    const db = parseWeekTabDate(b.tabName);
+    if (!da && !db) return a.tabName.localeCompare(b.tabName);
+    if (!da) return 1;
+    if (!db) return -1;
+    return da - db;
+  });
+}
 function formatWeekCommencing(tabName) {
   const match = tabName.match(/WC (\d{2})\.(\d{2})\.(\d{4})/);
   if (!match) return tabName;
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${parseInt(match[1])} ${months[parseInt(match[2]) - 1]} ${match[3]}`;
 }
+
+// Data layer adapter (phase 1): UI remains unchanged while source backends become swappable.
+const ROTA_DATA_ADAPTERS = {
+  googleSheets: {
+    async discoverTabs() {
+      return await discoverSheetTabs();
+    },
+    async fetchWeekByGid(gid) {
+      const csv = await fetchTabCSV(gid);
+      return parseRotaCSV(csv);
+    }
+  }
+};
+const ACTIVE_ROTA_ADAPTER_KEY = "googleSheets";
+const ACTIVE_ROTA_ADAPTER = ROTA_DATA_ADAPTERS[ACTIVE_ROTA_ADAPTER_KEY];
+
 async function fetchLiveRota() {
-  const tabs = await discoverSheetTabs();
+  const tabs = await ACTIVE_ROTA_ADAPTER.discoverTabs();
   const {
     tabName,
     gid
   } = findCurrentWeekTab(tabs);
-  const csv = await fetchTabCSV(gid);
+  const parsed = await ACTIVE_ROTA_ADAPTER.fetchWeekByGid(gid);
   const {
     sections,
     rota
-  } = parseRotaCSV(csv);
-  const availableWeeks = Object.keys(tabs).map(k => ({
+  } = applyManualStaffOverrides(parsed);
+  const availableWeeks = sortAvailableWeeks(Object.keys(tabs).map(k => ({
     tabName: k,
     gid: tabs[k],
     label: formatWeekCommencing(k)
-  }));
+  })));
   return {
     sections,
     rota,
@@ -5108,8 +5201,8 @@ async function fetchLiveRota() {
 async function fetchWeekRota(tabs, tabName) {
   const gid = tabs[tabName];
   if (!gid) return null;
-  const csv = await fetchTabCSV(gid);
-  return parseRotaCSV(csv);
+  const parsed = await ACTIVE_ROTA_ADAPTER.fetchWeekByGid(gid);
+  return applyManualStaffOverrides(parsed);
 }
 
 // ─── DERIVED DATA BUILDERS ──────────────────────────────────
