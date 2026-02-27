@@ -15,31 +15,30 @@
   } = window.JET_DATA_LAYER;
   const { C, isDutyNumber, getSpecialDuty, getStatusStyle, filterNote } = window.JET_UI;
 
-async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
 function readStoredSession() {
   try {
     const raw = localStorage.getItem("jet_session") || sessionStorage.getItem("jet_session");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.name) return null;
+    if (!parsed?.name || !parsed?.token) return null;
+    if (parsed.expiresAt && Date.now() > new Date(parsed.expiresAt).getTime()) return null;
     return {
       name: parsed.name,
-      role: parsed.role === "manager" ? "manager" : "driver"
+      role: parsed.role === "manager" ? "manager" : "driver",
+      token: parsed.token,
+      expiresAt: parsed.expiresAt || null
     };
   } catch {
     return null;
   }
 }
-function writeSession(name, role) {
+function writeSession(name, role, token, expiresAt) {
   try {
     const payload = JSON.stringify({
       name,
-      role
+      role,
+      token,
+      expiresAt: expiresAt || null
     });
     localStorage.setItem("jet_session", payload);
     sessionStorage.setItem("jet_session", payload);
@@ -60,12 +59,17 @@ function clearSession() {
   } catch {}
 }
 const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
-async function submitPortalRequest(kind, payload) {
+const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
+const AUTH_SESSION_ENDPOINT = "/api/auth-session";
+async function submitPortalRequest(kind, payload, token) {
+  if (!token) throw new Error("Session expired. Please sign in again.");
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  };
   const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers,
     cache: "no-store",
     body: JSON.stringify({
       kind,
@@ -80,11 +84,52 @@ async function submitPortalRequest(kind, payload) {
     throw new Error(data?.error || "Unable to send request right now.");
   }
 }
+async function loginWithServer(name, pin) {
+  const response = await fetch(AUTH_LOGIN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    cache: "no-store",
+    body: JSON.stringify({
+      name,
+      pin
+    })
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {}
+  if (!response.ok || !data?.ok || !data?.session?.token) {
+    throw new Error(data?.error || "Unable to sign in.");
+  }
+  return data.session;
+}
+async function verifyServerSession(token) {
+  if (!token) throw new Error("Missing session token.");
+  const response = await fetch(AUTH_SESSION_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    cache: "no-store"
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {}
+  if (!response.ok || !data?.ok || !data?.session?.name) {
+    throw new Error(data?.error || "Session verification failed.");
+  }
+  return data.session;
+}
 
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
   const storedSession = React.useMemo(() => readStoredSession(), []);
   const [authed, setAuthed] = React.useState(() => !!storedSession);
+  const [sessionToken, setSessionToken] = React.useState(() => storedSession?.token || "");
+  const [sessionVerifying, setSessionVerifying] = React.useState(() => !!storedSession?.token);
   const [authName, setAuthName] = React.useState(() => storedSession?.name || "");
   const [authPin, setAuthPin] = React.useState("");
   const [authError, setAuthError] = React.useState("");
@@ -146,6 +191,49 @@ function App() {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
   } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!storedSession?.token) {
+      setSessionVerifying(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    verifyServerSession(storedSession.token).then(serverSession => {
+      if (cancelled) return;
+      const resolvedRole = serverSession.role === "manager" ? "manager" : "driver";
+      writeSession(serverSession.name, resolvedRole, storedSession.token, serverSession.expiresAt || storedSession.expiresAt || null);
+      setSessionToken(storedSession.token);
+      setAuthed(true);
+      setCurrentRole(resolvedRole);
+      setCurrentUser(serverSession.name);
+      setAuthName(serverSession.name);
+      if (DRIVERS.includes(serverSession.name)) {
+        setSelectedDriver(serverSession.name);
+        setScreen("week");
+      } else {
+        setSelectedDriver(null);
+        setScreen("home");
+      }
+    }).catch(() => {
+      if (cancelled) return;
+      clearSession();
+      setSessionToken("");
+      setAuthed(false);
+      setCurrentUser(null);
+      setCurrentRole("driver");
+      setScreen("home");
+      setSelectedDriver(null);
+      setAuthName("");
+      setAuthPin("");
+      setAuthError("Session expired. Please sign in again.");
+    }).finally(() => {
+      if (!cancelled) setSessionVerifying(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storedSession?.token]);
 
   // Fetch live rota on mount
   React.useEffect(() => {
@@ -233,30 +321,23 @@ function App() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      const hash = await sha256(pin);
-      const strictMode = ACCESS_CONTROL.mode === "strict";
-      const userPinHash = ACCESS_CONTROL.userPinHashes?.[name];
-      const passByUserPin = !!userPinHash && hash === userPinHash;
-      const passByManagerPin = !!ACCESS_CONTROL.managerMasterPinHash && isManagerName && hash === ACCESS_CONTROL.managerMasterPinHash;
-      const passBySharedPin = !strictMode && !!ACCESS_CONTROL.defaultDriverPinHash && hash === ACCESS_CONTROL.defaultDriverPinHash;
-      if (!(passByUserPin || passByManagerPin || passBySharedPin)) {
-        setAuthError("Incorrect PIN.");
-        setAuthLoading(false);
-        return;
-      }
-      const role = isManagerName ? "manager" : "driver";
-      writeSession(name, role);
+      const session = await loginWithServer(name, pin);
+      const resolvedName = session.name;
+      const role = session.role === "manager" ? "manager" : "driver";
+      const resolvedKnownDriver = DRIVERS.includes(resolvedName);
+      writeSession(resolvedName, role, session.token, session.expiresAt || null);
+      setSessionToken(session.token);
       setAuthed(true);
       setCurrentRole(role);
-      setCurrentUser(name);
-      setSelectedDriver(knownDriver ? name : null);
-      setScreen(knownDriver ? "week" : "home");
+      setCurrentUser(resolvedName);
+      setSelectedDriver(resolvedKnownDriver ? resolvedName : null);
+      setScreen(resolvedKnownDriver ? "week" : "home");
       setSearch("");
       setDutySearch("");
       setNameSearch("");
       setAuthPin("");
-    } catch {
-      setAuthError("Unable to verify PIN. Please try again.");
+    } catch (err) {
+      setAuthError(err?.message || "Unable to verify PIN. Please try again.");
     }
     setAuthLoading(false);
   };
@@ -264,6 +345,25 @@ function App() {
     if (!authed || isManager) return;
     if (selectedDriver !== currentUser) setSelectedDriver(currentUser);
   }, [authed, isManager, selectedDriver, currentUser]);
+  if (sessionVerifying) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted
+      }
+    }, "Verifying session..."));
+  }
   if (!authed) {
     const nameQ = nameSearch.toLowerCase().trim();
     const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
@@ -639,6 +739,7 @@ function App() {
   };
   const switchUser = () => {
     clearSession();
+    setSessionToken("");
     setAuthed(false);
     setCurrentUser(null);
     setCurrentRole("driver");
@@ -1739,7 +1840,7 @@ function App() {
           reason: leaveForm.reason || "Annual leave",
           notes: leaveForm.notes || "",
           submittedAtIso: new Date().toISOString()
-        });
+        }, sessionToken);
         setLeaveSubmitted(true);
       } catch (err) {
         setLeaveError(err?.message || "Unable to send leave request.");
@@ -2007,7 +2108,7 @@ function App() {
           targetDuty: targetDayDuty || "—",
           notes: swapForm.notes || "",
           submittedAtIso: new Date().toISOString()
-        });
+        }, sessionToken);
         setSwapSubmitted(true);
       } catch (err) {
         setSwapError(err?.message || "Unable to send swap request.");

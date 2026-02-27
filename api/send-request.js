@@ -1,3 +1,4 @@
+const { verifyRequestSession, parseRequestBody } = require("./_auth");
 const LEAVE_REQUEST_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_REQUEST_TO = "operations@jasonedwardstravel.co.uk";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -113,6 +114,10 @@ module.exports = async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ ok: false, error: "Method not allowed." });
   }
+  const session = verifyRequestSession(req);
+  if (!session) {
+    return res.status(401).json({ ok: false, error: "Session expired. Please sign in again." });
+  }
 
   const apiKey = process.env.RESEND_API_KEY;
   const fromAddress = process.env.PORTAL_EMAIL_FROM || process.env.EMAIL_FROM;
@@ -123,18 +128,27 @@ module.exports = async function handler(req, res) {
       error: "Email service is not configured. Set RESEND_API_KEY and PORTAL_EMAIL_FROM."
     });
   }
-
-  let body = req.body;
-  if (typeof body === "string") {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      return res.status(400).json({ ok: false, error: "Invalid JSON body." });
-    }
+  const body = parseRequestBody(req);
+  if (!body) {
+    return res.status(400).json({ ok: false, error: "Invalid JSON body." });
   }
 
   const kind = body && typeof body.kind === "string" ? body.kind : "";
   const payload = body && typeof body.payload === "object" && body.payload ? body.payload : {};
+  if (session.role !== "manager") {
+    if (kind === "leave") {
+      const requestedDriver = asCleanString(payload.driverName, 120);
+      if (requestedDriver !== session.name) {
+        return res.status(403).json({ ok: false, error: "Not allowed to submit leave for another driver." });
+      }
+    }
+    if (kind === "swap") {
+      const requestingDriver = asCleanString(payload.requestingDriver, 120);
+      if (requestingDriver !== session.name) {
+        return res.status(403).json({ ok: false, error: "Not allowed to submit swap for another driver." });
+      }
+    }
+  }
 
   let email;
   if (kind === "leave") {
