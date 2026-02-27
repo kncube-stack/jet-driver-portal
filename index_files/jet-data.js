@@ -4944,6 +4944,14 @@ const STAFF_DIRECTORY = [{
   drivers: ["Abdikadir", "Alin"]
 }];
 
+// Name-source behavior:
+// - includeSheetDiscoveredStaff false: only in-app directory names are shown.
+// - includeSheetDiscoveredStaff true: new names found in sheet/sharepoint are auto-added.
+const STAFF_SOURCE_CONFIG = {
+  includeSheetDiscoveredStaff: false,
+  fallbackSectionKey: "part_time"
+};
+
 // Manual staff overrides stay in-code while external source integration is in progress.
 const MANUAL_STAFF_OVERRIDES = [{
   name: "Errol Thomas",
@@ -4971,6 +4979,7 @@ const ACCESS_CONTROL = {
     SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
     STAFF_DIRECTORY,
+    STAFF_SOURCE_CONFIG,
     MANUAL_STAFF_OVERRIDES,
     ACCESS_CONTROL
   };

@@ -2,8 +2,10 @@
   const {
     DAILY_RUNOUT,
     GSHEET_PUB_BASE,
+    SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
     STAFF_DIRECTORY,
+    STAFF_SOURCE_CONFIG,
     MANUAL_STAFF_OVERRIDES
   } = window.JET_DATA;
 
@@ -122,10 +124,20 @@ function parseRotaCSV(csvText) {
   const sections = getStaffDirectorySections();
   const rota = buildEmptyRotaFromSections(sections);
   const sheetWeekByName = {};
+  const sheetSectionByName = {};
+  let currentSectionKey = null;
+  let previousSectionKey = null;
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const colA = (row[0] || "").trim();
     const colB = (row[1] || "").trim();
+    if (colA && !colB && Object.prototype.hasOwnProperty.call(SECTION_KEY_MAP, colA)) {
+      currentSectionKey = SECTION_KEY_MAP[colA];
+      if (currentSectionKey) {
+        previousSectionKey = currentSectionKey;
+      }
+      continue;
+    }
     if (!colA || !colB || !/^\d+$/.test(colB)) continue;
     const week = Array.from({
       length: 7
@@ -134,12 +146,37 @@ function parseRotaCSV(csvText) {
       return v === "" ? null : v;
     });
     sheetWeekByName[colA] = week;
+    const resolvedSection = currentSectionKey || previousSectionKey || STAFF_SOURCE_CONFIG.fallbackSectionKey || null;
+    if (resolvedSection) {
+      sheetSectionByName[colA] = resolvedSection;
+    }
   }
   Object.keys(rota).forEach(name => {
     if (sheetWeekByName[name]) {
       rota[name] = sheetWeekByName[name];
     }
   });
+  if (STAFF_SOURCE_CONFIG.includeSheetDiscoveredStaff) {
+    const knownNames = new Set(Object.keys(rota));
+    const sectionIdxByKey = {};
+    sections.forEach((section, idx) => {
+      sectionIdxByKey[section.key] = idx;
+    });
+    Object.entries(sheetWeekByName).forEach(([name, week]) => {
+      if (knownNames.has(name)) return;
+      const sectionKey = sheetSectionByName[name] || STAFF_SOURCE_CONFIG.fallbackSectionKey || "part_time";
+      if (sectionIdxByKey[sectionKey] === undefined) {
+        sections.push({
+          key: sectionKey,
+          label: SECTION_LABEL_MAP[sectionKey] || sectionKey,
+          drivers: []
+        });
+        sectionIdxByKey[sectionKey] = sections.length - 1;
+      }
+      sections[sectionIdxByKey[sectionKey]].drivers.push(name);
+      rota[name] = week;
+    });
+  }
   return {
     sections,
     rota

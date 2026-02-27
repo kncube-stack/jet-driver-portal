@@ -442,7 +442,7 @@ function App() {
       onKeyDown: e => {
         if (e.key === "Enter" && authName && authPin) handleLogin();
       },
-      placeholder: "PIN Number",
+      placeholder: "PIN",
       disabled: !authName,
       style: {
         width: "100%",
@@ -451,7 +451,7 @@ function App() {
         border: `1px solid ${authError ? "#ef4444" : C.border}`,
         borderRadius: "8px",
         color: C.white,
-        fontSize: "14px",
+        fontSize: "13px",
         fontFamily: "inherit",
         outline: "none",
         boxSizing: "border-box",
