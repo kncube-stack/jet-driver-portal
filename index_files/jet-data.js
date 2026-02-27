@@ -4900,6 +4900,50 @@ const SECTION_LABEL_MAP = {
   shunters: "Shunters"
 };
 
+// Authoritative in-app staff directory.
+// External rota sources (Google Sheets / SharePoint) should only supply duty cells.
+const STAFF_DIRECTORY = [{
+  key: "early_a6",
+  label: "Early A6",
+  drivers: ["Habib Mohammed", "Bruno Rodrigues", "Afolabi Ajewole", "Hannah Pearson", "Jeremy Collard", "Harpatarp Sandhu"]
+}, {
+  key: "late_a6",
+  label: "Late A6",
+  drivers: ["Denver Bent", "Iwona Czochra", "Said Garad", "Mahmaud Ismail", "Zafar Harris", "Ahasanul Hoque", "Kevin Reid"]
+}, {
+  key: "early_network",
+  label: "Early Network",
+  drivers: ["Volito Rebello", "Umair Akram", "Mansoor Edris", "Mark Eke", "Hacene Brinis", "Chris Small", "Oneil Thomas", "Michael Jara"]
+}, {
+  key: "late_network",
+  label: "Late Network",
+  drivers: ["Sanjeev Rana", "Emmanuel Owusu", "Vusi Maziya", "Amar Habib", "Azhar Khan", "Si Tun", "Jeffrey Ralph", "Jerome Lionel"]
+}, {
+  key: "part_time",
+  label: "Part Time",
+  drivers: ["Paul Page", "Jomon Ponnapon", "Armaan Rana", "Frankie", "Marius Apostoale"]
+}, {
+  key: "spare",
+  label: "Spare / Private Hire / Tour",
+  drivers: ["Ash Singh", "Kennedy Ncube", "Alfie Hoque", "George Hall", "Joseph Goodwin", "Nash Bridges", "Salomon Castro", "Gordon Jones", "Wegles Carter", "Adrian Koprowski", "Piotr Gawrys"]
+}, {
+  key: "management",
+  label: "Management Duties",
+  drivers: ["Errol Thomas"]
+}, {
+  key: "controllers",
+  label: "Controllers",
+  drivers: ["M. Ali", "D. Howards", "J. Ferreira"]
+}, {
+  key: "cleaners",
+  label: "Cleaners",
+  drivers: ["Aristotelis Stefanidis", "Chelsea Whiskin", "Angelina Braganca"]
+}, {
+  key: "shunters",
+  label: "Shunters",
+  drivers: ["Abdikadir", "Alin"]
+}];
+
 // Manual staff overrides stay in-code while external source integration is in progress.
 const MANUAL_STAFF_OVERRIDES = [{
   name: "Errol Thomas",
@@ -4926,6 +4970,7 @@ const ACCESS_CONTROL = {
     GSHEET_PUB_BASE,
     SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
+    STAFF_DIRECTORY,
     MANUAL_STAFF_OVERRIDES,
     ACCESS_CONTROL
   };

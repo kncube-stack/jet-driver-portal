@@ -2,8 +2,8 @@
   const {
     DAILY_RUNOUT,
     GSHEET_PUB_BASE,
-    SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
+    STAFF_DIRECTORY,
     MANUAL_STAFF_OVERRIDES
   } = window.JET_DATA;
 
@@ -97,55 +97,49 @@ function parseCSVRow(line) {
   result.push(current);
   return result;
 }
+function blankWeek() {
+  return [null, null, null, null, null, null, null];
+}
+function getStaffDirectorySections() {
+  return (STAFF_DIRECTORY || []).map(section => ({
+    key: section.key,
+    label: section.label || SECTION_LABEL_MAP[section.key] || section.key,
+    drivers: Array.isArray(section.drivers) ? [...section.drivers] : []
+  }));
+}
+function buildEmptyRotaFromSections(sections) {
+  const rota = {};
+  sections.forEach(section => {
+    section.drivers.forEach(name => {
+      rota[name] = blankWeek();
+    });
+  });
+  return rota;
+}
 function parseRotaCSV(csvText) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim());
   const rows = lines.map(l => parseCSVRow(l));
-  const sections = [];
-  const rota = {};
-  let curKey = null;
-  let curDrivers = [];
+  const sections = getStaffDirectorySections();
+  const rota = buildEmptyRotaFromSections(sections);
+  const sheetWeekByName = {};
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const colA = (row[0] || "").trim();
     const colB = (row[1] || "").trim();
-    const days = row.slice(2, 9).map(d => {
-      const v = (d || "").trim();
+    if (!colA || !colB || !/^\d+$/.test(colB)) continue;
+    const week = Array.from({
+      length: 7
+    }, (_, dayIdx) => {
+      const v = (row[dayIdx + 2] || "").trim();
       return v === "" ? null : v;
     });
-    if (colA && !colB && SECTION_KEY_MAP.hasOwnProperty(colA)) {
-      if (curKey && curDrivers.length > 0) {
-        sections.push({
-          key: curKey,
-          label: SECTION_LABEL_MAP[curKey],
-          drivers: [...curDrivers]
-        });
-        curDrivers = [];
-      }
-      const newKey = SECTION_KEY_MAP[colA];
-      curKey = newKey; // null for "Work to cover"
-      continue;
-    }
-    if (colA && colB && /^\d+$/.test(colB)) {
-      if (curKey) {
-        curDrivers.push(colA);
-        rota[colA] = days;
-      } else {
-        // Between sections (e.g. Frankie/Marius after Part Time gap) — attach to previous
-        if (sections.length > 0) {
-          sections[sections.length - 1].drivers.push(colA);
-          rota[colA] = days;
-        }
-      }
-      continue;
-    }
+    sheetWeekByName[colA] = week;
   }
-  if (curKey && curDrivers.length > 0) {
-    sections.push({
-      key: curKey,
-      label: SECTION_LABEL_MAP[curKey],
-      drivers: [...curDrivers]
-    });
-  }
+  Object.keys(rota).forEach(name => {
+    if (sheetWeekByName[name]) {
+      rota[name] = sheetWeekByName[name];
+    }
+  });
   return {
     sections,
     rota
@@ -286,6 +280,8 @@ const SHORT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     findCurrentWeekTab,
     fetchTabCSV,
     parseCSVRow,
+    getStaffDirectorySections,
+    buildEmptyRotaFromSections,
     parseRotaCSV,
     applyManualStaffOverrides,
     parseWeekTabDate,

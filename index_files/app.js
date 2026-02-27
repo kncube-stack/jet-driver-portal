@@ -6,6 +6,8 @@
     fetchLiveRota,
     fetchWeekRota,
     formatWeekCommencing,
+    getStaffDirectorySections,
+    buildEmptyRotaFromSections,
     buildDriverList,
     buildSectionLookup,
     DAYS,
@@ -123,8 +125,8 @@ function App() {
   })();
 
   // ─── LIVE ROTA STATE ──────────────────────────────────────
-  const [STAFF_SECTIONS, setStaffSections] = React.useState([]);
-  const [ROTA, setRota] = React.useState({});
+  const [STAFF_SECTIONS, setStaffSections] = React.useState(() => getStaffDirectorySections());
+  const [ROTA, setRota] = React.useState(() => buildEmptyRotaFromSections(getStaffDirectorySections()));
   const [weekLabel, setWeekLabel] = React.useState("");
   const [currentTabName, setCurrentTabName] = React.useState("");
   const [availableWeeks, setAvailableWeeks] = React.useState([]);
