@@ -1,5 +1,5 @@
 (function (window) {
-  const { DUTY_CARDS, ROTA_NOTES } = window.JET_DATA;
+  const { DUTY_CARDS, ROTA_NOTES, ACCESS_CONTROL } = window.JET_DATA;
   const {
     getTodayRunout,
     getDriverRunout,
@@ -13,42 +13,58 @@
   } = window.JET_DATA_LAYER;
   const { C, isDutyNumber, getSpecialDuty, getStatusStyle, filterNote } = window.JET_UI;
 
-// ─── AUTH GATE ─────────────────────────────────────────────────
-// SHA-256 hash of the site password (password never appears in source)
-// To change: generate new hash with: echo -n "NEWPASSWORD" | sha256sum
-const AUTH_HASH = "2f7c1c453971dbefacd8a0f3dd5d8b49d2cb91f688d88269f47c52dd93822da5";
 async function sha256(message) {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
+function readStoredSession() {
+  try {
+    const raw = sessionStorage.getItem("jet_session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.name) return null;
+    return {
+      name: parsed.name,
+      role: parsed.role === "manager" ? "manager" : "driver"
+    };
+  } catch {
+    return null;
+  }
+}
+function writeSession(name, role) {
+  try {
+    sessionStorage.setItem("jet_session", JSON.stringify({
+      name,
+      role
+    }));
+    sessionStorage.setItem("jet_user", name);
+    sessionStorage.setItem("jet_auth", "1");
+  } catch {}
+}
+function clearSession() {
+  try {
+    sessionStorage.removeItem("jet_session");
+    sessionStorage.removeItem("jet_user");
+    sessionStorage.removeItem("jet_auth");
+  } catch {}
+}
 
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
-  const [authed, setAuthed] = React.useState(() => {
-    try {
-      return sessionStorage.getItem("jet_auth") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [authInput, setAuthInput] = React.useState("");
-  const [authError, setAuthError] = React.useState(false);
+  const storedSession = React.useMemo(() => readStoredSession(), []);
+  const [authed, setAuthed] = React.useState(() => !!storedSession);
+  const [authName, setAuthName] = React.useState(() => storedSession?.name || "");
+  const [authPin, setAuthPin] = React.useState("");
+  const [authError, setAuthError] = React.useState("");
   const [authLoading, setAuthLoading] = React.useState(false);
+  const [currentRole, setCurrentRole] = React.useState(() => storedSession?.role || "driver");
   const [screen, setScreen] = React.useState(() => {
-    try {
-      return sessionStorage.getItem("jet_user") ? "week" : "home";
-    } catch {
-      return "home";
-    }
+    return storedSession?.name ? "week" : "home";
   });
   const [selectedDriver, setSelectedDriver] = React.useState(() => {
-    try {
-      return sessionStorage.getItem("jet_user") || null;
-    } catch {
-      return null;
-    }
+    return storedSession?.name || null;
   });
   const [selectedDuty, setSelectedDuty] = React.useState(null);
   const [search, setSearch] = React.useState("");
@@ -86,14 +102,9 @@ function App() {
   const [lastFetchTime, setLastFetchTime] = React.useState(null);
 
   // ─── USER IDENTITY ────────────────────────────────────────
-  const [currentUser, setCurrentUser] = React.useState(() => {
-    try {
-      return sessionStorage.getItem("jet_user") || null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
+  const isManager = currentRole === "manager";
 
   // Derived data from live state
   const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
@@ -102,9 +113,8 @@ function App() {
     DRIVER_SECTION_LABEL
   } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
 
-  // Fetch live rota on mount (after auth)
+  // Fetch live rota on mount
   React.useEffect(() => {
-    if (!authed) return;
     let cancelled = false;
     setRotaLoading(true);
     setRotaError(null);
@@ -127,7 +137,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [authed]);
+  }, []);
 
   // Week switcher
   const switchWeek = async tabName => {
@@ -174,36 +184,78 @@ function App() {
     return DRIVERS.filter(d => d.toLowerCase().includes(q));
   }, [search, DRIVERS]);
   const handleLogin = async () => {
+    const name = authName.trim();
+    const pin = authPin.trim();
+    if (!name || !pin) {
+      setAuthError("Select your name and enter your PIN.");
+      return;
+    }
+    const isManagerName = ACCESS_CONTROL.managerNames?.includes(name);
+    const knownDriver = DRIVERS.includes(name);
+    if (!knownDriver && !isManagerName) {
+      setAuthError("Name not found on this week's rota.");
+      return;
+    }
     setAuthLoading(true);
-    setAuthError(false);
-    const hash = await sha256(authInput);
-    if (hash === AUTH_HASH) {
-      try {
-        sessionStorage.setItem("jet_auth", "1");
-      } catch {}
+    setAuthError("");
+    try {
+      const hash = await sha256(pin);
+      const strictMode = ACCESS_CONTROL.mode === "strict";
+      const userPinHash = ACCESS_CONTROL.userPinHashes?.[name];
+      const passByUserPin = !!userPinHash && hash === userPinHash;
+      const passByManagerPin = !!ACCESS_CONTROL.managerMasterPinHash && isManagerName && hash === ACCESS_CONTROL.managerMasterPinHash;
+      const passBySharedPin = !strictMode && !!ACCESS_CONTROL.defaultDriverPinHash && hash === ACCESS_CONTROL.defaultDriverPinHash;
+      if (!(passByUserPin || passByManagerPin || passBySharedPin)) {
+        setAuthError("Incorrect PIN.");
+        setAuthLoading(false);
+        return;
+      }
+      const role = isManagerName ? "manager" : "driver";
+      writeSession(name, role);
       setAuthed(true);
-    } else {
-      setAuthError(true);
+      setCurrentRole(role);
+      setCurrentUser(name);
+      setSelectedDriver(knownDriver ? name : null);
+      setScreen(knownDriver ? "week" : "home");
+      setSearch("");
+      setDutySearch("");
+      setNameSearch("");
+      setAuthPin("");
+    } catch {
+      setAuthError("Unable to verify PIN. Please try again.");
     }
     setAuthLoading(false);
   };
+  React.useEffect(() => {
+    if (!authed || isManager) return;
+    if (screen === "home") setScreen("week");
+    if (selectedDriver !== currentUser) setSelectedDriver(currentUser);
+  }, [authed, isManager, screen, selectedDriver, currentUser]);
   if (!authed) {
+    const nameQ = nameSearch.toLowerCase().trim();
+    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
         background: C.bg,
         color: C.text,
-        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px"
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
       }
     }, /*#__PURE__*/React.createElement("link", {
       href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
       rel: "stylesheet"
     }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: "640px",
+        margin: "0 auto",
+        padding: "24px 16px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "14px",
         fontWeight: 700,
@@ -217,34 +269,125 @@ function App() {
         letterSpacing: "1.5px",
         color: "#ffffff",
         textTransform: "uppercase",
-        marginBottom: "32px"
+        marginBottom: "20px"
       }
     }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
       style: {
-        width: "100%",
-        maxWidth: "320px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "11px",
-        color: C.textMuted,
+        fontSize: "13px",
+        color: C.white,
         fontWeight: 600,
-        letterSpacing: "0.5px",
-        marginBottom: "8px",
-        textAlign: "center"
+        marginBottom: "4px"
       }
-    }, "ENTER PASSWORD TO CONTINUE"), /*#__PURE__*/React.createElement("input", {
+    }, "Sign in"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Select your name and enter your PIN")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "relative",
+        marginBottom: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: nameSearch,
+      onChange: e => setNameSearch(e.target.value),
+      placeholder: "Search by name...",
+      autoFocus: true,
+      style: {
+        width: "100%",
+        padding: "13px 16px 13px 38px",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        color: C.white,
+        fontSize: "14px",
+        fontFamily: "inherit",
+        outline: "none",
+        boxSizing: "border-box"
+      },
+      onFocus: e => e.target.style.borderColor = C.accent,
+      onBlur: e => e.target.style.borderColor = C.border
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        left: "14px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        color: C.textDim,
+        fontSize: "14px"
+      }
+    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "4px",
+        maxHeight: "34vh",
+        overflowY: "auto",
+        marginBottom: "12px"
+      }
+    }, DRIVERS.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "24px",
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, rotaLoading ? "Loading staff list..." : "No staff available") : nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "24px",
+        color: C.textDim,
+        fontSize: "12px"
+      }
+    }, "No staff found") : nameFiltered.map(name => /*#__PURE__*/React.createElement("button", {
+      key: name,
+      onClick: () => {
+        setAuthName(name);
+        setAuthError("");
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: authName === name ? C.accent + "18" : C.surface,
+        border: `1px solid ${authName === name ? C.accent + "66" : C.border}`,
+        borderRadius: "8px",
+        padding: "11px 14px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.white,
+        fontSize: "13px",
+        fontWeight: 500
+      }
+    }, name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        marginTop: "1px"
+      }
+    }, DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: authName === name ? C.accent : C.textDim,
+        fontSize: "12px"
+      }
+    }, authName === name ? "\u2713" : "\u203A")))), /*#__PURE__*/React.createElement("input", {
       type: "password",
-      value: authInput,
+      value: authPin,
       onChange: e => {
-        setAuthInput(e.target.value);
-        setAuthError(false);
+        setAuthPin(e.target.value);
+        setAuthError("");
       },
       onKeyDown: e => {
-        if (e.key === "Enter" && authInput) handleLogin();
+        if (e.key === "Enter" && authName && authPin) handleLogin();
       },
-      placeholder: "Password",
-      autoFocus: true,
+      placeholder: authName ? `PIN for ${authName}` : "Select your name first",
+      disabled: !authName,
       style: {
         width: "100%",
         padding: "14px 16px",
@@ -256,12 +399,11 @@ function App() {
         fontFamily: "inherit",
         outline: "none",
         boxSizing: "border-box",
-        textAlign: "center",
         letterSpacing: "2px",
         marginBottom: "10px"
       },
       onFocus: e => {
-        if (!authError) e.target.style.borderColor = C.accent;
+        if (!authError && authName) e.target.style.borderColor = C.accent;
       },
       onBlur: e => {
         if (!authError) e.target.style.borderColor = C.border;
@@ -273,23 +415,23 @@ function App() {
         textAlign: "center",
         marginBottom: "8px"
       }
-    }, "Incorrect password"), /*#__PURE__*/React.createElement("button", {
+    }, authError), /*#__PURE__*/React.createElement("button", {
       onClick: handleLogin,
-      disabled: !authInput || authLoading,
+      disabled: !authName || !authPin || authLoading || DRIVERS.length === 0,
       style: {
         width: "100%",
         padding: "13px",
-        background: !authInput || authLoading ? C.textDim + "44" : C.accent,
-        color: !authInput || authLoading ? C.textDim : C.bg,
+        background: !authName || !authPin || authLoading || DRIVERS.length === 0 ? C.textDim + "44" : C.accent,
+        color: !authName || !authPin || authLoading || DRIVERS.length === 0 ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "13px",
         fontWeight: 700,
-        cursor: !authInput || authLoading ? "not-allowed" : "pointer",
+        cursor: !authName || !authPin || authLoading || DRIVERS.length === 0 ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px"
       }
-    }, authLoading ? "Checking..." : "Log In"), /*#__PURE__*/React.createElement("p", {
+    }, authLoading ? "Checking..." : "Continue"), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "9px",
         color: C.textDim,
@@ -297,7 +439,7 @@ function App() {
         lineHeight: 1.5,
         marginTop: "16px"
       }
-    }, "This portal contains staff data protected under UK GDPR.", /*#__PURE__*/React.createElement("br", null), "Authorised personnel only.")));
+    }, ACCESS_CONTROL.mode === "soft" ? "Soft mode enabled for testing. Shared driver PIN is active." : "Strict mode enabled. Per-user PIN required.", /*#__PURE__*/React.createElement("br", null), "This portal contains staff data protected under UK GDPR.")));
   }
   const handlePrint = () => {
     const el = printRef.current;
@@ -423,221 +565,24 @@ function App() {
 
   // ─── USER SELECTION ─────────────────────────────────────
   const selectUser = name => {
-    setCurrentUser(name);
-    try {
-      sessionStorage.setItem("jet_user", name);
-    } catch {}
+    if (!isManager) return;
     setSelectedDriver(name);
     setScreen("week");
-    setNameSearch("");
+    setSearch("");
   };
   const switchUser = () => {
+    clearSession();
+    setAuthed(false);
     setCurrentUser(null);
-    try {
-      sessionStorage.removeItem("jet_user");
-    } catch {}
+    setCurrentRole("driver");
     setScreen("home");
     setSelectedDriver(null);
+    setAuthName("");
+    setAuthPin("");
+    setAuthError("");
     setNameSearch("");
+    setSearch("");
   };
-
-  // ─── NAME PICKER SCREEN ──────────────────────────────────
-  if (!currentUser) {
-    const nameQ = nameSearch.toLowerCase().trim();
-    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        minHeight: "100vh",
-        background: C.bg,
-        color: C.text,
-        fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
-      }
-    }, /*#__PURE__*/React.createElement("link", {
-      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
-      rel: "stylesheet"
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        maxWidth: "640px",
-        margin: "0 auto",
-        padding: "24px 16px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        marginBottom: "24px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "14px",
-        fontWeight: 700,
-        letterSpacing: "3px",
-        color: "#ef4444",
-        marginBottom: "2px"
-      }
-    }, "JET"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "9px",
-        letterSpacing: "1.5px",
-        color: "#ffffff",
-        textTransform: "uppercase",
-        marginBottom: "20px"
-      }
-    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "13px",
-        color: C.white,
-        fontWeight: 600,
-        marginBottom: "4px"
-      }
-    }, "Who are you?"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.textDim
-      }
-    }, "Select your name to see your rota")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: "relative",
-        marginBottom: "16px"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "text",
-      value: nameSearch,
-      onChange: e => setNameSearch(e.target.value),
-      placeholder: "Search by name...",
-      autoFocus: true,
-      style: {
-        width: "100%",
-        padding: "13px 16px 13px 38px",
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: "8px",
-        color: C.white,
-        fontSize: "14px",
-        fontFamily: "inherit",
-        outline: "none",
-        boxSizing: "border-box"
-      },
-      onFocus: e => e.target.style.borderColor = C.accent,
-      onBlur: e => e.target.style.borderColor = C.border
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        position: "absolute",
-        left: "14px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        color: C.textDim,
-        fontSize: "14px"
-      }
-    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: "4px",
-        maxHeight: "60vh",
-        overflowY: "auto"
-      }
-    }, nameQ ? nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        padding: "40px",
-        color: C.textDim,
-        fontSize: "12px"
-      }
-    }, "No staff found") : nameFiltered.map(name => /*#__PURE__*/React.createElement("button", {
-      key: name,
-      onClick: () => selectUser(name),
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: "8px",
-        padding: "12px 14px",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: "100%",
-        transition: "all 0.1s"
-      },
-      onMouseEnter: e => {
-        e.currentTarget.style.background = C.surfaceHover;
-        e.currentTarget.style.borderColor = C.accent + "33";
-      },
-      onMouseLeave: e => {
-        e.currentTarget.style.background = C.surface;
-        e.currentTarget.style.borderColor = C.border;
-      }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: C.white,
-        fontSize: "13px",
-        fontWeight: 500
-      }
-    }, name), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "9px",
-        color: C.textDim,
-        marginTop: "1px"
-      }
-    }, DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: C.textDim,
-        fontSize: "12px"
-      }
-    }, "\u203A"))) : STAFF_SECTIONS.map(section => /*#__PURE__*/React.createElement("div", {
-      key: section.key,
-      style: {
-        marginBottom: "8px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        fontWeight: 700,
-        color: C.accent,
-        letterSpacing: "1.5px",
-        padding: "8px 4px 6px",
-        textTransform: "uppercase"
-      }
-    }, section.label), section.drivers.map(name => /*#__PURE__*/React.createElement("button", {
-      key: name,
-      onClick: () => selectUser(name),
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: "8px",
-        padding: "11px 14px",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: "100%",
-        marginBottom: "3px",
-        transition: "all 0.1s"
-      },
-      onMouseEnter: e => {
-        e.currentTarget.style.background = C.surfaceHover;
-        e.currentTarget.style.borderColor = C.accent + "33";
-      },
-      onMouseLeave: e => {
-        e.currentTarget.style.background = C.surface;
-        e.currentTarget.style.borderColor = C.border;
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: C.white,
-        fontSize: "13px",
-        fontWeight: 500
-      }
-    }, name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: C.textDim,
-        fontSize: "12px"
-      }
-    }, "\u203A"))))))));
-  }
 
   // Is the user viewing the current calendar week?
   const isCurrentWeek = (() => {
@@ -767,7 +712,7 @@ function App() {
       margin: "0 auto",
       padding: "16px"
     }
-  }, screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, screen === "home" && isManager && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: "20px"
     }
@@ -1186,7 +1131,7 @@ function App() {
       margin: 0,
       color: C.white
     }
-  }, selectedDriver), selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
+  }, selectedDriver), isManager && selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setScreen("home");
       setSelectedDriver(null);

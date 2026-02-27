@@ -4907,6 +4907,17 @@ const MANUAL_STAFF_OVERRIDES = [{
   week: ["OPM", "OPM", "OPM", "OPM", "OPM", "R", "R"]
 }];
 
+// Access control (development-friendly):
+// - mode "soft": shared driver PIN works for all drivers
+// - mode "strict": require per-user PIN or manager PIN
+const ACCESS_CONTROL = {
+  mode: "soft",
+  managerNames: ["Kennedy Ncube", "Errol Thomas"],
+  defaultDriverPinHash: "ed946f65d2c785d90e827c5ffd879ce3b49c68d4c88013074176a7e73bc58bcf",
+  managerMasterPinHash: "07c903ce633842c12f7430406521a6d57fd72de978b2c667a5bf8ec2cc7f9a9c",
+  userPinHashes: {}
+};
+
   window.JET_DATA = {
     DUTY_CARDS,
     SPECIAL_DUTIES,
@@ -4915,6 +4926,7 @@ const MANUAL_STAFF_OVERRIDES = [{
     GSHEET_PUB_BASE,
     SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
-    MANUAL_STAFF_OVERRIDES
+    MANUAL_STAFF_OVERRIDES,
+    ACCESS_CONTROL
   };
 })(window);
