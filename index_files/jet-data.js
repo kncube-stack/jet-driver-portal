@@ -4536,7 +4536,7 @@ const SPECIAL_DUTIES = {
     signOn: "06:00",
     signOff: "18:00",
     dutyLength: "12:00",
-    color: "#0284c7"
+    color: "#4338ca"
   },
   "OPM": {
     label: "Management Duties",
