@@ -3,27 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0a0e17" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="JET Staff Portal — Jason Edwards Travel" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>JET Staff Hub</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <title>JET Staff Portal</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { background: #0a0e17; overflow-y: scroll; -webkit-font-smoothing: antialiased; }
-    #root { min-height: 100vh; }
-  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <style>html,body{margin:0;padding:0;background:#0a0e17}*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}</style>
 </head>
 <body>
   <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script>
-    const { useState, useMemo, useRef } = React;
+import { useState, useMemo, useRef, useEffect } from "react";
 
 // ═══════════════════════════════════════════════════════════════
 // JASON EDWARDS TRAVEL — DRIVER DUTY PORTAL
@@ -4947,121 +4936,200 @@ const ROTA_NOTES = {
   }
 };
 
-// ─── STAFF SECTIONS ─────────────────────────────────────────
-const STAFF_SECTIONS = [{
-  key: "early_a6",
-  label: "Early A6",
-  drivers: ["Habib Mohammed", "Bruno Rodrigues", "Afolabi Ajewole", "Hannah Pearson", "Jeremy Collard", "Harpatarp Sandhu"]
-}, {
-  key: "late_a6",
-  label: "Late A6",
-  drivers: ["Denver Bent", "Iwona Czochra", "Said Garad", "Mahmaud Ismail", "Zafar Harris", "Ahasanul Hoque", "Kevin Reid"]
-}, {
-  key: "early_network",
-  label: "Early Network",
-  drivers: ["Volito Rebello", "Umair Akram", "Mansoor Edris", "Mark Eke", "Hacene Brinis", "Chris Small", "Oneil Thomas", "Michael Jara"]
-}, {
-  key: "late_network",
-  label: "Late Network",
-  drivers: ["Sanjeev Rana", "Emmanuel Owusu", "Vusi Maziya", "Amar Habib", "Azhar Khan", "Si Tun", "Jeffrey Ralph", "Jerome Lionel"]
-}, {
-  key: "part_time",
-  label: "Part Time",
-  drivers: ["Paul Page", "Jomon Ponnapon", "Armaan Rana", "Frankie", "Marius Apostoale"]
-}, {
-  key: "spare",
-  label: "Spare / Private Hire / Tour",
-  drivers: ["Ash Singh", "Kennedy Ncube", "Alfie Hoque", "George Hall", "Joseph Goodwin", "Nash Bridges", "Salomon Castro", "Gordon Jones", "Wegles Carter", "Adrian Koprowski", "Piotr Gawrys"]
-}, {
-  key: "controllers",
-  label: "Controllers",
-  drivers: ["M. Ali", "D. Howards", "J. Ferreira"]
-}, {
-  key: "cleaners",
-  label: "Cleaners",
-  drivers: ["Aristotelis Stefanidis", "Chelsea Whiskin", "Angelina Braganca"]
-}, {
-  key: "shunters",
-  label: "Shunters",
-  drivers: ["Abdikadir", "Alin"]
-}];
-
-// Columns: Mon, Tue, Wed, Thu, Fri, Sat, Sun
-// Parsed from Rota_copy.xlsx — WC 23.02.2026
-
-const ROTA = {
-  // Early A6
-  "Habib Mohammed": ["R", "202", "204", "204", "203", "301", "R"],
-  "Bruno Rodrigues": ["R", "R", "202", "201", "202", "262", "301"],
-  "Afolabi Ajewole": ["R", "R", "R", "202", "204", "264", "263"],
-  "Hannah Pearson": ["202", "204", "R", "R", "R", "263", "262"],
-  "Jeremy Collard": ["203", "203", "203", "R", "R", "R", "261"],
-  "Harpatarp Sandhu": ["201", "201", "201", "203", "R", "R", "R"],
-  // Late A6
-  "Denver Bent": ["210", "210", "210", "209", "R", "R", "R"],
-  "Iwona Czochra": ["R", "R", "208", "OFF", "210", "269", "268"],
-  "Said Garad": ["308", "R", "R", "210", "209", "369", "368"],
-  "Mahmaud Ismail": ["209", "R", "R", "R", "208", "268", "267"],
-  "Zafar Harris": ["HOL", "R", "R", "R", "R", "270", "270"],
-  "Ahasanul Hoque": ["208", "209", "HOL", "R", "R", "R", "HOL"],
-  "Kevin Reid": ["207", "306", "207", "306", "R", "R", "R"],
-  // Early Network
-  "Volito Rebello": ["303", "323", "323", "HOL", "302", "R", "R"],
-  "Umair Akram": ["R", "N Control", "N Control", "N Control", "N Control", "HOL", "R"],
-  "Mansoor Edris": ["R", "R", "302", "301", "303", "363", "264"],
-  "Mark Eke": ["R", "R", "R", "324", "301", "364", "364"],
-  "Hacene Brinis": ["301", "R", "R", "R", "R", "362", "363"],
-  "Chris Small": ["304", "302", "R", "R", "201", "261", "USP"],
-  "Oneil Thomas": ["204", "324", "324", "R", "R", "AVRA8", "362"],
-  "Michael Jara": ["302", "301", "ESP", "323", "R", "R", "R"],
-  // Late Network
-  "Sanjeev Rana": ["306", "327", "328", "329", "306", "R", "R"],
-  "Emmanuel Owusu": [null, null, null, null, "R", "R", "R"],
-  "Vusi Maziya": ["R", "R", "206", "207", "347", "366", "366"],
-  "Amar Habib": ["R", "R", "RL328", "208", "RL309", "267", "R"],
-  "Azhar Khan": ["R", "RL329", "209", "R", "207", "368", "R"],
-  "Si Tun": ["307", "328", "R", "R", "R", "266", "369"],
-  "Jeffrey Ralph": ["R", "206", "RL327", "RL328", "RL347", "R", "R"],
-  "Jerome Lionel": ["206", "RL306", "306", "R", "206", "R", "R"],
-  // Part Time
-  "Paul Page": ["R", "R", "R", "R", "R", "AVRA6", "266"],
-  "Jomon Ponnapon": ["R", "R", "R", "206", "348", "367", "367"],
-  "Armaan Rana": ["HOL", "R", "R", "R", "R", "AVRA8&A9", "AVRA8"],
-  "Frankie": ["R", "R", "205", "205", "205", "205", "R"],
-  "Marius Apostoale": ["205", "205", "R", "R", "R", "R", "205"],
-  // Spare / Private Hire / Tour
-  "Ash Singh": [null, null, null, "P2742", null, "P2756", null],
-  "Kennedy Ncube": ["R", "MSP", "329", "328", "R", "R", "269"],
-  "Alfie Hoque": ["DTO", "DTO", "DTO", "R", "R", "DTO", "DTO"],
-  "George Hall": ["RL307", "207", "RL329", "R", "R", "R", "R"],
-  "Joseph Goodwin": ["RL308", "RL327", "RL206", "RL329", "RL306", "R", "R"],
-  "Nash Bridges": ["WS", "WS", "WS", "WS", "R", "6AVRA8&A6", "R"],
-  "Salomon Castro": ["308", "R", "R", "ESP", "USP", "1AVRA9A8A6", "AVRA6&A9"],
-  "Gordon Jones": ["R", "R", "301", "302", "304", "R", "TOUR"],
-  "Wegles Carter": ["R", "329", "R", "327", "309", "5AVRA6A8", "R"],
-  "Adrian Koprowski": ["HOL", "208", "327", "R", "R", "AVRA6&A8", "AVRA6&A9"],
-  "Piotr Gawrys": ["R", "R", "R", null, null, "P2756", null],
-  // Controllers
-  "M. Ali": ["N Control", "R", "R", "R", "R", "N Control", "N Control"],
-  "D. Howards": ["R", "D Control", "D Control", "D Control", "D Control", "R", "R"],
-  "J. Ferreira": ["D Control", "R", "R", "R", "R", "D Control", "D Control"],
-  // Cleaners
-  "Aristotelis Stefanidis": ["R", "R", "R", "R", "WORK", "WORK", "WORK"],
-  "Chelsea Whiskin": ["WORK", "WORK", "WORK", "WORK", "R", "R", "R"],
-  "Angelina Braganca": ["WORK", "WORK", "WORK", "WORK", "WORK", "R", "R"],
-  // Shunters
-  "Abdikadir": ["WORK", "R", "R", "WORK", "WORK", "WORK", "WORK"],
-  "Alin": ["WORK", "WORK", "WORK", "R", "R", "R", "WORK"]
+// ─── GOOGLE SHEETS LIVE DATA ─────────────────────────────────
+const GSHEET_PUB_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRR4hSCivY7n92vpTGwayaOzGrI6ZULZxTYfTX7kp7VWCPBtvKZfLyKoTR9_f7AEaunbnhUuwV4DJpS";
+const SECTION_KEY_MAP = {
+  "Early A6": "early_a6",
+  "Late A6": "late_a6",
+  "Early Network": "early_network",
+  "Late Network": "late_network",
+  "Part Time Rota": "part_time",
+  "Spare/Private Hire/Tour Drivers": "spare",
+  "Work to cover": null,
+  "Controllers": "controllers",
+  "Cleaners (Fixed Nights)": "cleaners",
+  "Shunters (4 ON / 4 OFF)": "shunters"
 };
+const SECTION_LABEL_MAP = {
+  early_a6: "Early A6",
+  late_a6: "Late A6",
+  early_network: "Early Network",
+  late_network: "Late Network",
+  part_time: "Part Time",
+  spare: "Spare / Private Hire / Tour",
+  controllers: "Controllers",
+  cleaners: "Cleaners",
+  shunters: "Shunters"
+};
+async function discoverSheetTabs() {
+  const res = await fetch(GSHEET_PUB_BASE + "/pubhtml");
+  const html = await res.text();
+  const tabs = {};
+  const regex = /name:\s*"(WC \d{2}\.\d{2}\.\d{4})".*?gid:\s*"(\d+)"/g;
+  let m;
+  while ((m = regex.exec(html)) !== null) tabs[m[1]] = m[2];
+  return tabs;
+}
+function findCurrentWeekTab(tabs) {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMon = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMon);
+  const fmt = d => {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `WC ${dd}.${mm}.${d.getFullYear()}`;
+  };
+  const key = fmt(monday);
+  if (tabs[key]) return {
+    tabName: key,
+    gid: tabs[key]
+  };
+  const nextMon = new Date(monday);
+  nextMon.setDate(monday.getDate() + 7);
+  const key2 = fmt(nextMon);
+  if (tabs[key2]) return {
+    tabName: key2,
+    gid: tabs[key2]
+  };
+  const keys = Object.keys(tabs);
+  const lastKey = keys[keys.length - 1];
+  return {
+    tabName: lastKey,
+    gid: tabs[lastKey]
+  };
+}
+async function fetchTabCSV(gid) {
+  const res = await fetch(GSHEET_PUB_BASE + `/pub?gid=${gid}&single=true&output=csv`);
+  return await res.text();
+}
+function parseCSVRow(line) {
+  const result = [];
+  let current = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && i + 1 < line.length && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      result.push(current);
+      current = "";
+    } else current += ch;
+  }
+  result.push(current);
+  return result;
+}
+function parseRotaCSV(csvText) {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+  const rows = lines.map(l => parseCSVRow(l));
+  const sections = [];
+  const rota = {};
+  let curKey = null;
+  let curDrivers = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const colA = (row[0] || "").trim();
+    const colB = (row[1] || "").trim();
+    const days = row.slice(2, 9).map(d => {
+      const v = (d || "").trim();
+      return v === "" ? null : v;
+    });
+    if (colA && !colB && SECTION_KEY_MAP.hasOwnProperty(colA)) {
+      if (curKey && curDrivers.length > 0) {
+        sections.push({
+          key: curKey,
+          label: SECTION_LABEL_MAP[curKey],
+          drivers: [...curDrivers]
+        });
+        curDrivers = [];
+      }
+      const newKey = SECTION_KEY_MAP[colA];
+      curKey = newKey; // null for "Work to cover"
+      continue;
+    }
+    if (colA && colB && /^\d+$/.test(colB)) {
+      if (curKey) {
+        curDrivers.push(colA);
+        rota[colA] = days;
+      } else {
+        // Between sections (e.g. Frankie/Marius after Part Time gap) — attach to previous
+        if (sections.length > 0) {
+          sections[sections.length - 1].drivers.push(colA);
+          rota[colA] = days;
+        }
+      }
+      continue;
+    }
+  }
+  if (curKey && curDrivers.length > 0) {
+    sections.push({
+      key: curKey,
+      label: SECTION_LABEL_MAP[curKey],
+      drivers: [...curDrivers]
+    });
+  }
+  return {
+    sections,
+    rota
+  };
+}
+function formatWeekCommencing(tabName) {
+  const match = tabName.match(/WC (\d{2})\.(\d{2})\.(\d{4})/);
+  if (!match) return tabName;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${parseInt(match[1])} ${months[parseInt(match[2]) - 1]} ${match[3]}`;
+}
+async function fetchLiveRota() {
+  const tabs = await discoverSheetTabs();
+  const {
+    tabName,
+    gid
+  } = findCurrentWeekTab(tabs);
+  const csv = await fetchTabCSV(gid);
+  const {
+    sections,
+    rota
+  } = parseRotaCSV(csv);
+  const availableWeeks = Object.keys(tabs).map(k => ({
+    tabName: k,
+    gid: tabs[k],
+    label: formatWeekCommencing(k)
+  }));
+  return {
+    sections,
+    rota,
+    tabName,
+    availableWeeks,
+    tabs
+  };
+}
+async function fetchWeekRota(tabs, tabName) {
+  const gid = tabs[tabName];
+  if (!gid) return null;
+  const csv = await fetchTabCSV(gid);
+  return parseRotaCSV(csv);
+}
 
-// Build driver list maintaining section order (not alphabetical)
-const DRIVERS = STAFF_SECTIONS.flatMap(s => s.drivers);
-// Lookup: driver name → section key
-const DRIVER_SECTION = {};
-STAFF_SECTIONS.forEach(s => s.drivers.forEach(d => DRIVER_SECTION[d] = s.key));
-// Lookup: driver name → section label
-const DRIVER_SECTION_LABEL = {};
-STAFF_SECTIONS.forEach(s => s.drivers.forEach(d => DRIVER_SECTION_LABEL[d] = s.label));
+// ─── DERIVED DATA BUILDERS ──────────────────────────────────
+function buildDriverList(sections) {
+  return sections.flatMap(s => s.drivers);
+}
+function buildSectionLookup(sections) {
+  const byKey = {};
+  const byLabel = {};
+  sections.forEach(s => s.drivers.forEach(d => {
+    byKey[d] = s.key;
+    byLabel[d] = s.label;
+  }));
+  return {
+    DRIVER_SECTION: byKey,
+    DRIVER_SECTION_LABEL: byLabel
+  };
+}
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SHORT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -5090,11 +5158,8 @@ const C = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────────
-function getWeekCommencing() {
-  // Hardcoded to match current ROTA data sheet
-  // When connected to SharePoint, this will be parsed from the sheet tab name
-  return "23 Feb 2026";
-}
+// getWeekCommencing is now state-driven from the Google Sheets tab name
+
 function isDutyNumber(val) {
   return /^\d+$/.test(val);
 }
@@ -5120,7 +5185,7 @@ function getSpecialDuty(val) {
   };
   return null;
 }
-function getStatusStyle(val, driverName, showTimes) {
+function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
   if (val === null || val === undefined || val === "—") return {
     color: C.textDim,
     bg: "transparent",
@@ -5152,7 +5217,7 @@ function getStatusStyle(val, driverName, showTimes) {
     label: "ABSENT"
   };
   if (val === "WORK") {
-    const sec = driverName ? DRIVER_SECTION[driverName] : null;
+    const sec = driverName && driverSectionLookup ? driverSectionLookup[driverName] : null;
     if (sec === "cleaners") {
       const isDay = driverName === "Angelina Braganca";
       return {
@@ -5207,7 +5272,7 @@ async function sha256(message) {
 }
 
 // ─── APP ────────────────────────────────────────────────────────
-function App() {
+export default function App() {
   const [authed, setAuthed] = useState(() => {
     try {
       return sessionStorage.getItem("jet_auth") === "1";
@@ -5243,11 +5308,92 @@ function App() {
     const d = new Date().getDay();
     return d === 0 ? 6 : d - 1;
   })();
+
+  // ─── LIVE ROTA STATE ──────────────────────────────────────
+  const [STAFF_SECTIONS, setStaffSections] = useState([]);
+  const [ROTA, setRota] = useState({});
+  const [weekLabel, setWeekLabel] = useState("");
+  const [availableWeeks, setAvailableWeeks] = useState([]);
+  const [allTabs, setAllTabs] = useState({});
+  const [rotaLoading, setRotaLoading] = useState(true);
+  const [rotaError, setRotaError] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
+
+  // Derived data from live state
+  const DRIVERS = useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const {
+    DRIVER_SECTION,
+    DRIVER_SECTION_LABEL
+  } = useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+
+  // Fetch live rota on mount (after auth)
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    setRotaLoading(true);
+    setRotaError(null);
+    fetchLiveRota().then(data => {
+      if (cancelled) return;
+      setStaffSections(data.sections);
+      setRota(data.rota);
+      setWeekLabel(formatWeekCommencing(data.tabName));
+      setAvailableWeeks(data.availableWeeks);
+      setAllTabs(data.tabs);
+      setLastFetchTime(new Date().toLocaleTimeString());
+      setRotaLoading(false);
+    }).catch(err => {
+      if (cancelled) return;
+      console.error("Rota fetch failed:", err);
+      setRotaError("Failed to load rota from Google Sheets. Check your connection.");
+      setRotaLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authed]);
+
+  // Week switcher
+  const switchWeek = async tabName => {
+    setRotaLoading(true);
+    setRotaError(null);
+    try {
+      const data = await fetchWeekRota(allTabs, tabName);
+      if (data) {
+        setStaffSections(data.sections);
+        setRota(data.rota);
+        setWeekLabel(formatWeekCommencing(tabName));
+        setLastFetchTime(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      console.error("Week switch failed:", err);
+      setRotaError("Failed to load week data.");
+    }
+    setRotaLoading(false);
+  };
+
+  // Refresh current week data
+  const refreshRota = async () => {
+    setRotaLoading(true);
+    setRotaError(null);
+    try {
+      const data = await fetchLiveRota();
+      setStaffSections(data.sections);
+      setRota(data.rota);
+      setWeekLabel(formatWeekCommencing(data.tabName));
+      setAvailableWeeks(data.availableWeeks);
+      setAllTabs(data.tabs);
+      setLastFetchTime(new Date().toLocaleTimeString());
+    } catch (err) {
+      setRotaError("Refresh failed.");
+    }
+    setRotaLoading(false);
+  };
+  const getWeekCommencing = () => weekLabel || "Loading...";
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return null;
     return DRIVERS.filter(d => d.toLowerCase().includes(q));
-  }, [search]);
+  }, [search, DRIVERS]);
   const handleLogin = async () => {
     setAuthLoading(true);
     setAuthError(false);
@@ -5392,6 +5538,98 @@ function App() {
     w.document.close();
     w.print();
   };
+
+  // Loading screen while fetching rota data
+  if (rotaLoading && DRIVERS.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "2px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        letterSpacing: "1.5px",
+        color: "#ffffff",
+        textTransform: "uppercase",
+        marginBottom: "32px"
+      }
+    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.accent,
+        marginBottom: "8px"
+      }
+    }, "\u23F3 Loading rota from Google Sheets..."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim
+      }
+    }, "Fetching live data"));
+  }
+  if (rotaError && DRIVERS.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: C.bg,
+        color: C.text,
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }
+    }, /*#__PURE__*/React.createElement("link", {
+      href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap",
+      rel: "stylesheet"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "3px",
+        color: "#ef4444",
+        marginBottom: "16px"
+      }
+    }, "JET"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: "#ef4444",
+        marginBottom: "12px"
+      }
+    }, "\u26A0 ", rotaError), /*#__PURE__*/React.createElement("button", {
+      onClick: refreshRota,
+      style: {
+        padding: "10px 24px",
+        background: C.accent,
+        color: C.bg,
+        border: "none",
+        borderRadius: "6px",
+        fontSize: "12px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Retry"));
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -5503,7 +5741,13 @@ function App() {
     style: {
       marginBottom: "20px"
     }
-  }, /*#__PURE__*/React.createElement("h1", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
     style: {
       fontSize: "18px",
       fontWeight: 600,
@@ -5517,6 +5761,37 @@ function App() {
       margin: 0
     }
   }, "w/c ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px"
+    }
+  }, rotaLoading && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: C.accent
+    }
+  }, "\u23F3"), /*#__PURE__*/React.createElement("button", {
+    onClick: refreshRota,
+    disabled: rotaLoading,
+    title: "Refresh rota data",
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "6px 10px",
+      cursor: rotaLoading ? "not-allowed" : "pointer",
+      color: C.textMuted,
+      fontSize: "12px",
+      fontFamily: "inherit"
+    }
+  }, "\u21BB"))), lastFetchTime && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "9px",
+      color: C.textDim,
+      marginTop: "4px"
+    }
+  }, "\uD83D\uDFE2 Live from Google Sheets \xB7 Updated ", lastFetchTime)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       marginBottom: "14px",
@@ -5607,7 +5882,7 @@ function App() {
     }
   }, "No staff found matching \"", search, "\""), filtered.map(driver => {
     const todayVal = ROTA[driver]?.[today] || "—";
-    const st = getStatusStyle(todayVal, driver);
+    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION);
     return /*#__PURE__*/React.createElement("button", {
       key: driver,
       onClick: () => {
@@ -5691,7 +5966,7 @@ function App() {
     }
   }, "(", section.drivers.length, ")")), section.drivers.map(driver => {
     const todayVal = ROTA[driver]?.[today] || "—";
-    const st = getStatusStyle(todayVal, driver);
+    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION);
     return /*#__PURE__*/React.createElement("button", {
       key: driver,
       onClick: () => {
@@ -5954,9 +6229,9 @@ function App() {
       style: {
         fontSize: "16px",
         fontWeight: 700,
-        color: getStatusStyle(todayVal, selectedDriver, true).color
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).color
       }
-    }, getStatusStyle(todayVal, selectedDriver, true).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.textMuted,
@@ -6084,7 +6359,7 @@ function App() {
   }, DAYS.map((day, i) => {
     const val = ROTA[selectedDriver]?.[i] || "—";
     const isToday = i === today;
-    const st = getStatusStyle(val, selectedDriver, true);
+    const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION);
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
@@ -7153,7 +7428,7 @@ function App() {
     }, "If your actual duty differs from this card, contact the duty manager immediately."));
   })()));
 }
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
   </script>
 </body>
 </html>
