@@ -12,8 +12,6 @@
 <body>
   <div id="root"></div>
   <script>
-import { useState, useMemo, useRef, useEffect } from "react";
-
 // ═══════════════════════════════════════════════════════════════
 // JASON EDWARDS TRAVEL — DRIVER DUTY PORTAL
 // Real data from duty cards PDF and weekly rota
@@ -5272,62 +5270,62 @@ async function sha256(message) {
 }
 
 // ─── APP ────────────────────────────────────────────────────────
-export default function App() {
-  const [authed, setAuthed] = useState(() => {
+function App() {
+  const [authed, setAuthed] = React.useState(() => {
     try {
       return sessionStorage.getItem("jet_auth") === "1";
     } catch {
       return false;
     }
   });
-  const [authInput, setAuthInput] = useState("");
-  const [authError, setAuthError] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [screen, setScreen] = useState("home");
-  const [selectedDriver, setSelectedDriver] = useState(null);
-  const [selectedDuty, setSelectedDuty] = useState(null);
-  const [search, setSearch] = useState("");
-  const [dutySearch, setDutySearch] = useState("");
-  const [showDutyLookup, setShowDutyLookup] = useState(false);
-  const [dutyLookupSource, setDutyLookupSource] = useState(false);
-  const [leaveForm, setLeaveForm] = useState({
+  const [authInput, setAuthInput] = React.useState("");
+  const [authError, setAuthError] = React.useState(false);
+  const [authLoading, setAuthLoading] = React.useState(false);
+  const [screen, setScreen] = React.useState("home");
+  const [selectedDriver, setSelectedDriver] = React.useState(null);
+  const [selectedDuty, setSelectedDuty] = React.useState(null);
+  const [search, setSearch] = React.useState("");
+  const [dutySearch, setDutySearch] = React.useState("");
+  const [showDutyLookup, setShowDutyLookup] = React.useState(false);
+  const [dutyLookupSource, setDutyLookupSource] = React.useState(false);
+  const [leaveForm, setLeaveForm] = React.useState({
     dateFrom: "",
     dateTo: "",
     reason: "",
     notes: ""
   });
-  const [leaveSubmitted, setLeaveSubmitted] = useState(false);
-  const [swapForm, setSwapForm] = useState({
+  const [leaveSubmitted, setLeaveSubmitted] = React.useState(false);
+  const [swapForm, setSwapForm] = React.useState({
     dayIndex: "",
     targetDriver: "",
     notes: ""
   });
-  const [swapSubmitted, setSwapSubmitted] = useState(false);
-  const printRef = useRef(null);
+  const [swapSubmitted, setSwapSubmitted] = React.useState(false);
+  const printRef = React.useRef(null);
   const today = (() => {
     const d = new Date().getDay();
     return d === 0 ? 6 : d - 1;
   })();
 
   // ─── LIVE ROTA STATE ──────────────────────────────────────
-  const [STAFF_SECTIONS, setStaffSections] = useState([]);
-  const [ROTA, setRota] = useState({});
-  const [weekLabel, setWeekLabel] = useState("");
-  const [availableWeeks, setAvailableWeeks] = useState([]);
-  const [allTabs, setAllTabs] = useState({});
-  const [rotaLoading, setRotaLoading] = useState(true);
-  const [rotaError, setRotaError] = useState(null);
-  const [lastFetchTime, setLastFetchTime] = useState(null);
+  const [STAFF_SECTIONS, setStaffSections] = React.useState([]);
+  const [ROTA, setRota] = React.useState({});
+  const [weekLabel, setWeekLabel] = React.useState("");
+  const [availableWeeks, setAvailableWeeks] = React.useState([]);
+  const [allTabs, setAllTabs] = React.useState({});
+  const [rotaLoading, setRotaLoading] = React.useState(true);
+  const [rotaError, setRotaError] = React.useState(null);
+  const [lastFetchTime, setLastFetchTime] = React.useState(null);
 
   // Derived data from live state
-  const DRIVERS = useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
   const {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
-  } = useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
 
   // Fetch live rota on mount (after auth)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!authed) return;
     let cancelled = false;
     setRotaLoading(true);
@@ -5389,7 +5387,7 @@ export default function App() {
     setRotaLoading(false);
   };
   const getWeekCommencing = () => weekLabel || "Loading...";
-  const filtered = useMemo(() => {
+  const filtered = React.useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return null;
     return DRIVERS.filter(d => d.toLowerCase().includes(q));
