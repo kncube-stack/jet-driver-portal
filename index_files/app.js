@@ -58,32 +58,10 @@ function clearSession() {
     sessionStorage.removeItem("jet_auth");
   } catch {}
 }
-const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
-async function submitPortalRequest(kind, payload, token) {
-  if (!token) throw new Error("Session expired. Please sign in again.");
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`
-  };
-  const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
-    method: "POST",
-    headers,
-    cache: "no-store",
-    body: JSON.stringify({
-      kind,
-      payload
-    })
-  });
-  let data = null;
-  try {
-    data = await response.json();
-  } catch {}
-  if (!response.ok || !data?.ok) {
-    throw new Error(data?.error || "Unable to send request right now.");
-  }
-}
+const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
+const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 async function loginWithServer(name, pin) {
   const response = await fetch(AUTH_LOGIN_ENDPOINT, {
     method: "POST",
@@ -128,7 +106,6 @@ async function verifyServerSession(token) {
 function App() {
   const storedSession = React.useMemo(() => readStoredSession(), []);
   const [authed, setAuthed] = React.useState(() => !!storedSession);
-  const [sessionToken, setSessionToken] = React.useState(() => storedSession?.token || "");
   const [sessionVerifying, setSessionVerifying] = React.useState(() => !!storedSession?.token);
   const [authName, setAuthName] = React.useState(() => storedSession?.name || "");
   const [authPin, setAuthPin] = React.useState("");
@@ -203,7 +180,6 @@ function App() {
       if (cancelled) return;
       const resolvedRole = serverSession.role === "manager" ? "manager" : "driver";
       writeSession(serverSession.name, resolvedRole, storedSession.token, serverSession.expiresAt || storedSession.expiresAt || null);
-      setSessionToken(storedSession.token);
       setAuthed(true);
       setCurrentRole(resolvedRole);
       setCurrentUser(serverSession.name);
@@ -218,7 +194,6 @@ function App() {
     }).catch(() => {
       if (cancelled) return;
       clearSession();
-      setSessionToken("");
       setAuthed(false);
       setCurrentUser(null);
       setCurrentRole("driver");
@@ -326,7 +301,6 @@ function App() {
       const role = session.role === "manager" ? "manager" : "driver";
       const resolvedKnownDriver = DRIVERS.includes(resolvedName);
       writeSession(resolvedName, role, session.token, session.expiresAt || null);
-      setSessionToken(session.token);
       setAuthed(true);
       setCurrentRole(role);
       setCurrentUser(resolvedName);
@@ -739,7 +713,6 @@ function App() {
   };
   const switchUser = () => {
     clearSession();
-    setSessionToken("");
     setAuthed(false);
     setCurrentUser(null);
     setCurrentRole("driver");
@@ -1810,7 +1783,7 @@ function App() {
       e.currentTarget.style.borderColor = "#ffffff25";
     }
   }, "\uD83D\uDD04 Request Shift Swap")), screen === "leave" && selectedDriver && (() => {
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
         weekday: "long",
@@ -1830,20 +1803,12 @@ function App() {
       setLeaveSending(true);
       setLeaveError("");
       try {
-        await submitPortalRequest("leave", {
-          driverName: selectedDriver,
-          dateFrom: leaveForm.dateFrom,
-          dateTo: leaveForm.dateTo,
-          fromDateLabel: fromDate,
-          toDateLabel: toDate,
-          totalDays: diffDays,
-          reason: leaveForm.reason || "Annual leave",
-          notes: leaveForm.notes || "",
-          submittedAtIso: new Date().toISOString()
-        }, sessionToken);
+        const subject = `Annual Leave Request - ${selectedDriver}`;
+        const body = [`ANNUAL LEAVE REQUEST`, ``, `Driver: ${selectedDriver}`, `From: ${fromDate}`, `To: ${toDate}`, `Total days: ${diffDays}`, `Reason: ${leaveForm.reason || "Annual leave"}`, leaveForm.notes ? `Notes: ${leaveForm.notes}` : `Notes: None`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        window.open(`mailto:${LEAVE_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
         setLeaveSubmitted(true);
       } catch (err) {
-        setLeaveError(err?.message || "Unable to send leave request.");
+        setLeaveError(err?.message || "Unable to open your email app.");
       }
       setLeaveSending(false);
     };
@@ -1883,7 +1848,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your annual leave request has been emailed for approval. You'll be contacted with a decision."), /*#__PURE__*/React.createElement("button", {
+    }, "Your annual leave request draft is ready in your email app. Send it to submit the request."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setLeaveSubmitted(false);
@@ -2086,32 +2051,25 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This sends directly to office staff for approval. You'll be contacted with a decision.")));
+    }, "This opens your email app with the request ready to send to office staff.")));
   })(), screen === "swap" && selectedDriver && (() => {
     const myRota = ROTA[selectedDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
     const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
     const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
     const targetDayDuty = swapForm.dayIndex !== "" && swapForm.targetDriver ? targetRota[parseInt(swapForm.dayIndex)] || "—" : null;
-    const handleSwapSubmit = async () => {
+    const handleSwapSubmit = () => {
       if (swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending) return;
       const dayName = DAYS[parseInt(swapForm.dayIndex)];
       setSwapSending(true);
       setSwapError("");
       try {
-        await submitPortalRequest("swap", {
-          requestingDriver: selectedDriver,
-          targetDriver: swapForm.targetDriver,
-          dayIndex: parseInt(swapForm.dayIndex),
-          dayName,
-          requestingDuty: selectedDayDuty || "—",
-          targetDuty: targetDayDuty || "—",
-          notes: swapForm.notes || "",
-          submittedAtIso: new Date().toISOString()
-        }, sessionToken);
+        const subject = `Shift Swap Request - ${selectedDriver} <-> ${swapForm.targetDriver}`;
+        const body = [`SHIFT SWAP REQUEST`, ``, `Requesting Driver: ${selectedDriver}`, `Current duty (${dayName}): ${selectedDayDuty || "—"}`, ``, `Swap With: ${swapForm.targetDriver}`, `Their duty (${dayName}): ${targetDayDuty || "—"}`, swapForm.notes ? `Notes: ${swapForm.notes}` : `Notes: None`, ``, `Both drivers must agree to this swap.`, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        window.open(`mailto:${SWAP_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
         setSwapSubmitted(true);
       } catch (err) {
-        setSwapError(err?.message || "Unable to send swap request.");
+        setSwapError(err?.message || "Unable to open your email app.");
       }
       setSwapSending(false);
     };
@@ -2151,7 +2109,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your shift swap request has been emailed to the manager. Both drivers will need to agree before the swap is confirmed."), /*#__PURE__*/React.createElement("button", {
+    }, "Your shift swap request draft is ready in your email app. Send it to submit the request."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setSwapSubmitted(false);
@@ -2436,7 +2394,7 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This sends a request to the manager. Both drivers must agree before any swap is confirmed.")));
+    }, "This opens your email app with the swap request ready to send.")));
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
