@@ -316,7 +316,18 @@ function App() {
         fontSize: "10px",
         color: C.textDim
       }
-    }, "Select your name and enter your PIN")), /*#__PURE__*/React.createElement("div", {
+    }, "Select your name and enter your PIN")), rotaError && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: "12px",
+        background: "#ef444422",
+        border: "1px solid #ef444455",
+        borderRadius: "8px",
+        padding: "10px 12px",
+        fontSize: "10px",
+        color: "#fecaca",
+        lineHeight: 1.5
+      }
+    }, "\u26A0 ", rotaError, " Showing directory names only until sync recovers."), /*#__PURE__*/React.createElement("div", {
       style: {
         position: "relative",
         marginBottom: "12px"
@@ -770,7 +781,18 @@ function App() {
       margin: "0 auto",
       padding: "16px"
     }
-  }, screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, rotaError && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: "12px",
+      background: "#ef444422",
+      border: "1px solid #ef444455",
+      borderRadius: "8px",
+      padding: "10px 12px",
+      fontSize: "10px",
+      color: "#fecaca",
+      lineHeight: 1.5
+    }
+  }, "\u26A0 ", rotaError, " Some duties may be out of date."), screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: "20px"
     }
