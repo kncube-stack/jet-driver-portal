@@ -61,7 +61,7 @@ function getSpecialDuty(val) {
     signOn: "—",
     signOff: "—",
     dutyLength: "—",
-    color: "#fb7185"
+    color: "#be185d"
   };
   // P-codes (Private hire, e.g. P2742)
   if (/^P\d+/.test(val)) return {

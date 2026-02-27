@@ -4501,49 +4501,49 @@ const SPECIAL_DUTIES = {
     signOn: "01:20",
     signOff: "11:20",
     dutyLength: "10:00",
-    color: "#f97316"
+    color: "#0f766e"
   },
   "ESP": {
     label: "Early Spare",
     signOn: "03:30",
     signOff: "13:30",
     dutyLength: "10:00",
-    color: "#f97316"
+    color: "#0f766e"
   },
   "MSP": {
     label: "Mid Spare",
     signOn: "11:45",
     signOff: "21:45",
     dutyLength: "10:00",
-    color: "#f97316"
+    color: "#0f766e"
   },
   "LSP": {
     label: "Late Spare",
     signOn: "15:45",
     signOff: "01:45",
     dutyLength: "10:00",
-    color: "#f97316"
+    color: "#0f766e"
   },
   "N Control": {
     label: "Night Control",
     signOn: "18:00",
     signOff: "06:00",
     dutyLength: "12:00",
-    color: "#8b5cf6"
+    color: "#4338ca"
   },
   "D Control": {
     label: "Day Control",
     signOn: "06:00",
     signOff: "18:00",
     dutyLength: "12:00",
-    color: "#8b5cf6"
+    color: "#0284c7"
   },
   "OPM": {
     label: "Management Duties",
     signOn: "07:00",
     signOff: "17:00",
     dutyLength: "10:00",
-    color: "#14b8a6"
+    color: "#64748b"
   },
   "DTO": {
     label: "Driver Training / Office",
