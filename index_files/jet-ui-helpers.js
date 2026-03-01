@@ -48,24 +48,29 @@ const C = {
 // ─── Helpers ────────────────────────────────────────────────────
 // getWeekCommencing is now state-driven from the Google Sheets tab name
 
+function normalizeDutyValue(val) {
+  if (val === null || val === undefined) return "";
+  return typeof val === "string" ? val.trim() : String(val).trim();
+}
 function isDutyNumber(val) {
-  return /^\d+$/.test(val);
+  return /^\d+$/.test(normalizeDutyValue(val));
 }
 function getSpecialDuty(val) {
-  if (!val) return null;
+  const raw = normalizeDutyValue(val);
+  if (!raw) return null;
   // Direct match
-  if (SPECIAL_DUTIES[val]) return SPECIAL_DUTIES[val];
+  if (SPECIAL_DUTIES[raw]) return SPECIAL_DUTIES[raw];
   // AVRA variants (e.g. AVRA6, AVRA8, 6AVRA8&A6, 1AVRA9A8A6)
-  if (val.includes("AVR")) return {
-    label: val,
+  if (raw.includes("AVR")) return {
+    label: raw,
     signOn: "—",
     signOff: "—",
     dutyLength: "—",
     color: "#be185d"
   };
   // P-codes (Private hire, e.g. P2742)
-  if (/^P\d+/.test(val)) return {
-    label: `Private Hire ${val}`,
+  if (/^P\d+/.test(raw)) return {
+    label: `Private Hire ${raw}`,
     signOn: "—",
     signOff: "—",
     dutyLength: "—",
@@ -74,37 +79,38 @@ function getSpecialDuty(val) {
   return null;
 }
 function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
-  if (val === null || val === undefined || val === "—") return {
+  const raw = normalizeDutyValue(val);
+  if (!raw || raw === "—") return {
     color: C.textDim,
     bg: "transparent",
     label: "—"
   };
-  if (val === "R") return {
+  if (raw === "R") return {
     color: C.green,
     bg: C.green + "15",
     label: "REST"
   };
-  if (val === "HOL") return {
+  if (raw === "HOL") return {
     color: "#a78bfa",
     bg: "#a78bfa15",
     label: "HOLIDAY"
   };
-  if (val === "OFF") return {
+  if (raw === "OFF") return {
     color: C.textMuted,
     bg: C.textMuted + "15",
     label: "OFF"
   };
-  if (val === "SICK") return {
+  if (raw === "SICK") return {
     color: "#ef4444",
     bg: "#ef444415",
     label: "SICK"
   };
-  if (val === "ABS") return {
+  if (raw === "ABS") return {
     color: "#ef4444",
     bg: "#ef444415",
     label: "ABSENT"
   };
-  if (val === "WORK") {
+  if (raw === "WORK") {
     const sec = driverName && driverSectionLookup ? driverSectionLookup[driverName] : null;
     if (sec === "cleaners") {
       const isDay = driverName === "Angelina Braganca";
@@ -125,26 +131,26 @@ function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
       label: "WORK"
     };
   }
-  if (val?.startsWith("RL")) return {
+  if (raw.startsWith("RL")) return {
     color: C.blue,
     bg: C.blue + "15",
-    label: `Route Learning ${val.slice(2)}`
+    label: `Route Learning ${raw.slice(2)}`
   };
-  const special = getSpecialDuty(val);
+  const special = getSpecialDuty(raw);
   if (special) return {
     color: special.color,
     bg: special.color + "15",
     label: special.label
   };
-  if (isDutyNumber(val)) return {
+  if (isDutyNumber(raw)) return {
     color: C.accent,
     bg: "transparent",
-    label: `Duty ${val}`
+    label: `Duty ${raw}`
   };
   return {
     color: C.warnText,
     bg: C.warnText + "15",
-    label: val
+    label: raw
   };
 }
 
