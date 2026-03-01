@@ -1389,8 +1389,9 @@ function App() {
     const runoutForDuty = dutyNum ? getTodayRunout(dutyNum) : null;
     const activeRunout = runout || runoutForDuty;
 
-    // Only show the summary card if there's useful info (duty, vehicle, or notes)
-    if (!dutyCard && !activeRunout && !todayNote && todayVal === "R") return null;
+    // Show a banner for today unless there is truly no data for the day.
+    // REST now gets the same top-banner treatment as work duties.
+    if (!dutyCard && !activeRunout && !todayNote && todayVal === "—") return null;
     return /*#__PURE__*/React.createElement("div", {
       style: {
         background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
@@ -1446,7 +1447,17 @@ function App() {
         cursor: "pointer",
         fontFamily: "inherit"
       }
-    }, "View Card \u2192")), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
+    }, "View Card \u2192")), !dutyCard && todayVal === "R" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).color
+      }
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).label)), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: activeRunout ? "10px" : "0"
       }
