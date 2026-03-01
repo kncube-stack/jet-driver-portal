@@ -432,7 +432,7 @@ function App() {
         if (e.key === "Enter" && nameFiltered.length > 0) {
           e.preventDefault();
           setAuthName(nameFiltered[0]);
-          setNameSearch(nameFiltered[0]);
+          setNameSearch("");
           setAuthError("");
         }
       },
@@ -461,7 +461,7 @@ function App() {
         color: C.textDim,
         fontSize: "14px"
       }
-    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+    }, "\u2315")), (DRIVERS.length === 0 || nameQ) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -477,17 +477,7 @@ function App() {
         color: C.textDim,
         fontSize: "12px"
       }
-    }, rotaLoading ? "Loading staff list..." : "No staff available") : !nameQ ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        padding: "16px 12px",
-        color: C.textDim,
-        fontSize: "11px",
-        border: `1px dashed ${C.border}`,
-        borderRadius: "8px",
-        background: C.surface
-      }
-    }, "Start typing your name to see matches.") : nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    }, rotaLoading ? "Loading staff list..." : "No staff available") : nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         padding: "24px",
@@ -498,7 +488,7 @@ function App() {
       key: name,
       onClick: () => {
         setAuthName(name);
-        setNameSearch(name);
+        setNameSearch("");
         setAuthError("");
       },
       style: {
