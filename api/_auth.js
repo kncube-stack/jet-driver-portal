@@ -8,6 +8,18 @@ const DEFAULT_DRIVER_PIN_HASH = "ed946f65d2c785d90e827c5ffd879ce3b49c68d4c880130
 const DEFAULT_MANAGER_MASTER_PIN_HASH = "07c903ce633842c12f7430406521a6d57fd72de978b2c667a5bf8ec2cc7f9a9c";
 const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 
+function getFallbackTokenSecret() {
+  // Deployment-specific fallback to avoid a universally-known static secret.
+  const seed = [
+    process.cwd(),
+    process.env.VERCEL_ENV || "",
+    process.env.VERCEL_URL || "",
+    process.version,
+    "jet-driver-portal"
+  ].join("|");
+  return crypto.createHash("sha256").update(seed).digest("hex");
+}
+
 let cachedClientData = null;
 
 function parseJsonObject(value, fallback = {}) {
@@ -99,7 +111,7 @@ function getAuthConfig() {
     userPinHashes: parseJsonObject(process.env.AUTH_USER_PIN_HASHES, {}),
     defaultDriverPinHash: process.env.AUTH_DEFAULT_DRIVER_PIN_HASH || DEFAULT_DRIVER_PIN_HASH,
     managerMasterPinHash: process.env.AUTH_MANAGER_MASTER_PIN_HASH || DEFAULT_MANAGER_MASTER_PIN_HASH,
-    tokenSecret: process.env.AUTH_SIGNING_SECRET || process.env.RESEND_API_KEY || "jet-driver-portal-dev-secret",
+    tokenSecret: process.env.AUTH_SIGNING_SECRET || process.env.RESEND_API_KEY || getFallbackTokenSecret(),
     tokenTtlSeconds,
     allowUnknownDrivers: process.env.AUTH_ALLOW_UNKNOWN_DRIVERS === "1"
   };

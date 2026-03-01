@@ -38,7 +38,9 @@ function getDriverRunout(driverName) {
   return null;
 }
 async function discoverSheetTabs() {
-  const res = await fetch(GSHEET_PUB_BASE + "/pubhtml");
+  const res = await fetch(GSHEET_PUB_BASE + "/pubhtml", {
+    cache: "no-store"
+  });
   const html = await res.text();
   const tabs = {};
   const regex = /name:\s*"(WC \d{2}\.\d{2}\.\d{4})".*?gid:\s*"(\d+)"/g;
@@ -47,6 +49,11 @@ async function discoverSheetTabs() {
   return tabs;
 }
 function findCurrentWeekTab(tabs) {
+  const safeTabs = tabs && typeof tabs === "object" ? tabs : {};
+  const tabKeys = Object.keys(safeTabs);
+  if (tabKeys.length === 0) {
+    throw new Error("No weekly tabs found in rota source.");
+  }
   const now = new Date();
   const day = now.getDay();
   const diffToMon = day === 0 ? 6 : day - 1;
@@ -58,26 +65,27 @@ function findCurrentWeekTab(tabs) {
     return `WC ${dd}.${mm}.${d.getFullYear()}`;
   };
   const key = fmt(monday);
-  if (tabs[key]) return {
+  if (safeTabs[key]) return {
     tabName: key,
-    gid: tabs[key]
+    gid: safeTabs[key]
   };
   const nextMon = new Date(monday);
   nextMon.setDate(monday.getDate() + 7);
   const key2 = fmt(nextMon);
-  if (tabs[key2]) return {
+  if (safeTabs[key2]) return {
     tabName: key2,
-    gid: tabs[key2]
+    gid: safeTabs[key2]
   };
-  const keys = Object.keys(tabs);
-  const lastKey = keys[keys.length - 1];
+  const lastKey = tabKeys[tabKeys.length - 1];
   return {
     tabName: lastKey,
-    gid: tabs[lastKey]
+    gid: safeTabs[lastKey]
   };
 }
 async function fetchTabCSV(gid) {
-  const res = await fetch(GSHEET_PUB_BASE + `/pub?gid=${gid}&single=true&output=csv`);
+  const res = await fetch(GSHEET_PUB_BASE + `/pub?gid=${gid}&single=true&output=csv`, {
+    cache: "no-store"
+  });
   return await res.text();
 }
 function parseCSVRow(line) {
@@ -194,7 +202,8 @@ function applyManualStaffOverrides(parsed) {
   sections.forEach((s, idx) => {
     sectionIdxByKey[s.key] = idx;
   });
-  MANUAL_STAFF_OVERRIDES.forEach(override => {
+  const overrides = Array.isArray(MANUAL_STAFF_OVERRIDES) ? MANUAL_STAFF_OVERRIDES : [];
+  overrides.forEach(override => {
     if (!override?.name || !override?.sectionKey || !Array.isArray(override.week)) return;
     const name = override.name;
     sections.forEach(s => {
@@ -238,10 +247,13 @@ function sortAvailableWeeks(weeks) {
   });
 }
 function formatWeekCommencing(tabName) {
+  if (typeof tabName !== "string") return "Loading...";
   const match = tabName.match(/WC (\d{2})\.(\d{2})\.(\d{4})/);
   if (!match) return tabName;
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${parseInt(match[1])} ${months[parseInt(match[2]) - 1]} ${match[3]}`;
+  const monthIndex = parseInt(match[2], 10) - 1;
+  if (monthIndex < 0 || monthIndex > 11) return tabName;
+  return `${parseInt(match[1], 10)} ${months[monthIndex]} ${match[3]}`;
 }
 
 // Data layer adapter (phase 1): UI remains unchanged while source backends become swappable.
