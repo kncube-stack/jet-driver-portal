@@ -340,7 +340,22 @@ function App() {
   }
   if (!authed) {
     const nameQ = nameSearch.toLowerCase().trim();
-    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
+    const scoreNameMatch = name => {
+      const n = name.toLowerCase();
+      if (!nameQ) return -1;
+      if (n === nameQ) return 1000;
+      if (n.startsWith(nameQ)) return 900 - n.length / 100;
+      const words = n.split(/\s+/).filter(Boolean);
+      const wordPrefixIdx = words.findIndex(w => w.startsWith(nameQ));
+      if (wordPrefixIdx >= 0) return 750 - wordPrefixIdx;
+      const idx = n.indexOf(nameQ);
+      if (idx >= 0) return 600 - idx / 100;
+      return -1;
+    };
+    const nameFiltered = nameQ ? DRIVERS.map(name => ({
+      name,
+      score: scoreNameMatch(name)
+    })).filter(item => item.score >= 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(item => item.name).slice(0, 8) : [];
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
@@ -409,7 +424,18 @@ function App() {
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: nameSearch,
-      onChange: e => setNameSearch(e.target.value),
+      onChange: e => {
+        setNameSearch(e.target.value);
+        setAuthError("");
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter" && nameFiltered.length > 0) {
+          e.preventDefault();
+          setAuthName(nameFiltered[0]);
+          setNameSearch(nameFiltered[0]);
+          setAuthError("");
+        }
+      },
       placeholder: "Search by name...",
       autoFocus: true,
       style: {
@@ -451,17 +477,28 @@ function App() {
         color: C.textDim,
         fontSize: "12px"
       }
-    }, rotaLoading ? "Loading staff list..." : "No staff available") : nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    }, rotaLoading ? "Loading staff list..." : "No staff available") : !nameQ ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "16px 12px",
+        color: C.textDim,
+        fontSize: "11px",
+        border: `1px dashed ${C.border}`,
+        borderRadius: "8px",
+        background: C.surface
+      }
+    }, "Start typing your name to see matches.") : nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         padding: "24px",
         color: C.textDim,
         fontSize: "12px"
       }
-    }, "No staff found") : nameFiltered.map(name => /*#__PURE__*/React.createElement("button", {
+    }, "No staff found") : nameFiltered.map((name, idx) => /*#__PURE__*/React.createElement("button", {
       key: name,
       onClick: () => {
         setAuthName(name);
+        setNameSearch(name);
         setAuthError("");
       },
       style: {
@@ -489,7 +526,7 @@ function App() {
         color: C.textDim,
         marginTop: "1px"
       }
-    }, DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+    }, idx === 0 ? `Best match \u00b7 ${DRIVER_SECTION_LABEL[name]}` : DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
       style: {
         color: authName === name ? C.accent : C.textDim,
         fontSize: "12px"
