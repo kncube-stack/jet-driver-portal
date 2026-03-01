@@ -84,20 +84,55 @@ async function loginWithServer(name, pin) {
   return data.session;
 }
 async function verifyServerSession(token) {
-  if (!token) throw new Error("Missing session token.");
-  const response = await fetch(AUTH_SESSION_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`
-    },
-    cache: "no-store"
-  });
+  if (!token) {
+    const missingTokenError = new Error("Missing session token.");
+    missingTokenError.code = "SESSION_INVALID";
+    throw missingTokenError;
+  }
+  let response = null;
   let data = null;
-  try {
-    data = await response.json();
-  } catch {}
+  let lastNetworkError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      response = await fetch(AUTH_SESSION_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        cache: "no-store"
+      });
+    } catch (error) {
+      lastNetworkError = error;
+      if (attempt === 0) continue;
+      const networkError = new Error("Unable to verify session right now.");
+      networkError.code = "SESSION_NETWORK_ERROR";
+      networkError.cause = error;
+      throw networkError;
+    }
+    data = null;
+    try {
+      data = await response.json();
+    } catch {}
+    if (response.status >= 500 && attempt === 0) continue;
+    break;
+  }
+  if (!response) {
+    const networkError = new Error("Unable to verify session right now.");
+    networkError.code = "SESSION_NETWORK_ERROR";
+    if (lastNetworkError) networkError.cause = lastNetworkError;
+    throw networkError;
+  }
+  if (response.status === 401 || response.status === 403) {
+    const invalidError = new Error(data?.error || "Session expired. Please sign in again.");
+    invalidError.code = "SESSION_INVALID";
+    invalidError.status = response.status;
+    throw invalidError;
+  }
   if (!response.ok || !data?.ok || !data?.session?.name) {
-    throw new Error(data?.error || "Session verification failed.");
+    const unavailableError = new Error(data?.error || `Session verification unavailable (${response.status}).`);
+    unavailableError.code = "SESSION_UNAVAILABLE";
+    unavailableError.status = response.status;
+    throw unavailableError;
   }
   return data.session;
 }
@@ -195,17 +230,36 @@ function App() {
         setSelectedDriver(null);
         setScreen("home");
       }
-    }).catch(() => {
+    }).catch(err => {
       if (cancelled) return;
-      clearSession();
-      setAuthed(false);
-      setCurrentUser(null);
-      setCurrentRole("driver");
-      setScreen("home");
-      setSelectedDriver(null);
-      setAuthName("");
-      setAuthPin("");
-      setAuthError("Session expired. Please sign in again.");
+      if (err?.code === "SESSION_INVALID") {
+        clearSession();
+        setAuthed(false);
+        setCurrentUser(null);
+        setCurrentRole("driver");
+        setScreen("home");
+        setSelectedDriver(null);
+        setAuthName("");
+        setAuthPin("");
+        setAuthError(err?.message || "Session expired. Please sign in again.");
+        return;
+      }
+      // Keep the cached session during transient API/network issues.
+      console.warn("Session verification unavailable; keeping local session.", err);
+      setAuthError("");
+      setAuthed(true);
+      if (storedSession?.name) {
+        setCurrentUser(storedSession.name);
+        setCurrentRole(storedSession.role === "manager" ? "manager" : "driver");
+        setAuthName(storedSession.name);
+        if (DRIVERS.includes(storedSession.name)) {
+          setSelectedDriver(storedSession.name);
+          setScreen("week");
+        } else {
+          setSelectedDriver(null);
+          setScreen("home");
+        }
+      }
     }).finally(() => {
       if (!cancelled) setSessionVerifying(false);
     });

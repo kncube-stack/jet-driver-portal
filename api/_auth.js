@@ -9,12 +9,13 @@ const DEFAULT_MANAGER_MASTER_PIN_HASH = "07c903ce633842c12f7430406521a6d57fd72de
 const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function getFallbackTokenSecret() {
-  // Deployment-specific fallback to avoid a universally-known static secret.
+  // Stable fallback to reduce unexpected logouts between deployments.
+  // Production should still set AUTH_SIGNING_SECRET explicitly.
   const seed = [
+    process.env.AUTH_SECRET_SEED || "",
+    process.env.VERCEL_PROJECT_ID || "",
+    process.env.VERCEL_ORG_ID || "",
     process.cwd(),
-    process.env.VERCEL_ENV || "",
-    process.env.VERCEL_URL || "",
-    process.version,
     "jet-driver-portal"
   ].join("|");
   return crypto.createHash("sha256").update(seed).digest("hex");
