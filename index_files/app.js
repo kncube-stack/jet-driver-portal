@@ -323,6 +323,13 @@ function App() {
     if (!authed || isManager) return;
     if (selectedDriver !== currentUser) setSelectedDriver(currentUser);
   }, [authed, isManager, selectedDriver, currentUser]);
+  React.useEffect(() => {
+    if (!authed) return;
+    // Safety fallback: prevent blank content if state lands on week without a selected driver.
+    if (screen === "week" && !selectedDriver) {
+      setScreen("home");
+    }
+  }, [authed, screen, selectedDriver]);
   if (sessionVerifying) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
