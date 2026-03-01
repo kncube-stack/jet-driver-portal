@@ -101,6 +101,10 @@ async function verifyServerSession(token) {
   }
   return data.session;
 }
+function getStopMapUrl(stopName) {
+  const query = String(stopName || "").trim();
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
 
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
@@ -2697,7 +2701,15 @@ function App() {
           marginRight: "6px",
           fontSize: "10px"
         }
-      }, "ARR"), s.stop), s.notes && /*#__PURE__*/React.createElement("div", {
+      }, "ARR"), /*#__PURE__*/React.createElement("a", {
+        href: getStopMapUrl(s.stop),
+        target: "_blank",
+        rel: "noopener noreferrer",
+        style: {
+          color: "inherit",
+          textDecoration: "none"
+        }
+      }, s.stop)), s.notes && /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: "10px",
           color: isTakeover ? C.blue : C.textMuted,
