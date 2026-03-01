@@ -3091,7 +3091,7 @@ function App() {
   })(), !canRenderActiveScreen && /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.surface,
-      border: `1px solid `,
+      border: `1px solid ${C.border}`,
       borderRadius: "8px",
       padding: "12px 14px",
       marginTop: "12px",
