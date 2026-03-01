@@ -311,7 +311,10 @@ function App() {
       setCurrentRole(resolvedRole);
       setCurrentUser(serverSession.name);
       setAuthName(serverSession.name);
-      if (DRIVERS.includes(serverSession.name)) {
+      if (resolvedRole === "manager") {
+        setSelectedDriver(null);
+        setScreen("home");
+      } else if (DRIVERS.includes(serverSession.name)) {
         setSelectedDriver(serverSession.name);
         setScreen("week");
       } else {
@@ -500,8 +503,13 @@ function App() {
       setAuthed(true);
       setCurrentRole(role);
       setCurrentUser(resolvedName);
-      setSelectedDriver(resolvedKnownDriver ? resolvedName : null);
-      setScreen(resolvedKnownDriver ? "week" : "home");
+      if (role === "manager") {
+        setSelectedDriver(null);
+        setScreen("home");
+      } else {
+        setSelectedDriver(resolvedKnownDriver ? resolvedName : null);
+        setScreen(resolvedKnownDriver ? "week" : "home");
+      }
       setSearch("");
       setDutySearch("");
       setNameSearch("");
@@ -515,6 +523,13 @@ function App() {
     if (!authed || isManager) return;
     if (selectedDriver !== currentUser) setSelectedDriver(currentUser);
   }, [authed, isManager, selectedDriver, currentUser]);
+  React.useEffect(() => {
+    if (!authed || !isManager) return;
+    if (screen === "week") {
+      setSelectedDriver(null);
+      setScreen("home");
+    }
+  }, [authed, isManager, screen]);
   React.useEffect(() => {
     if (!authed) return;
     // Safety fallback: prevent blank content if state lands on week without a selected driver.
@@ -1022,9 +1037,14 @@ function App() {
           notes: ""
         });
       } else if (screen === "home") {
-        setSelectedDriver(currentUser);
-        setScreen("week");
-        setSearch("");
+        if (isManager) {
+          setSearch("");
+          setDutySearch("");
+        } else {
+          setSelectedDriver(currentUser);
+          setScreen("week");
+          setSearch("");
+        }
       } else if (screen === "week" && selectedDriver !== currentUser) {
         setSelectedDriver(currentUser);
       } else {
