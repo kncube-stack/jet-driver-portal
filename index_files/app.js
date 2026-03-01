@@ -58,10 +58,117 @@ function clearSession() {
     sessionStorage.removeItem("jet_auth");
   } catch {}
 }
+const APP_VERSION = window.JET_APP_VERSION || "v2.6.0";
+const ROTA_CACHE_KEY = "jet_rota_cache_v1";
+const RECENT_DUTIES_KEY = "jet_recent_duties_v1";
+const LARGE_TEXT_KEY = "jet_large_text_v1";
+const PINNED_STOPS_KEY_PREFIX = "jet_pinned_stops_v1::";
+function readJSON(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+function writeJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+function readRotaCache() {
+  const cached = readJSON(ROTA_CACHE_KEY);
+  if (!cached?.sections || !cached?.rota || !cached?.tabName || !cached?.tabs) return null;
+  return cached;
+}
+function writeRotaCache(payload) {
+  writeJSON(ROTA_CACHE_KEY, payload);
+}
+function readRecentDuties() {
+  const list = readJSON(RECENT_DUTIES_KEY);
+  if (!Array.isArray(list)) return [];
+  return list.filter(n => Number.isInteger(n)).slice(0, 3);
+}
+function writeRecentDuties(list) {
+  writeJSON(RECENT_DUTIES_KEY, list.slice(0, 3));
+}
+function readLargeTextPref() {
+  return localStorage.getItem(LARGE_TEXT_KEY) === "1";
+}
+function writeLargeTextPref(enabled) {
+  try {
+    localStorage.setItem(LARGE_TEXT_KEY, enabled ? "1" : "0");
+  } catch {}
+}
+function sanitizeUserKey(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+}
+function readPinnedStops(name) {
+  if (!name) return [];
+  const list = readJSON(PINNED_STOPS_KEY_PREFIX + sanitizeUserKey(name));
+  if (!Array.isArray(list)) return [];
+  return list.filter(v => typeof v === "string").slice(0, 30);
+}
+function writePinnedStops(name, stops) {
+  if (!name) return;
+  writeJSON(PINNED_STOPS_KEY_PREFIX + sanitizeUserKey(name), stops.slice(0, 30));
+}
+function getStopMapUrl(stop) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop || "")}`;
+}
+function getDutyFilterCategory(duty) {
+  const route = String(duty?.route || "").toLowerCase();
+  if (route.includes("a6")) return "a6";
+  if (route.includes("spare")) return "spare";
+  if (route.includes("management")) return "management";
+  return "network";
+}
+function matchesDutyFilter(duty, filterKey) {
+  if (!filterKey || filterKey === "all") return true;
+  return getDutyFilterCategory(duty) === filterKey;
+}
+function isActionDutyValue(val) {
+  return !!val && val !== "—" && val !== "R" && val !== "OFF" && val !== "HOL" && val !== "SICK" && val !== "ABS";
+}
+function formatSyncClock(isoString) {
+  if (!isoString) return null;
+  const dt = new Date(isoString);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toLocaleTimeString();
+}
+function formatSyncStamp(isoString) {
+  if (!isoString) return null;
+  const dt = new Date(isoString);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toLocaleString();
+}
+const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
-const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
-const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
+async function submitPortalRequest(kind, payload, token) {
+  if (!token) throw new Error("Session expired. Please sign in again.");
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  };
+  const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
+    method: "POST",
+    headers,
+    cache: "no-store",
+    body: JSON.stringify({
+      kind,
+      payload
+    })
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {}
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || "Unable to send request right now.");
+  }
+}
 async function loginWithServer(name, pin) {
   const response = await fetch(AUTH_LOGIN_ENDPOINT, {
     method: "POST",
@@ -101,15 +208,13 @@ async function verifyServerSession(token) {
   }
   return data.session;
 }
-function getStopMapUrl(stopName) {
-  const query = String(stopName || "").trim();
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
 
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
   const storedSession = React.useMemo(() => readStoredSession(), []);
+  const cachedRota = React.useMemo(() => readRotaCache(), []);
   const [authed, setAuthed] = React.useState(() => !!storedSession);
+  const [sessionToken, setSessionToken] = React.useState(() => storedSession?.token || "");
   const [sessionVerifying, setSessionVerifying] = React.useState(() => !!storedSession?.token);
   const [authName, setAuthName] = React.useState(() => storedSession?.name || "");
   const [authPin, setAuthPin] = React.useState("");
@@ -151,19 +256,25 @@ function App() {
   })();
 
   // ─── LIVE ROTA STATE ──────────────────────────────────────
-  const [STAFF_SECTIONS, setStaffSections] = React.useState(() => getStaffDirectorySections());
-  const [ROTA, setRota] = React.useState(() => buildEmptyRotaFromSections(getStaffDirectorySections()));
-  const [weekLabel, setWeekLabel] = React.useState("");
-  const [currentTabName, setCurrentTabName] = React.useState("");
-  const [availableWeeks, setAvailableWeeks] = React.useState([]);
-  const [allTabs, setAllTabs] = React.useState({});
-  const [rotaLoading, setRotaLoading] = React.useState(true);
+  const [STAFF_SECTIONS, setStaffSections] = React.useState(() => cachedRota?.sections || getStaffDirectorySections());
+  const [ROTA, setRota] = React.useState(() => cachedRota?.rota || buildEmptyRotaFromSections(getStaffDirectorySections()));
+  const [weekLabel, setWeekLabel] = React.useState(() => cachedRota?.tabName ? formatWeekCommencing(cachedRota.tabName) : "");
+  const [currentTabName, setCurrentTabName] = React.useState(() => cachedRota?.tabName || "");
+  const [availableWeeks, setAvailableWeeks] = React.useState(() => cachedRota?.availableWeeks || []);
+  const [allTabs, setAllTabs] = React.useState(() => cachedRota?.tabs || {});
+  const [rotaLoading, setRotaLoading] = React.useState(() => !cachedRota);
   const [rotaError, setRotaError] = React.useState(null);
-  const [lastFetchTime, setLastFetchTime] = React.useState(null);
+  const [lastFetchTime, setLastFetchTime] = React.useState(() => formatSyncClock(cachedRota?.fetchedAt));
+  const [lastSyncAt, setLastSyncAt] = React.useState(() => cachedRota?.fetchedAt || null);
+  const [syncSource, setSyncSource] = React.useState(() => cachedRota ? "cache" : "live");
 
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
+  const [dutyFilter, setDutyFilter] = React.useState("all");
+  const [recentDutyCards, setRecentDutyCards] = React.useState(() => readRecentDuties());
+  const [largeTextEnabled, setLargeTextEnabled] = React.useState(() => readLargeTextPref());
+  const [pinnedStops, setPinnedStops] = React.useState(() => readPinnedStops(storedSession?.name || null));
   const isManager = currentRole === "manager";
 
   // Derived data from live state
@@ -172,6 +283,37 @@ function App() {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
   } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  React.useEffect(() => {
+    if (!document.getElementById("jet-large-text-style")) {
+      const styleEl = document.createElement("style");
+      styleEl.id = "jet-large-text-style";
+      styleEl.textContent = `
+        body.jet-large-text #root {
+          zoom: 1.08;
+        }
+        @supports not (zoom: 1) {
+          body.jet-large-text #root {
+            -webkit-text-size-adjust: 112%;
+            text-size-adjust: 112%;
+          }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+    document.body.classList.toggle("jet-large-text", largeTextEnabled);
+    writeLargeTextPref(largeTextEnabled);
+  }, [largeTextEnabled]);
+  React.useEffect(() => {
+    setPinnedStops(readPinnedStops(currentUser));
+  }, [currentUser]);
+  React.useEffect(() => {
+    if (screen !== "duty" || !selectedDuty || !DUTY_CARDS[selectedDuty]) return;
+    setRecentDutyCards(prev => {
+      const next = [selectedDuty, ...prev.filter(n => n !== selectedDuty)].slice(0, 3);
+      writeRecentDuties(next);
+      return next;
+    });
+  }, [screen, selectedDuty]);
   React.useEffect(() => {
     let cancelled = false;
     if (!storedSession?.token) {
@@ -184,6 +326,7 @@ function App() {
       if (cancelled) return;
       const resolvedRole = serverSession.role === "manager" ? "manager" : "driver";
       writeSession(serverSession.name, resolvedRole, storedSession.token, serverSession.expiresAt || storedSession.expiresAt || null);
+      setSessionToken(storedSession.token);
       setAuthed(true);
       setCurrentRole(resolvedRole);
       setCurrentUser(serverSession.name);
@@ -198,6 +341,7 @@ function App() {
     }).catch(() => {
       if (cancelled) return;
       clearSession();
+      setSessionToken("");
       setAuthed(false);
       setCurrentUser(null);
       setCurrentRole("driver");
@@ -221,18 +365,34 @@ function App() {
     setRotaError(null);
     fetchLiveRota().then(data => {
       if (cancelled) return;
+      const fetchedAt = new Date().toISOString();
       setStaffSections(data.sections);
       setRota(data.rota);
       setWeekLabel(formatWeekCommencing(data.tabName));
       setCurrentTabName(data.tabName);
       setAvailableWeeks(data.availableWeeks);
       setAllTabs(data.tabs);
-      setLastFetchTime(new Date().toLocaleTimeString());
+      setLastSyncAt(fetchedAt);
+      setLastFetchTime(formatSyncClock(fetchedAt));
+      setSyncSource("live");
+      writeRotaCache({
+        sections: data.sections,
+        rota: data.rota,
+        tabName: data.tabName,
+        availableWeeks: data.availableWeeks,
+        tabs: data.tabs,
+        fetchedAt
+      });
       setRotaLoading(false);
     }).catch(err => {
       if (cancelled) return;
       console.error("Rota fetch failed:", err);
-      setRotaError("Failed to load rota from Google Sheets. Check your connection.");
+      if (cachedRota) {
+        setSyncSource("cache");
+        setRotaError("Live sync failed. Showing cached rota.");
+      } else {
+        setRotaError("Failed to load rota from Google Sheets. Check your connection.");
+      }
       setRotaLoading(false);
     });
     return () => {
@@ -247,11 +407,22 @@ function App() {
     try {
       const data = await fetchWeekRota(allTabs, tabName);
       if (data) {
+        const fetchedAt = new Date().toISOString();
         setStaffSections(data.sections);
         setRota(data.rota);
         setWeekLabel(formatWeekCommencing(tabName));
         setCurrentTabName(tabName);
-        setLastFetchTime(new Date().toLocaleTimeString());
+        setLastSyncAt(fetchedAt);
+        setLastFetchTime(formatSyncClock(fetchedAt));
+        setSyncSource("live");
+        writeRotaCache({
+          sections: data.sections,
+          rota: data.rota,
+          tabName,
+          availableWeeks,
+          tabs: allTabs,
+          fetchedAt
+        });
       }
     } catch (err) {
       console.error("Week switch failed:", err);
@@ -266,14 +437,26 @@ function App() {
     setRotaError(null);
     try {
       const data = await fetchLiveRota();
+      const fetchedAt = new Date().toISOString();
       setStaffSections(data.sections);
       setRota(data.rota);
       setWeekLabel(formatWeekCommencing(data.tabName));
       setCurrentTabName(data.tabName);
       setAvailableWeeks(data.availableWeeks);
       setAllTabs(data.tabs);
-      setLastFetchTime(new Date().toLocaleTimeString());
+      setLastSyncAt(fetchedAt);
+      setLastFetchTime(formatSyncClock(fetchedAt));
+      setSyncSource("live");
+      writeRotaCache({
+        sections: data.sections,
+        rota: data.rota,
+        tabName: data.tabName,
+        availableWeeks: data.availableWeeks,
+        tabs: data.tabs,
+        fetchedAt
+      });
     } catch (err) {
+      setSyncSource(cachedRota ? "cache" : syncSource);
       setRotaError("Refresh failed.");
     }
     setRotaLoading(false);
@@ -284,6 +467,36 @@ function App() {
     if (!q) return null;
     return DRIVERS.filter(d => d.toLowerCase().includes(q));
   }, [search, DRIVERS]);
+  const dutyFilterOptions = [{
+    key: "all",
+    label: "All"
+  }, {
+    key: "a6",
+    label: "A6"
+  }, {
+    key: "network",
+    label: "Network"
+  }, {
+    key: "spare",
+    label: "Spare"
+  }, {
+    key: "management",
+    label: "Management"
+  }];
+  const openDutyCard = (dutyNumber, fromLookup) => {
+    setSelectedDuty(dutyNumber);
+    setDutyLookupSource(!!fromLookup);
+    setScreen("duty");
+  };
+  const togglePinnedStop = stopName => {
+    if (!currentUser || !stopName) return;
+    setPinnedStops(prev => {
+      const exists = prev.includes(stopName);
+      const next = exists ? prev.filter(s => s !== stopName) : [stopName, ...prev].slice(0, 30);
+      writePinnedStops(currentUser, next);
+      return next;
+    });
+  };
   const handleLogin = async () => {
     const name = authName.trim();
     const pin = authPin.trim();
@@ -305,6 +518,7 @@ function App() {
       const role = session.role === "manager" ? "manager" : "driver";
       const resolvedKnownDriver = DRIVERS.includes(resolvedName);
       writeSession(resolvedName, role, session.token, session.expiresAt || null);
+      setSessionToken(session.token);
       setAuthed(true);
       setCurrentRole(role);
       setCurrentUser(resolvedName);
@@ -344,22 +558,7 @@ function App() {
   }
   if (!authed) {
     const nameQ = nameSearch.toLowerCase().trim();
-    const scoreNameMatch = name => {
-      const n = name.toLowerCase();
-      if (!nameQ) return -1;
-      if (n === nameQ) return 1000;
-      if (n.startsWith(nameQ)) return 900 - n.length / 100;
-      const words = n.split(/\s+/).filter(Boolean);
-      const wordPrefixIdx = words.findIndex(w => w.startsWith(nameQ));
-      if (wordPrefixIdx >= 0) return 750 - wordPrefixIdx;
-      const idx = n.indexOf(nameQ);
-      if (idx >= 0) return 600 - idx / 100;
-      return -1;
-    };
-    const nameFiltered = nameQ ? DRIVERS.map(name => ({
-      name,
-      score: scoreNameMatch(name)
-    })).filter(item => item.score >= 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(item => item.name).slice(0, 8) : [];
+    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
@@ -428,18 +627,7 @@ function App() {
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: nameSearch,
-      onChange: e => {
-        setNameSearch(e.target.value);
-        setAuthError("");
-      },
-      onKeyDown: e => {
-        if (e.key === "Enter" && nameFiltered.length > 0) {
-          e.preventDefault();
-          setAuthName(nameFiltered[0]);
-          setNameSearch("");
-          setAuthError("");
-        }
-      },
+      onChange: e => setNameSearch(e.target.value),
       placeholder: "Search by name...",
       autoFocus: true,
       style: {
@@ -465,7 +653,7 @@ function App() {
         color: C.textDim,
         fontSize: "14px"
       }
-    }, "\u2315")), (DRIVERS.length === 0 || nameQ) && /*#__PURE__*/React.createElement("div", {
+    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -488,11 +676,10 @@ function App() {
         color: C.textDim,
         fontSize: "12px"
       }
-    }, "No staff found") : nameFiltered.map((name, idx) => /*#__PURE__*/React.createElement("button", {
+    }, "No staff found") : nameFiltered.map(name => /*#__PURE__*/React.createElement("button", {
       key: name,
       onClick: () => {
         setAuthName(name);
-        setNameSearch("");
         setAuthError("");
       },
       style: {
@@ -520,7 +707,7 @@ function App() {
         color: C.textDim,
         marginTop: "1px"
       }
-    }, idx === 0 ? `Best match \u00b7 ${DRIVER_SECTION_LABEL[name]}` : DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+    }, DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
       style: {
         color: authName === name ? C.accent : C.textDim,
         fontSize: "12px"
@@ -528,8 +715,11 @@ function App() {
     }, authName === name ? "\u2713" : "\u203A")))), /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: authName,
+      onChange: e => {
+        setAuthName(e.target.value);
+        setAuthError("");
+      },
       placeholder: "Name",
-      readOnly: true,
       style: {
         width: "100%",
         padding: "12px 14px",
@@ -541,9 +731,10 @@ function App() {
         fontFamily: "inherit",
         outline: "none",
         boxSizing: "border-box",
-        marginBottom: "8px",
-        opacity: authName ? 1 : 0.9
-      }
+        marginBottom: "8px"
+      },
+      onFocus: e => e.target.style.borderColor = C.accent,
+      onBlur: e => e.target.style.borderColor = C.border
     }), /*#__PURE__*/React.createElement("input", {
       type: "password",
       value: authPin,
@@ -740,6 +931,7 @@ function App() {
   };
   const switchUser = () => {
     clearSession();
+    setSessionToken("");
     setAuthed(false);
     setCurrentUser(null);
     setCurrentRole("driver");
@@ -765,6 +957,27 @@ function App() {
   })();
   const canBrowseStaff = isManager;
   const showingDutyLookup = !canBrowseStaff || showDutyLookup;
+  const syncStamp = formatSyncStamp(lastSyncAt);
+  const nextDutyInfo = (() => {
+    if (!selectedDriver) return null;
+    const week = ROTA[selectedDriver] || [];
+    if (!Array.isArray(week) || week.length === 0) return null;
+    const startIndex = isCurrentWeek ? today : 0;
+    const maxLookahead = isCurrentWeek ? 7 : week.length;
+    for (let offset = 0; offset < maxLookahead; offset++) {
+      const idx = isCurrentWeek ? (startIndex + offset) % 7 : offset;
+      const value = week[idx] || "—";
+      if (!isActionDutyValue(value)) continue;
+      const delta = isCurrentWeek ? idx >= today ? idx - today : idx + 7 - today : null;
+      const relativeLabel = delta === 0 ? "Today" : delta === 1 ? "Tomorrow" : delta !== null ? `In ${delta} days` : null;
+      return {
+        dayIndex: idx,
+        value,
+        relativeLabel
+      };
+    }
+    return null;
+  })();
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -860,7 +1073,21 @@ function App() {
       textAlign: "right",
       lineHeight: 1.4
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setLargeTextEnabled(v => !v),
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      color: largeTextEnabled ? C.accent : C.textMuted,
+      borderRadius: "6px",
+      fontSize: "9px",
+      fontWeight: 600,
+      padding: "3px 7px",
+      cursor: "pointer",
+      fontFamily: "inherit",
+      marginBottom: "3px"
+    }
+  }, largeTextEnabled ? "Large Text: On" : "Large Text: Off"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 600
     }
@@ -947,7 +1174,34 @@ function App() {
       color: C.textDim,
       marginTop: "4px"
     }
-  }, "\uD83D\uDFE2 Live from Google Sheets \xB7 Updated ", lastFetchTime)), /*#__PURE__*/React.createElement("div", {
+  }, syncSource === "cache" ? "\uD83D\uDFE1 Cached rota \xB7 Updated " : "\uD83D\uDFE2 Live from Google Sheets \xB7 Updated ", lastFetchTime), recentDutyCards.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "10px",
+      display: "flex",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: "6px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: C.textMuted,
+      marginRight: "2px"
+    }
+  }, "Recent"), recentDutyCards.map(dutyNumber => /*#__PURE__*/React.createElement("button", {
+    key: dutyNumber,
+    onClick: () => openDutyCard(dutyNumber, true),
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      color: C.white,
+      borderRadius: "999px",
+      padding: "4px 10px",
+      fontSize: "10px",
+      cursor: "pointer",
+      fontFamily: "inherit"
+    }
+  }, "Duty ", dutyNumber))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       marginBottom: "14px",
@@ -1187,6 +1441,27 @@ function App() {
     }, "\u203A")));
   })))))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      gap: "6px",
+      flexWrap: "wrap",
+      marginBottom: "10px"
+    }
+  }, dutyFilterOptions.map(option => /*#__PURE__*/React.createElement("button", {
+    key: option.key,
+    onClick: () => setDutyFilter(option.key),
+    style: {
+      background: dutyFilter === option.key ? C.accent + "22" : C.surface,
+      color: dutyFilter === option.key ? C.accent : C.textMuted,
+      border: `1px solid ${dutyFilter === option.key ? C.accent + "55" : C.border}`,
+      borderRadius: "999px",
+      padding: "5px 10px",
+      fontSize: "10px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit"
+    }
+  }, option.label))), /*#__PURE__*/React.createElement("div", {
+    style: {
       position: "relative",
       marginBottom: "16px"
     }
@@ -1228,7 +1503,7 @@ function App() {
   }, (() => {
     const allDuties = Object.values(DUTY_CARDS).sort((a, b) => a.number - b.number);
     const q = dutySearch.toLowerCase().trim();
-    const matchedDuties = q ? allDuties.filter(d => String(d.number).includes(q) || d.route.toLowerCase().includes(q) || d.days.toLowerCase().includes(q)) : allDuties;
+    const matchedDuties = allDuties.filter(d => matchesDutyFilter(d, dutyFilter)).filter(d => !q || String(d.number).includes(q) || d.route.toLowerCase().includes(q) || d.days.toLowerCase().includes(q));
     if (matchedDuties.length === 0) return /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
@@ -1239,11 +1514,7 @@ function App() {
     }, "No duties found matching \"", dutySearch, "\"");
     return matchedDuties.map(duty => /*#__PURE__*/React.createElement("button", {
       key: duty.number,
-      onClick: () => {
-        setSelectedDuty(duty.number);
-        setDutyLookupSource(true);
-        setScreen("duty");
-      },
+      onClick: () => openDutyCard(duty.number, true),
       style: {
         display: "flex",
         alignItems: "center",
@@ -1431,10 +1702,7 @@ function App() {
         marginTop: "2px"
       }
     }, dutyCard.route, " \xB7 ", dutyCard.signOn, " \u2013 ", dutyCard.signOff)), /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setSelectedDuty(dutyNum);
-        setScreen("duty");
-      },
+      onClick: () => openDutyCard(dutyNum, false),
       style: {
         background: C.accent,
         color: C.bg,
@@ -1575,7 +1843,42 @@ function App() {
         whiteSpace: "pre-line"
       }
     }, todayNote)));
-  })(), /*#__PURE__*/React.createElement("div", {
+  })(), nextDutyInfo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "9px",
+      padding: "10px 12px",
+      marginBottom: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: C.textMuted,
+      letterSpacing: "0.6px",
+      marginBottom: "4px",
+      fontWeight: 600
+    }
+  }, "NEXT DUTY"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "13px",
+      color: C.white,
+      fontWeight: 600
+    }
+  }, SHORT_DAYS[nextDutyInfo.dayIndex], nextDutyInfo.relativeLabel ? ` \u2014 ${nextDutyInfo.relativeLabel}` : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "12px",
+      color: C.accent,
+      fontWeight: 700
+    }
+  }, isDutyNumber(nextDutyInfo.value) ? `Duty ${nextDutyInfo.value}` : getStatusStyle(nextDutyInfo.value, selectedDriver, true, DRIVER_SECTION).label))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -1584,6 +1887,7 @@ function App() {
   }, DAYS.map((day, i) => {
     const val = ROTA[selectedDriver]?.[i] || "—";
     const isToday = isCurrentWeek && i === today;
+    const isNextDuty = !!nextDutyInfo && i === nextDutyInfo.dayIndex && !isToday;
     const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION);
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
@@ -1595,8 +1899,8 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       key: day,
       style: {
-        background: isToday ? C.accent + "08" : C.surface,
-        border: `1px solid ${isToday ? C.accent + "33" : C.border}`,
+        background: isToday ? C.accent + "08" : isNextDuty ? C.accent + "05" : C.surface,
+        border: `1px solid ${isToday ? C.accent + "33" : isNextDuty ? C.accent + "26" : C.border}`,
         borderRadius: "8px",
         overflow: "hidden"
       }
@@ -1609,7 +1913,7 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        width: "38px",
+        width: "62px",
         textAlign: "center"
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -1619,7 +1923,14 @@ function App() {
         color: C.textMuted,
         letterSpacing: "1px"
       }
-    }, SHORT_DAYS[i])), /*#__PURE__*/React.createElement("div", {
+    }, SHORT_DAYS[i]), isNextDuty && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "2px",
+        fontSize: "8px",
+        color: C.accent,
+        fontWeight: 600
+      }
+    }, nextDutyInfo?.relativeLabel === "Tomorrow" ? "TOMORROW" : "NEXT")), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1
       }
@@ -1674,10 +1985,7 @@ function App() {
         whiteSpace: "pre-line"
       }
     }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
-        setScreen("duty");
-      },
+      onClick: () => openDutyCard(hasDutyCard ? parseInt(val) : rlDutyNum, false),
       style: {
         background: isToday ? C.accent : C.accent + "22",
         color: isToday ? C.bg : C.accent,
@@ -1700,7 +2008,7 @@ function App() {
           e.currentTarget.style.color = C.accent;
         }
       }
-    }, "View Card \u2192")), isToday && /*#__PURE__*/React.createElement("div", {
+    }, "View Card \u2192")), (isToday || isNextDuty) && /*#__PURE__*/React.createElement("div", {
       style: {
         height: "2px",
         background: `linear-gradient(90deg, ${C.accent}, transparent)`
@@ -1810,7 +2118,7 @@ function App() {
       e.currentTarget.style.borderColor = "#ffffff25";
     }
   }, "\uD83D\uDD04 Request Shift Swap")), screen === "leave" && selectedDriver && (() => {
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
         weekday: "long",
@@ -1830,12 +2138,20 @@ function App() {
       setLeaveSending(true);
       setLeaveError("");
       try {
-        const subject = `Annual Leave Request - ${selectedDriver}`;
-        const body = [`ANNUAL LEAVE REQUEST`, ``, `Driver: ${selectedDriver}`, `From: ${fromDate}`, `To: ${toDate}`, `Total days: ${diffDays}`, `Reason: ${leaveForm.reason || "Annual leave"}`, leaveForm.notes ? `Notes: ${leaveForm.notes}` : `Notes: None`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
-        window.open(`mailto:${LEAVE_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+        await submitPortalRequest("leave", {
+          driverName: selectedDriver,
+          dateFrom: leaveForm.dateFrom,
+          dateTo: leaveForm.dateTo,
+          fromDateLabel: fromDate,
+          toDateLabel: toDate,
+          totalDays: diffDays,
+          reason: leaveForm.reason || "Annual leave",
+          notes: leaveForm.notes || "",
+          submittedAtIso: new Date().toISOString()
+        }, sessionToken);
         setLeaveSubmitted(true);
       } catch (err) {
-        setLeaveError(err?.message || "Unable to open your email app.");
+        setLeaveError(err?.message || "Unable to send leave request.");
       }
       setLeaveSending(false);
     };
@@ -1875,7 +2191,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your annual leave request draft is ready in your email app. Send it to submit the request."), /*#__PURE__*/React.createElement("button", {
+    }, "Your annual leave request has been emailed for approval. You'll be contacted with a decision."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setLeaveSubmitted(false);
@@ -2078,25 +2394,32 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This opens your email app with the request ready to send to office staff.")));
+    }, "This sends directly to office staff for approval. You'll be contacted with a decision.")));
   })(), screen === "swap" && selectedDriver && (() => {
     const myRota = ROTA[selectedDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
     const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
     const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
     const targetDayDuty = swapForm.dayIndex !== "" && swapForm.targetDriver ? targetRota[parseInt(swapForm.dayIndex)] || "—" : null;
-    const handleSwapSubmit = () => {
+    const handleSwapSubmit = async () => {
       if (swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending) return;
       const dayName = DAYS[parseInt(swapForm.dayIndex)];
       setSwapSending(true);
       setSwapError("");
       try {
-        const subject = `Shift Swap Request - ${selectedDriver} <-> ${swapForm.targetDriver}`;
-        const body = [`SHIFT SWAP REQUEST`, ``, `Requesting Driver: ${selectedDriver}`, `Current duty (${dayName}): ${selectedDayDuty || "—"}`, ``, `Swap With: ${swapForm.targetDriver}`, `Their duty (${dayName}): ${targetDayDuty || "—"}`, swapForm.notes ? `Notes: ${swapForm.notes}` : `Notes: None`, ``, `Both drivers must agree to this swap.`, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
-        window.open(`mailto:${SWAP_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+        await submitPortalRequest("swap", {
+          requestingDriver: selectedDriver,
+          targetDriver: swapForm.targetDriver,
+          dayIndex: parseInt(swapForm.dayIndex),
+          dayName,
+          requestingDuty: selectedDayDuty || "—",
+          targetDuty: targetDayDuty || "—",
+          notes: swapForm.notes || "",
+          submittedAtIso: new Date().toISOString()
+        }, sessionToken);
         setSwapSubmitted(true);
       } catch (err) {
-        setSwapError(err?.message || "Unable to open your email app.");
+        setSwapError(err?.message || "Unable to send swap request.");
       }
       setSwapSending(false);
     };
@@ -2136,7 +2459,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your shift swap request draft is ready in your email app. Send it to submit the request."), /*#__PURE__*/React.createElement("button", {
+    }, "Your shift swap request has been emailed to the manager. Both drivers will need to agree before the swap is confirmed."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setSwapSubmitted(false);
@@ -2421,10 +2744,11 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This opens your email app with the swap request ready to send.")));
+    }, "This sends a request to the manager. Both drivers must agree before any swap is confirmed.")));
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
+    const pinnedStopSet = new Set(pinnedStops);
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       ref: printRef,
       style: {
@@ -2637,7 +2961,48 @@ function App() {
         color: C.warnText,
         lineHeight: 1.4
       }
-    }, "\u26A0 Ensure seatbelts are done-up before returning to depot"), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
+    }, "\u26A0 Ensure seatbelts are done-up before returning to depot"), pinnedStops.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        padding: "10px 12px",
+        marginBottom: "10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 700,
+        letterSpacing: "0.7px",
+        marginBottom: "6px"
+      }
+    }, "PINNED STOPS"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "6px"
+      }
+    }, pinnedStops.slice(0, 8).map(stop => /*#__PURE__*/React.createElement("button", {
+      key: stop,
+      onClick: () => window.open(getStopMapUrl(stop), "_blank", "noopener,noreferrer"),
+      style: {
+        background: C.surfaceHover,
+        border: `1px solid ${C.border}`,
+        color: C.white,
+        borderRadius: "999px",
+        padding: "4px 10px",
+        fontSize: "10px",
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, stop))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "9px",
+        color: C.textDim,
+        marginTop: "6px"
+      }
+    }, "Tap any stop to open Google Maps.")), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
       key: si,
       style: {
         marginBottom: "12px"
@@ -2707,7 +3072,8 @@ function App() {
         rel: "noopener noreferrer",
         style: {
           color: "inherit",
-          textDecoration: "none"
+          textDecorationColor: C.textDim,
+          textUnderlineOffset: "2px"
         }
       }, s.stop)), s.notes && /*#__PURE__*/React.createElement("div", {
         style: {
@@ -2715,7 +3081,24 @@ function App() {
           color: isTakeover ? C.blue : C.textMuted,
           marginTop: "2px"
         }
-      }, s.notes)));
+      }, s.notes)), /*#__PURE__*/React.createElement("button", {
+        onClick: e => {
+          e.preventDefault();
+          togglePinnedStop(s.stop);
+        },
+        style: {
+          marginLeft: "8px",
+          background: pinnedStopSet.has(s.stop) ? C.accent + "22" : "transparent",
+          color: pinnedStopSet.has(s.stop) ? C.accent : C.textDim,
+          border: `1px solid ${pinnedStopSet.has(s.stop) ? C.accent + "55" : C.border}`,
+          borderRadius: "6px",
+          padding: "3px 7px",
+          fontSize: "10px",
+          fontFamily: "inherit",
+          cursor: "pointer",
+          flexShrink: 0
+        }
+      }, pinnedStopSet.has(s.stop) ? "Pinned" : "Pin"));
     })))), /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
@@ -2725,7 +3108,16 @@ function App() {
         lineHeight: 1.5
       }
     }, "If your actual duty differs from this card, contact the duty manager immediately."));
-  })()));
+  })(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      fontSize: "9px",
+      color: C.textDim,
+      lineHeight: 1.5,
+      marginTop: "18px",
+      paddingBottom: "8px"
+    }
+  }, "Portal ", APP_VERSION, " \xB7 ", syncSource === "cache" ? "Cached mode" : "Live mode", syncStamp ? ` \xB7 Synced ${syncStamp}` : ""))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 })(window);
