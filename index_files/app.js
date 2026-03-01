@@ -543,7 +543,19 @@ function App() {
   }
   if (!authed) {
     const nameQ = nameSearch.toLowerCase().trim();
-    const nameFiltered = nameQ ? DRIVERS.filter(d => d.toLowerCase().includes(nameQ)) : DRIVERS;
+    const scoreNameMatch = name => {
+      const normalized = name.toLowerCase();
+      if (!nameQ) return -1;
+      if (normalized === nameQ) return 100;
+      if (normalized.startsWith(nameQ)) return 80;
+      if (normalized.split(/\s+/).some(part => part.startsWith(nameQ))) return 60;
+      const idx = normalized.indexOf(nameQ);
+      return idx >= 0 ? Math.max(30 - idx, 5) : -1;
+    };
+    const nameFiltered = nameQ ? DRIVERS.map(name => ({
+      name,
+      score: scoreNameMatch(name)
+    })).filter(item => item.score > 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(item => item.name) : [];
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
@@ -638,7 +650,7 @@ function App() {
         color: C.textDim,
         fontSize: "14px"
       }
-    }, "\u2315")), /*#__PURE__*/React.createElement("div", {
+    }, "\u2315")), (DRIVERS.length === 0 || nameQ) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -665,6 +677,7 @@ function App() {
       key: name,
       onClick: () => {
         setAuthName(name);
+        setNameSearch("");
         setAuthError("");
       },
       style: {
@@ -700,10 +713,7 @@ function App() {
     }, authName === name ? "\u2713" : "\u203A")))), /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: authName,
-      onChange: e => {
-        setAuthName(e.target.value);
-        setAuthError("");
-      },
+      readOnly: true,
       placeholder: "Name",
       style: {
         width: "100%",
@@ -962,6 +972,7 @@ function App() {
     }
     return null;
   })();
+  const canRenderActiveScreen = screen === "home" || screen === "week" && !!selectedDriver || screen === "leave" && !!selectedDriver || screen === "swap" && !!selectedDriver || screen === "duty" && !!selectedDuty && !!DUTY_CARDS[selectedDuty];
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -3077,7 +3088,46 @@ function App() {
         lineHeight: 1.5
       }
     }, "If your actual duty differs from this card, contact the duty manager immediately."));
-  })(), /*#__PURE__*/React.createElement("div", {
+  })(), !canRenderActiveScreen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.surface,
+      border: `1px solid `,
+      borderRadius: "8px",
+      padding: "12px 14px",
+      marginTop: "12px",
+      marginBottom: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "11px",
+      color: C.white,
+      fontWeight: 600,
+      marginBottom: "6px"
+    }
+  }, "Resetting view"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: C.textMuted
+    }
+  }, "Your view state looked inconsistent, so the app is returning you to Home."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setScreen("home");
+      setSelectedDuty(null);
+      if (!selectedDriver) setSelectedDriver(currentUser || null);
+    },
+    style: {
+      marginTop: "10px",
+      background: C.accent,
+      color: C.bg,
+      border: "none",
+      borderRadius: "6px",
+      padding: "7px 12px",
+      fontSize: "11px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit"
+    }
+  }, "Go Home")), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       fontSize: "9px",

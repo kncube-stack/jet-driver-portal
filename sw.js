@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jet-portal-v10';
+const CACHE_NAME = 'jet-portal-v11';
 const ASSETS = [
   '/',
   '/index.html',
