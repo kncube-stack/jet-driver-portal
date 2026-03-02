@@ -2973,6 +2973,8 @@ function App() {
       width: "100%",
       maxWidth: "100%",
       minWidth: 0,
+      display: "block",
+      inlineSize: "100%",
       padding: "10px 12px",
       background: C.surface,
       border: `1px solid ${C.border}`,
@@ -2982,6 +2984,11 @@ function App() {
       fontFamily: "inherit",
       outline: "none",
       boxSizing: "border-box"
+    };
+    const fieldWrapStyle = {
+      width: "100%",
+      minWidth: 0,
+      overflow: "hidden"
     };
     if (timesheetSubmitted) return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3093,7 +3100,9 @@ function App() {
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
           gap: "8px"
         }
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      }, /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
         style: {
           display: "block",
           fontSize: "9px",
@@ -3110,7 +3119,9 @@ function App() {
           background: C.surfaceHover,
           color: C.textMuted
         }
-      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      })), /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
         style: {
           display: "block",
           fontSize: "9px",
@@ -3127,9 +3138,13 @@ function App() {
         }),
         style: {
           ...inputStyle,
+          appearance: "none",
+          WebkitAppearance: "none",
           colorScheme: "dark"
         }
-      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      })), /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
         style: {
           display: "block",
           fontSize: "9px",
@@ -3146,9 +3161,13 @@ function App() {
         }),
         style: {
           ...inputStyle,
+          appearance: "none",
+          WebkitAppearance: "none",
           colorScheme: "dark"
         }
-      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      })), /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
         style: {
           display: "block",
           fontSize: "9px",

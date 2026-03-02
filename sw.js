@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jet-portal-v9';
+const CACHE_NAME = 'jet-portal-v10';
 const ASSETS = [
   '/',
   '/index.html',
@@ -6,8 +6,17 @@ const ASSETS = [
   '/index_files/jet-data.js',
   '/index_files/jet-data-layer.js',
   '/index_files/jet-ui-helpers.js',
+  '/index_files/jet-stop-directory.js',
   '/index_files/app.js'
 ];
+const NETWORK_FIRST_PATHS = new Set([
+  '/index.html',
+  '/index_files/app.js',
+  '/index_files/jet-data.js',
+  '/index_files/jet-data-layer.js',
+  '/index_files/jet-ui-helpers.js',
+  '/index_files/jet-stop-directory.js'
+]);
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
@@ -22,6 +31,18 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (NETWORK_FIRST_PATHS.has(url.pathname)) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => caches.match(e.request).then(r => r || caches.match('/')))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('/')))
   );
