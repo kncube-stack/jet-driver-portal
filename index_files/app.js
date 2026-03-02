@@ -62,6 +62,46 @@ const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
+const TIMESHEET_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
+const PADDINGTON_TRAVEL_COST = 6.2;
+const STANDARD_TRAVEL_COST = 9.2;
+function isTimeValue(value) {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
+}
+function parseTimeValueToMinutes(value) {
+  if (!isTimeValue(value)) return null;
+  const [hh, mm] = String(value).split(":");
+  return parseInt(hh, 10) * 60 + parseInt(mm, 10);
+}
+function getDurationMinutes(startTime, finishTime) {
+  const start = parseTimeValueToMinutes(startTime);
+  const finish = parseTimeValueToMinutes(finishTime);
+  if (start === null || finish === null) return 0;
+  let diff = finish - start;
+  if (diff < 0) diff += 24 * 60;
+  return diff;
+}
+function formatDurationLabel(totalMinutes) {
+  const safeMinutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  return `${hours}h ${String(mins).padStart(2, "0")}m`;
+}
+function formatMoneyPounds(value) {
+  const amount = Number.isFinite(value) ? value : 0;
+  return `£${amount.toFixed(2)}`;
+}
+function inferDutyTravelCost(dutyCard) {
+  if (!dutyCard) return 0;
+  const routeLabel = String(dutyCard.route || "").toLowerCase();
+  if (!routeLabel.includes("a6")) return STANDARD_TRAVEL_COST;
+  const allStops = Array.isArray(dutyCard.segments) ? dutyCard.segments.flatMap(seg => Array.isArray(seg.stops) ? seg.stops : []).map(stop => String(stop?.stop || "").trim()).filter(Boolean) : [];
+  const firstStop = (allStops[0] || "").toLowerCase();
+  const lastStop = (allStops[allStops.length - 1] || "").toLowerCase();
+  const startsOrFinishesAtPaddington = firstStop.includes("paddington") || lastStop.includes("paddington");
+  if (startsOrFinishesAtPaddington) return PADDINGTON_TRAVEL_COST;
+  return STANDARD_TRAVEL_COST;
+}
 async function loginWithServer(name, pin) {
   const response = await fetch(AUTH_LOGIN_ENDPOINT, {
     method: "POST",
@@ -460,6 +500,10 @@ function App() {
   const [swapSubmitted, setSwapSubmitted] = React.useState(false);
   const [swapSending, setSwapSending] = React.useState(false);
   const [swapError, setSwapError] = React.useState("");
+  const [timesheetRows, setTimesheetRows] = React.useState([]);
+  const [timesheetSubmitted, setTimesheetSubmitted] = React.useState(false);
+  const [timesheetSending, setTimesheetSending] = React.useState(false);
+  const [timesheetError, setTimesheetError] = React.useState("");
   const printRef = React.useRef(null);
   const today = (() => {
     const d = new Date().getDay();
@@ -488,6 +532,44 @@ function App() {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
   } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
+    const dutyValue = dutyCode === null || dutyCode === undefined || dutyCode === "" ? "—" : String(dutyCode).trim();
+    const dutyNum = isDutyNumber(dutyValue) ? parseInt(dutyValue, 10) : null;
+    const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
+    const routeLearningMatch = dutyValue.match(/^RL\s*(\d+)$/i);
+    const routeLearningNum = routeLearningMatch ? parseInt(routeLearningMatch[1], 10) : null;
+    const routeLearningCard = routeLearningNum && DUTY_CARDS[routeLearningNum] ? DUTY_CARDS[routeLearningNum] : null;
+    const special = getSpecialDuty(dutyValue);
+    const startTimeRaw = dutyCard ? dutyCard.signOn : routeLearningCard ? routeLearningCard.signOn : special?.signOn && special.signOn !== "—" ? special.signOn : "";
+    const finishTimeRaw = dutyCard ? dutyCard.signOff : routeLearningCard ? routeLearningCard.signOff : special?.signOff && special.signOff !== "—" ? special.signOff : "";
+    const startTime = isTimeValue(startTimeRaw) ? startTimeRaw : "";
+    const finishTime = isTimeValue(finishTimeRaw) ? finishTimeRaw : "";
+    const baseTravelCost = dutyCard ? inferDutyTravelCost(dutyCard) : routeLearningCard ? inferDutyTravelCost(routeLearningCard) : 0;
+    const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION).label;
+    return {
+      dutyCode: dutyValue,
+      dutyLabel,
+      startTime,
+      finishTime,
+      travelCost: Number(baseTravelCost.toFixed(2))
+    };
+  };
+  const buildTimesheetRowsForDriver = driverName => {
+    return DAYS.map((dayName, dayIndex) => {
+      const dutyValueRaw = ROTA[driverName]?.[dayIndex];
+      const dutyValue = dutyValueRaw === null || dutyValueRaw === undefined || dutyValueRaw === "" ? "—" : String(dutyValueRaw);
+      const defaults = getTimesheetDefaultsForDuty(dutyValue, driverName);
+      return {
+        dayIndex,
+        dayName,
+        dutyCode: defaults.dutyCode,
+        dutyLabel: defaults.dutyLabel,
+        startTime: defaults.startTime,
+        finishTime: defaults.finishTime,
+        travelCost: defaults.travelCost
+      };
+    });
+  };
   React.useEffect(() => {
     let cancelled = false;
     if (!storedSession?.token) {
@@ -665,6 +747,13 @@ function App() {
       setScreen("home");
     }
   }, [authed, screen, selectedDriver]);
+  React.useEffect(() => {
+    if (screen !== "timesheet" || !selectedDriver) return;
+    setTimesheetRows(buildTimesheetRowsForDriver(selectedDriver));
+    setTimesheetSubmitted(false);
+    setTimesheetSending(false);
+    setTimesheetError("");
+  }, [screen, selectedDriver, currentTabName]);
   if (sessionVerifying) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1092,6 +1181,10 @@ function App() {
     setAuthError("");
     setNameSearch("");
     setSearch("");
+    setTimesheetRows([]);
+    setTimesheetSubmitted(false);
+    setTimesheetSending(false);
+    setTimesheetError("");
   };
 
   // Is the user viewing the current calendar week?
@@ -1155,6 +1248,11 @@ function App() {
           targetDriver: "",
           notes: ""
         });
+      } else if (screen === "timesheet") {
+        setScreen("week");
+        setTimesheetSubmitted(false);
+        setTimesheetSending(false);
+        setTimesheetError("");
       } else if (screen === "home") {
         setSelectedDriver(currentUser);
         setScreen("week");
@@ -2162,7 +2260,43 @@ function App() {
     onMouseLeave: e => {
       e.currentTarget.style.borderColor = "#ffffff25";
     }
-  }, "\uD83D\uDD04 Request Shift Swap")), screen === "leave" && selectedDriver && (() => {
+  }, "\uD83D\uDD04 Request Shift Swap"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setTimesheetSubmitted(false);
+      setTimesheetSending(false);
+      setTimesheetError("");
+      if (selectedDriver) {
+        setTimesheetRows(buildTimesheetRowsForDriver(selectedDriver));
+      } else {
+        setTimesheetRows([]);
+      }
+      setScreen("timesheet");
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      width: "100%",
+      marginTop: "8px",
+      padding: "14px",
+      background: "linear-gradient(135deg, #38bdf822, #0284c722)",
+      border: "1px solid #38bdf833",
+      borderRadius: "10px",
+      color: "#7dd3fc",
+      fontSize: "13px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = "#38bdf866";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = "#38bdf833";
+    }
+  }, "\uD83E\uDDFE Generate Timesheet")), screen === "leave" && selectedDriver && (() => {
     const handleSubmit = () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
@@ -2775,6 +2909,345 @@ function App() {
         margin: "4px 0 0"
       }
     }, "This opens your email app with the swap request ready to send.")));
+  })(), screen === "timesheet" && selectedDriver && (() => {
+    const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(selectedDriver);
+    const updateTimesheetRow = (dayIndex, patch) => {
+      setTimesheetRows(prev => {
+        const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(selectedDriver);
+        return baseRows.map(row => row.dayIndex === dayIndex ? {
+          ...row,
+          ...patch
+        } : row);
+      });
+      if (timesheetSubmitted) setTimesheetSubmitted(false);
+      if (timesheetError) setTimesheetError("");
+    };
+    const totals = rows.reduce((acc, row) => {
+      const minutes = getDurationMinutes(row.startTime, row.finishTime);
+      const rowCost = Math.max(0, Number(row.travelCost) || 0);
+      acc.minutes += minutes;
+      acc.travelCost += rowCost;
+      return acc;
+    }, {
+      minutes: 0,
+      travelCost: 0
+    });
+    const totalHoursDecimal = (totals.minutes / 60).toFixed(2);
+    const isSundayEvening = (() => {
+      const now = new Date();
+      return now.getDay() === 0 && now.getHours() >= 18;
+    })();
+    const handleTimesheetSubmit = () => {
+      if (timesheetSending) return;
+      setTimesheetSending(true);
+      setTimesheetError("");
+      try {
+        const lines = rows.map(row => {
+          const rowMinutes = getDurationMinutes(row.startTime, row.finishTime);
+          const rowHours = (rowMinutes / 60).toFixed(2);
+          const rowCost = Math.max(0, Number(row.travelCost) || 0);
+          const dutyCode = String(row.dutyCode || "—").trim() || "—";
+          const startTime = isTimeValue(row.startTime) ? row.startTime : "--:--";
+          const finishTime = isTimeValue(row.finishTime) ? row.finishTime : "--:--";
+          return `${row.dayName}: Duty ${dutyCode} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
+        });
+        const subject = `Driver Timesheet - ${selectedDriver} - ${getWeekCommencing()}`;
+        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${selectedDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+        setTimesheetSubmitted(true);
+      } catch (err) {
+        setTimesheetError(err?.message || "Unable to open your email app.");
+      }
+      setTimesheetSending(false);
+    };
+    const inputStyle = {
+      width: "100%",
+      padding: "10px 12px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "8px",
+      color: C.white,
+      fontSize: "12px",
+      fontFamily: "inherit",
+      outline: "none",
+      boxSizing: "border-box"
+    };
+    if (timesheetSubmitted) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "40px 20px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "48px",
+        marginBottom: "16px"
+      }
+    }, "\uD83E\uDDFE"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "18px",
+        fontWeight: 600,
+        color: C.white,
+        margin: "0 0 8px"
+      }
+    }, "Timesheet Ready"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "12px",
+        color: C.textMuted,
+        margin: "0 0 24px",
+        lineHeight: 1.5
+      }
+    }, "Your timesheet draft is ready in your email app. Send it to submit this week's record."), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setScreen("week");
+        setTimesheetSubmitted(false);
+        setTimesheetSending(false);
+        setTimesheetError("");
+      },
+      style: {
+        background: "#38bdf8",
+        color: C.bg,
+        border: "none",
+        borderRadius: "8px",
+        padding: "12px 24px",
+        fontSize: "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Back to Rota"));
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: "14px"
+      }
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "17px",
+        fontWeight: 600,
+        margin: "0 0 2px",
+        color: C.white
+      }
+    }, "Generate Timesheet"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        margin: 0
+      }
+    }, selectedDriver, " \xB7 ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px"
+      }
+    }, rows.map(row => {
+      const rowMinutes = getDurationMinutes(row.startTime, row.finishTime);
+      const rowHours = (rowMinutes / 60).toFixed(2);
+      return /*#__PURE__*/React.createElement("div", {
+        key: row.dayIndex,
+        style: {
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: "10px",
+          padding: "12px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "8px",
+          marginBottom: "8px"
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "13px",
+          fontWeight: 700,
+          color: C.white
+        }
+      }, row.dayName), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, row.dutyLabel)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "11px",
+          color: "#38bdf8",
+          fontWeight: 700,
+          whiteSpace: "nowrap"
+        }
+      }, rowHours, "h")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: "8px"
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "DUTY NUMBER"), /*#__PURE__*/React.createElement("input", {
+        value: row.dutyCode,
+        readOnly: true,
+        style: {
+          ...inputStyle,
+          background: C.surfaceHover,
+          color: C.textMuted
+        }
+      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "START TIME"), /*#__PURE__*/React.createElement("input", {
+        type: "time",
+        value: row.startTime,
+        onChange: e => updateTimesheetRow(row.dayIndex, {
+          startTime: e.target.value
+        }),
+        style: {
+          ...inputStyle,
+          colorScheme: "dark"
+        }
+      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "FINISH TIME"), /*#__PURE__*/React.createElement("input", {
+        type: "time",
+        value: row.finishTime,
+        onChange: e => updateTimesheetRow(row.dayIndex, {
+          finishTime: e.target.value
+        }),
+        style: {
+          ...inputStyle,
+          colorScheme: "dark"
+        }
+      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "TRAVEL COST (\xA3)"), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.01",
+        value: Number.isFinite(row.travelCost) ? row.travelCost : 0,
+        onChange: e => {
+          const next = parseFloat(e.target.value);
+          updateTimesheetRow(row.dayIndex, {
+            travelCost: Number.isFinite(next) ? Math.max(0, Number(next.toFixed(2))) : 0
+          });
+        },
+        style: inputStyle
+      }))));
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "14px",
+        background: "linear-gradient(135deg, #38bdf814, #0284c70d)",
+        border: "1px solid #38bdf833",
+        borderRadius: "10px",
+        padding: "12px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        letterSpacing: "0.5px",
+        fontWeight: 600
+      }
+    }, "TOTAL HOURS"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#38bdf8"
+      }
+    }, formatDurationLabel(totals.minutes), " (", totalHoursDecimal, "h)")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        letterSpacing: "0.5px",
+        fontWeight: 600
+      }
+    }, "TOTAL TRAVEL COST"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#38bdf8"
+      }
+    }, formatMoneyPounds(totals.travelCost)))), /*#__PURE__*/React.createElement("button", {
+      onClick: handleTimesheetSubmit,
+      disabled: timesheetSending || rows.length === 0,
+      style: {
+        width: "100%",
+        marginTop: "12px",
+        padding: "14px",
+        background: timesheetSending || rows.length === 0 ? C.textDim + "44" : "#38bdf8",
+        color: timesheetSending || rows.length === 0 ? C.textDim : C.bg,
+        border: "none",
+        borderRadius: "8px",
+        fontSize: "14px",
+        fontWeight: 700,
+        cursor: timesheetSending || rows.length === 0 ? "not-allowed" : "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px"
+      }
+    }, timesheetSending ? "Sending..." : "Submit Timesheet"), timesheetError && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: "#fda4af",
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "6px 0 0"
+      }
+    }, timesheetError), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "6px 0 0"
+      }
+    }, isSundayEvening ? "Sunday evening detected. Your timesheet can now be submitted." : "Tip: submit your final timesheet on Sunday evening after your last duty."), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        textAlign: "center",
+        lineHeight: 1.5,
+        margin: "2px 0 0"
+      }
+    }, "A6 duties that start/finish at Paddington are prefilled at \xA36.20. All other duties are \xA39.20 by default."));
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
