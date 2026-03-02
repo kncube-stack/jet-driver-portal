@@ -2971,6 +2971,8 @@ function App() {
     };
     const inputStyle = {
       width: "100%",
+      maxWidth: "100%",
+      minWidth: 0,
       padding: "10px 12px",
       background: C.surface,
       border: `1px solid ${C.border}`,
@@ -3088,7 +3090,7 @@ function App() {
       }, rowHours, "h")), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
           gap: "8px"
         }
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
