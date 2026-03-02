@@ -136,44 +136,235 @@ async function verifyServerSession(token) {
   }
   return data.session;
 }
-const A6_PADDINGTON_STOP = {
-  label: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
-  route: "A6",
-  latitude: 51.51739,
-  longitude: -0.17949,
-  googleMapsUrl: "https://www.google.com/maps?q=51.51739,-0.17949",
-  aliases: ["Paddington Station Stop 15", "Paddington Station Stop J", "Paddington Station", "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)"]
+const STOP_DIRECTORY = Array.isArray(window.JET_STOP_DIRECTORY) ? window.JET_STOP_DIRECTORY : [];
+const STOP_OPERATION_PATTERNS = [/^sign on/i, /^sign off/i, /^empty to/i, /^take over/i, /^hand over/i, /^pull on stand/i, /^travel on tube/i, /^arrive for loading/i];
+const STOP_TOKEN_IGNORE = new Set(["the", "and", "to", "for", "of", "at", "in", "on", "bus", "station", "stn", "road", "rd", "stop", "coach", "stops", "nr", "near", "opp", "opposite", "o", "s", "bay", "bays", "lower", "upper", "airport"]);
+const STOP_MATCH_OVERRIDES = {
+  A6: [{
+    matchTokens: ["baker", "street", "gloucester"],
+    targetTokens: ["baker", "street", "stop", "a"]
+  }],
+  "025": [{
+    matchTokens: ["victoria", "coach", "station"],
+    targetTokens: ["victoria", "coach", "station"]
+  }, {
+    matchTokens: ["heathrow", "central", "bus", "station"],
+    targetTokens: ["heathrow", "central", "bus", "station"]
+  }, {
+    matchTokens: ["heathrow", "terminal", "5"],
+    targetTokens: ["heathrow", "t5", "arrivals"]
+  }, {
+    matchTokens: ["gatwick", "north", "terminal"],
+    targetTokens: ["gatwick", "north", "lower", "forecourt"]
+  }, {
+    matchTokens: ["gatwick", "south", "terminal"],
+    targetTokens: ["gatwick", "south", "lower", "forecourt"]
+  }, {
+    matchTokens: ["patcham", "black", "lion"],
+    targetTokens: ["patcham", "miller", "carter"]
+  }, {
+    matchTokens: ["withdean", "deneway"],
+    targetTokens: ["withdean", "deneway"]
+  }, {
+    matchTokens: ["preston", "circus", "london", "road"],
+    targetTokens: ["preston", "circus", "stop", "h"]
+  }, {
+    matchTokens: ["preston", "circus", "carters"],
+    targetTokens: ["preston", "circus", "stop", "x"]
+  }, {
+    matchTokens: ["preston", "park", "hotel"],
+    targetTokens: ["preston", "park", "hotel"]
+  }, {
+    matchTokens: ["preston", "park", "sainsburys"],
+    targetTokens: ["preston", "park", "lauriston", "road"]
+  }, {
+    matchTokens: ["york", "place", "st", "peters", "church"],
+    targetTokens: ["old", "steine", "s4"]
+  }, {
+    matchTokens: ["brighton", "pool", "valley"],
+    targetTokens: ["old", "steine", "s4"]
+  }],
+  "400": [{
+    matchTokens: ["victoria", "coach", "station"],
+    targetTokens: ["victoria", "coach", "station"]
+  }, {
+    matchTokens: ["greenford", "middleston", "avenue"],
+    targetTokens: ["greenford", "oldfield", "lane"]
+  }, {
+    matchTokens: ["greenford", "roundabout"],
+    targetTokens: ["greenford", "oldfield", "lane"]
+  }, {
+    matchTokens: ["north", "acton", "friary", "road"],
+    targetTokens: ["north", "acton", "friary", "road"]
+  }, {
+    matchTokens: ["marble", "arch", "park", "lane"],
+    targetTokens: ["marble", "arch", "park", "lane"]
+  }, {
+    matchTokens: ["birmingham", "digbeth"],
+    targetTokens: ["birmingham", "digbeth"]
+  }, {
+    matchTokens: ["coventry", "pool", "meadow"],
+    targetTokens: ["coventry", "pool", "meadow"]
+  }, {
+    matchTokens: ["golders", "green", "stop", "ge"],
+    targetTokens: ["golders", "green", "stop", "ge"]
+  }]
 };
+function parseDutyRouteCode(duty) {
+  const routeLabel = String(duty?.route || "");
+  const match = routeLabel.match(/\b(A\d+|\d{3})\b/);
+  return match ? match[1] : "";
+}
 function normalizeStopText(value) {
-  return String(value || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+  return String(value || "").toLowerCase().replace(/&/g, " and ").replace(/\bstn\b/g, "station").replace(/\brd\b/g, "road").replace(/\bnr\b/g, "near").replace(/\bopp\b/g, "opposite").replace(/\bo\/s\b/g, "opposite").replace(/[^a-z0-9]+/g, " ").trim();
 }
-function isLikelyA6PaddingtonStop(stopName, duty) {
-  const normalizedStop = normalizeStopText(stopName);
-  if (!normalizedStop) return false;
-  const routeLabel = normalizeStopText(duty?.route || "");
-  if (!routeLabel.includes("a6")) return false;
-  if (normalizedStop.includes("paddington")) return true;
-  if (normalizedStop.includes("eastbourne terrace") || normalizedStop.includes("cleveland terrace")) return true;
-  return A6_PADDINGTON_STOP.aliases.some(alias => normalizedStop.includes(normalizeStopText(alias)));
+function tokenizeStopText(value) {
+  return normalizeStopText(value).split(" ").filter(token => token && !STOP_TOKEN_IGNORE.has(token));
 }
-function resolveStopMapTarget(stopName, duty) {
+function extractStopCodes(value) {
+  const normalized = normalizeStopText(value);
+  const codes = new Set();
+  const codeRegex = /\bstop\s+([a-z]\d{0,2}|\d{1,2}[a-z]?)\b/g;
+  let match;
+  while ((match = codeRegex.exec(normalized)) !== null) {
+    codes.add(match[1]);
+  }
+  return codes;
+}
+function isOperationalStop(stopName) {
   const label = String(stopName || "").trim();
-  if (isLikelyA6PaddingtonStop(label, duty)) {
+  if (!label) return true;
+  return STOP_OPERATION_PATTERNS.some(pattern => pattern.test(label));
+}
+function inferDirectionHint(routeCode, segmentTitle) {
+  const seg = normalizeStopText(segmentTitle);
+  if (!seg) return "";
+  const findIndex = term => seg.indexOf(term);
+  if (routeCode === "A6" && seg.includes("paddington") && seg.includes("stansted")) {
+    return findIndex("paddington") < findIndex("stansted") ? "To Stansted" : "To Paddington";
+  }
+  if (routeCode === "025" && seg.includes("victoria") && seg.includes("brighton")) {
+    return findIndex("victoria") < findIndex("brighton") ? "VCS to Brighton" : "Brighton to VCS";
+  }
+  if (routeCode === "400" && seg.includes("victoria") && seg.includes("birmingham")) {
+    return findIndex("victoria") < findIndex("birmingham") ? "London to Birmingham" : "Birmingham to London";
+  }
+  return "";
+}
+const ROUTE_STOP_DIRECTORY = STOP_DIRECTORY.reduce((acc, row) => {
+  const routeCode = String(row?.route || "").trim();
+  if (!routeCode) return acc;
+  if (!acc[routeCode]) acc[routeCode] = [];
+  const dutyLabel = String(row?.dutyCardLabel || row?.displayName || "").trim();
+  const displayLabel = String(row?.displayName || row?.dutyCardLabel || "").trim();
+  const normalizedDuty = normalizeStopText(dutyLabel);
+  const normalizedDisplay = normalizeStopText(displayLabel);
+  const latitude = Number.parseFloat(row?.latitude);
+  const longitude = Number.parseFloat(row?.longitude);
+  const defaultUrl = Number.isFinite(latitude) && Number.isFinite(longitude) ? `https://www.google.com/maps?q=${latitude},${longitude}` : "";
+  acc[routeCode].push({
+    route: routeCode,
+    direction: String(row?.direction || "").trim(),
+    dutyCardLabel: dutyLabel,
+    displayName: displayLabel,
+    postcode: String(row?.postcode || "").trim(),
+    latitude,
+    longitude,
+    webUrl: String(row?.googleMapsUrl || "").trim() || defaultUrl,
+    normalizedDuty,
+    normalizedDisplay,
+    tokens: Array.from(new Set([...tokenizeStopText(dutyLabel), ...tokenizeStopText(displayLabel)])),
+    stopCodes: extractStopCodes(`${dutyLabel} ${displayLabel}`)
+  });
+  return acc;
+}, {});
+function containsAllTokens(text, tokens) {
+  return tokens.every(token => text.includes(token));
+}
+function findOverrideEntry(routeCode, normalizedStop, entries) {
+  const overrides = STOP_MATCH_OVERRIDES[routeCode] || [];
+  for (const override of overrides) {
+    if (!containsAllTokens(normalizedStop, override.matchTokens)) continue;
+    const matched = entries.find(entry => {
+      const dutyText = entry.normalizedDuty;
+      const displayText = entry.normalizedDisplay;
+      return containsAllTokens(dutyText, override.targetTokens) || containsAllTokens(displayText, override.targetTokens);
+    });
+    if (matched) return matched;
+  }
+  return null;
+}
+function scoreDirectoryCandidate(normalizedStop, stopTokens, stopCodes, candidate, directionHint) {
+  if (normalizedStop === candidate.normalizedDuty || normalizedStop === candidate.normalizedDisplay) {
+    return 100;
+  }
+  let score = 0;
+  if (candidate.normalizedDuty.includes(normalizedStop) || candidate.normalizedDisplay.includes(normalizedStop) || normalizedStop.includes(candidate.normalizedDuty) || normalizedStop.includes(candidate.normalizedDisplay)) {
+    score += 0.3;
+  }
+  const candidateTokenSet = new Set(candidate.tokens);
+  const overlap = stopTokens.filter(token => candidateTokenSet.has(token));
+  const unionCount = new Set([...stopTokens, ...candidate.tokens]).size || 1;
+  score += overlap.length / unionCount;
+  if (stopCodes.size > 0 && candidate.stopCodes.size > 0) {
+    const codesMatch = Array.from(stopCodes).some(code => candidate.stopCodes.has(code));
+    score += codesMatch ? 0.3 : -0.2;
+  }
+  if (directionHint && candidate.direction === directionHint) score += 0.08;
+  if (overlap.length >= 2) score += 0.08;
+  return score;
+}
+function selectDirectoryEntry(stopName, duty, segmentTitle) {
+  const routeCode = parseDutyRouteCode(duty);
+  if (!routeCode || routeCode === "450") return null;
+  const routeEntries = ROUTE_STOP_DIRECTORY[routeCode] || [];
+  if (routeEntries.length === 0) return null;
+  if (isOperationalStop(stopName)) return null;
+  const normalizedStop = normalizeStopText(stopName);
+  if (!normalizedStop) return null;
+  const directionHint = inferDirectionHint(routeCode, segmentTitle);
+  const directionalEntries = directionHint ? routeEntries.filter(entry => entry.direction === directionHint) : [];
+  const entries = directionalEntries.length > 0 ? directionalEntries : routeEntries;
+  const exactMatch = entries.find(entry => entry.normalizedDuty === normalizedStop || entry.normalizedDisplay === normalizedStop);
+  if (exactMatch) return exactMatch;
+  const overrideMatch = findOverrideEntry(routeCode, normalizedStop, entries);
+  if (overrideMatch) return overrideMatch;
+  const stopTokens = tokenizeStopText(stopName);
+  if (stopTokens.length === 0) return null;
+  const stopCodes = extractStopCodes(stopName);
+  let bestEntry = null;
+  let bestScore = -Infinity;
+  for (const entry of entries) {
+    const score = scoreDirectoryCandidate(normalizedStop, stopTokens, stopCodes, entry, directionHint);
+    if (score > bestScore) {
+      bestScore = score;
+      bestEntry = entry;
+    }
+  }
+  if (!bestEntry) return null;
+  if (bestScore < 0.34) return null;
+  return bestEntry;
+}
+function resolveStopMapTarget(stopName, duty, segmentTitle) {
+  const label = String(stopName || "").trim();
+  const matchedEntry = selectDirectoryEntry(label, duty, segmentTitle);
+  if (matchedEntry) {
+    const query = Number.isFinite(matchedEntry.latitude) && Number.isFinite(matchedEntry.longitude) ? String(matchedEntry.latitude) + "," + String(matchedEntry.longitude) : matchedEntry.displayName || label;
+    const fallbackUrl = matchedEntry.webUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     return {
-      label: A6_PADDINGTON_STOP.label,
-      query: String(A6_PADDINGTON_STOP.latitude) + "," + String(A6_PADDINGTON_STOP.longitude),
-      latitude: A6_PADDINGTON_STOP.latitude,
-      longitude: A6_PADDINGTON_STOP.longitude,
-      webUrl: A6_PADDINGTON_STOP.googleMapsUrl
+      label: matchedEntry.displayName || matchedEntry.dutyCardLabel || label,
+      query,
+      latitude: matchedEntry.latitude,
+      longitude: matchedEntry.longitude,
+      webUrl: fallbackUrl
     };
   }
-  const query = label;
   return {
     label,
-    query,
+    query: label,
     latitude: null,
     longitude: null,
-    webUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+    webUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`
   };
 }
 function getPreferredMapsAppUrl(target) {
@@ -219,7 +410,9 @@ function openStopInPreferredMapsApp(event, target) {
     cleanup();
   };
   document.addEventListener("visibilitychange", handleVisibility);
-  window.addEventListener("pagehide", handlePageHide, { once: true });
+  window.addEventListener("pagehide", handlePageHide, {
+    once: true
+  });
   fallbackTimer = window.setTimeout(() => {
     cleanup();
     if (!handoffToAppDetected && fallbackUrl) {
@@ -2821,7 +3014,7 @@ function App() {
       const isBreak = s.stop.includes("Pull on stand") || s.notes?.toLowerCase().includes("break");
       const isTakeover = s.notes?.includes("Takeover");
       const isSignal = s.dep || s.arr;
-      const mapTarget = resolveStopMapTarget(s.stop, duty);
+      const mapTarget = resolveStopMapTarget(s.stop, duty, seg.title);
       return /*#__PURE__*/React.createElement("div", {
         key: j,
         style: {
