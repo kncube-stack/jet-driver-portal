@@ -30,7 +30,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "02:45",
         dep: true
       }, {
@@ -78,14 +78,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "07:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "07:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "07:55",
         dep: true
       }, {
@@ -133,7 +133,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "12:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "12:51",
         arr: true,
         notes: "Hand over Coach 1 to Duty 206"
@@ -175,7 +175,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "02:45",
         dep: true
       }, {
@@ -223,14 +223,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "07:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "07:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "07:55",
         dep: true
       }, {
@@ -278,7 +278,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "12:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "12:51",
         arr: true,
         notes: "Hand over Coach 1 to Duty 266"
@@ -320,7 +320,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "03:35",
         dep: true
       }, {
@@ -368,14 +368,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "08:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "08:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "08:55",
         dep: true
       }, {
@@ -423,7 +423,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "13:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "13:51",
         arr: true,
         notes: "Hand over Coach 2 to Duty 207"
@@ -465,7 +465,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "03:35",
         dep: true
       }, {
@@ -513,14 +513,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "08:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "08:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "08:55",
         dep: true
       }, {
@@ -568,7 +568,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "13:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "13:51",
         arr: true,
         notes: "Hand over Coach 2 to Duty 267"
@@ -610,7 +610,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "04:25",
         dep: true
       }, {
@@ -658,14 +658,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "09:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "09:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "09:55",
         dep: true
       }, {
@@ -713,7 +713,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "14:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "14:51",
         arr: true,
         notes: "Hand over Coach 3 to Duty 208"
@@ -755,7 +755,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "04:25",
         dep: true
       }, {
@@ -803,14 +803,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "09:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "09:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "09:55",
         dep: true
       }, {
@@ -858,7 +858,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "14:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "14:51",
         arr: true,
         notes: "Hand over Coach 3 to Duty 268"
@@ -900,7 +900,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "05:25",
         dep: true
       }, {
@@ -948,14 +948,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "10:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "10:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "10:55",
         dep: true
       }, {
@@ -1003,7 +1003,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "15:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "15:51",
         arr: true,
         notes: "Hand over Coach 4 to Duty 209"
@@ -1045,7 +1045,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "05:25",
         dep: true
       }, {
@@ -1093,14 +1093,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "10:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "10:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "10:55",
         dep: true
       }, {
@@ -1148,7 +1148,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "15:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "15:51",
         arr: true,
         notes: "Hand over Coach 4 to Duty 269"
@@ -1190,7 +1190,7 @@ const DUTY_CARDS = {
     }, {
       title: "Trip 1 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "06:25",
         dep: true
       }, {
@@ -1238,14 +1238,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "11:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "11:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "11:55",
         dep: true
       }, {
@@ -1293,7 +1293,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "16:45"
       }, {
-        stop: "Paddington Station Stop 15",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "16:51",
         arr: true,
         notes: "Hand over Coach 5 to Duty 210"
@@ -1338,7 +1338,7 @@ const DUTY_CARDS = {
         time: "12:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "12:55",
         dep: true
       }, {
@@ -1386,14 +1386,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "17:45"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "17:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "17:55",
         dep: true
       }, {
@@ -1441,7 +1441,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "22:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "22:55",
         arr: true
       }]
@@ -1483,7 +1483,7 @@ const DUTY_CARDS = {
         time: "12:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "12:55",
         dep: true
       }, {
@@ -1531,14 +1531,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "17:45"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "17:51",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "17:55",
         dep: true
       }, {
@@ -1586,7 +1586,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "22:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "22:55",
         arr: true
       }]
@@ -1628,7 +1628,7 @@ const DUTY_CARDS = {
         time: "13:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "13:55",
         dep: true
       }, {
@@ -1676,14 +1676,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "18:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "18:56",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "19:00",
         dep: true
       }, {
@@ -1731,7 +1731,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "23:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "23:55",
         arr: true
       }]
@@ -1772,7 +1772,7 @@ const DUTY_CARDS = {
         time: "13:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "13:55",
         dep: true
       }, {
@@ -1820,14 +1820,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "18:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "18:56",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "19:00",
         dep: true
       }, {
@@ -1875,7 +1875,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "23:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "23:55",
         arr: true
       }]
@@ -1916,7 +1916,7 @@ const DUTY_CARDS = {
         time: "14:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "14:55",
         dep: true
       }, {
@@ -1964,14 +1964,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "19:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "19:56",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "20:00",
         dep: true
       }, {
@@ -2019,7 +2019,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "01:00"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "01:05",
         arr: true
       }]
@@ -2060,7 +2060,7 @@ const DUTY_CARDS = {
         time: "14:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "14:55",
         dep: true
       }, {
@@ -2108,14 +2108,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "19:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "19:56",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "20:00",
         dep: true
       }, {
@@ -2163,7 +2163,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "01:00"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "01:05",
         arr: true
       }]
@@ -2204,7 +2204,7 @@ const DUTY_CARDS = {
         time: "15:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "15:55",
         dep: true
       }, {
@@ -2252,14 +2252,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "20:51"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "20:56",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "21:00",
         dep: true
       }, {
@@ -2307,7 +2307,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "02:20"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "02:25",
         arr: true
       }]
@@ -2348,7 +2348,7 @@ const DUTY_CARDS = {
         time: "15:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "15:55",
         dep: true
       }, {
@@ -2396,14 +2396,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "20:51"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "20:56",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "21:00",
         dep: true
       }, {
@@ -2451,7 +2451,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "02:20"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "02:25",
         arr: true
       }]
@@ -2492,7 +2492,7 @@ const DUTY_CARDS = {
         time: "16:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "16:55",
         dep: true
       }, {
@@ -2540,14 +2540,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "21:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "21:55",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "21:55",
         dep: true
       }, {
@@ -2595,7 +2595,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "02:40"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "02:45",
         arr: true
       }]
@@ -2636,7 +2636,7 @@ const DUTY_CARDS = {
         time: "16:51",
         notes: "Takeover"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "16:55",
         dep: true
       }, {
@@ -2684,14 +2684,14 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "21:50"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "21:55",
         arr: true
       }]
     }, {
       title: "Trip 3 — Paddington → Stansted",
       stops: [{
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "21:55",
         dep: true
       }, {
@@ -2739,7 +2739,7 @@ const DUTY_CARDS = {
         stop: "Baker Street Stop A",
         time: "02:40"
       }, {
-        stop: "Paddington Station Stop J",
+        stop: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
         time: "02:45",
         arr: true
       }]

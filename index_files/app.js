@@ -136,9 +136,97 @@ async function verifyServerSession(token) {
   }
   return data.session;
 }
-function getStopMapUrl(stopName) {
-  const query = String(stopName || "").trim();
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+const A6_PADDINGTON_STOP = {
+  label: "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)",
+  route: "A6",
+  latitude: 51.51739,
+  longitude: -0.17949,
+  googleMapsUrl: "https://www.google.com/maps?q=51.51739,-0.17949",
+  aliases: ["Paddington Station Stop 15", "Paddington Station Stop J", "Paddington Station", "London (Paddington Stn): Eastbourne Terrace (opposite Cleveland Terrace)"]
+};
+function normalizeStopText(value) {
+  return String(value || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+}
+function isLikelyA6PaddingtonStop(stopName, duty) {
+  const normalizedStop = normalizeStopText(stopName);
+  if (!normalizedStop) return false;
+  const routeLabel = normalizeStopText(duty?.route || "");
+  if (!routeLabel.includes("a6")) return false;
+  if (normalizedStop.includes("paddington")) return true;
+  if (normalizedStop.includes("eastbourne terrace") || normalizedStop.includes("cleveland terrace")) return true;
+  return A6_PADDINGTON_STOP.aliases.some(alias => normalizedStop.includes(normalizeStopText(alias)));
+}
+function resolveStopMapTarget(stopName, duty) {
+  const label = String(stopName || "").trim();
+  if (isLikelyA6PaddingtonStop(label, duty)) {
+    return {
+      label: A6_PADDINGTON_STOP.label,
+      query: String(A6_PADDINGTON_STOP.latitude) + "," + String(A6_PADDINGTON_STOP.longitude),
+      latitude: A6_PADDINGTON_STOP.latitude,
+      longitude: A6_PADDINGTON_STOP.longitude,
+      webUrl: A6_PADDINGTON_STOP.googleMapsUrl
+    };
+  }
+  const query = label;
+  return {
+    label,
+    query,
+    latitude: null,
+    longitude: null,
+    webUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+  };
+}
+function getPreferredMapsAppUrl(target) {
+  const ua = (navigator.userAgent || "").toLowerCase();
+  const label = target?.label || target?.query || "Stop";
+  const hasCoordinates = Number.isFinite(target?.latitude) && Number.isFinite(target?.longitude);
+  const coordinateQuery = hasCoordinates ? String(target.latitude) + "," + String(target.longitude) : label;
+  if (ua.includes("android")) {
+    const androidQuery = hasCoordinates ? String(target.latitude) + "," + String(target.longitude) + " (" + label + ")" : label;
+    return `geo:0,0?q=${encodeURIComponent(androidQuery)}`;
+  }
+  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
+    return `comgooglemaps://?q=${encodeURIComponent(coordinateQuery)}`;
+  }
+  return target?.webUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`;
+}
+function openStopInPreferredMapsApp(event, target) {
+  if (!event || !target) return;
+  const ua = (navigator.userAgent || "").toLowerCase();
+  const isMobile = ua.includes("android") || ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod");
+  if (!isMobile) return;
+  event.preventDefault();
+  const appUrl = getPreferredMapsAppUrl(target);
+  const fallbackUrl = target.webUrl;
+  let fallbackTimer = null;
+  let handoffToAppDetected = false;
+  const cleanup = () => {
+    if (fallbackTimer !== null) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+    document.removeEventListener("visibilitychange", handleVisibility);
+    window.removeEventListener("pagehide", handlePageHide);
+  };
+  const handleVisibility = () => {
+    if (document.hidden) {
+      handoffToAppDetected = true;
+      cleanup();
+    }
+  };
+  const handlePageHide = () => {
+    handoffToAppDetected = true;
+    cleanup();
+  };
+  document.addEventListener("visibilitychange", handleVisibility);
+  window.addEventListener("pagehide", handlePageHide, { once: true });
+  fallbackTimer = window.setTimeout(() => {
+    cleanup();
+    if (!handoffToAppDetected && fallbackUrl) {
+      window.location.href = fallbackUrl;
+    }
+  }, 700);
+  window.location.href = appUrl;
 }
 
 // ─── APP ────────────────────────────────────────────────────────
@@ -2733,6 +2821,7 @@ function App() {
       const isBreak = s.stop.includes("Pull on stand") || s.notes?.toLowerCase().includes("break");
       const isTakeover = s.notes?.includes("Takeover");
       const isSignal = s.dep || s.arr;
+      const mapTarget = resolveStopMapTarget(s.stop, duty);
       return /*#__PURE__*/React.createElement("div", {
         key: j,
         style: {
@@ -2774,9 +2863,10 @@ function App() {
           fontSize: "10px"
         }
       }, "ARR"), /*#__PURE__*/React.createElement("a", {
-        href: getStopMapUrl(s.stop),
+        href: mapTarget.webUrl,
         target: "_blank",
         rel: "noopener noreferrer",
+        onClick: e => openStopInPreferredMapsApp(e, mapTarget),
         style: {
           color: "inherit",
           textDecoration: "none"
