@@ -63,6 +63,7 @@ const AUTH_SESSION_ENDPOINT = "/api/auth-session";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
+const TIMESHEET_DRAFTS_STORAGE_KEY = "jet_timesheet_drafts_v1";
 const PADDINGTON_TRAVEL_COST = 6.2;
 const STANDARD_TRAVEL_COST = 9.2;
 function isTimeValue(value) {
@@ -109,6 +110,94 @@ function isAvrOrPrivateHireDutyCode(value) {
   if (/^PH\b/.test(code) || code.startsWith("PH")) return true;
   if (/^P\d+/.test(code)) return true;
   return false;
+}
+function getTimesheetDraftEntryKey(driverName, weekTabName) {
+  const safeDriver = String(driverName || "").trim().toLowerCase();
+  const safeWeek = String(weekTabName || "").trim().toUpperCase();
+  if (!safeDriver || !safeWeek) return "";
+  return `${safeDriver}::${safeWeek}`;
+}
+function readTimesheetDraftStore() {
+  try {
+    const raw = localStorage.getItem(TIMESHEET_DRAFTS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+function writeTimesheetDraftStore(store) {
+  try {
+    localStorage.setItem(TIMESHEET_DRAFTS_STORAGE_KEY, JSON.stringify(store));
+  } catch {}
+}
+function normalizeTimesheetTravelCost(value, fallback) {
+  if (value === "" || value === null || value === undefined) return "";
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Number(parsed.toFixed(2));
+}
+function hydrateTimesheetRowsFromDraft(baseRows, draftRows) {
+  if (!Array.isArray(baseRows) || baseRows.length === 0 || !Array.isArray(draftRows)) return baseRows;
+  const byDay = new Map();
+  for (const row of draftRows) {
+    const dayIndex = Number(row?.dayIndex);
+    if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= baseRows.length) continue;
+    byDay.set(dayIndex, row);
+  }
+  return baseRows.map(baseRow => {
+    const draft = byDay.get(baseRow.dayIndex);
+    if (!draft) return baseRow;
+    const startTime = isTimeValue(draft.startTime) ? draft.startTime : "";
+    const finishTime = isTimeValue(draft.finishTime) ? draft.finishTime : "";
+    return {
+      ...baseRow,
+      startTime,
+      finishTime,
+      travelCost: normalizeTimesheetTravelCost(draft.travelCost, baseRow.travelCost)
+    };
+  });
+}
+function readTimesheetDraftRows(driverName, weekTabName, baseRows) {
+  const key = getTimesheetDraftEntryKey(driverName, weekTabName);
+  if (!key) return baseRows;
+  const store = readTimesheetDraftStore();
+  const entry = store[key];
+  if (!entry || typeof entry !== "object" || !Array.isArray(entry.rows)) return baseRows;
+  return hydrateTimesheetRowsFromDraft(baseRows, entry.rows);
+}
+function saveTimesheetDraftRows(driverName, weekTabName, rows) {
+  const key = getTimesheetDraftEntryKey(driverName, weekTabName);
+  if (!key || !Array.isArray(rows) || rows.length === 0) return;
+  const compactRows = rows.map(row => ({
+    dayIndex: row.dayIndex,
+    startTime: row.startTime || "",
+    finishTime: row.finishTime || "",
+    travelCost: row.travelCost === "" || row.travelCost === null || row.travelCost === undefined ? "" : normalizeTimesheetTravelCost(row.travelCost, "")
+  }));
+  const store = readTimesheetDraftStore();
+  store[key] = {
+    rows: compactRows,
+    updatedAt: Date.now()
+  };
+  const allKeys = Object.keys(store);
+  if (allKeys.length > 100) {
+    allKeys.sort((a, b) => (store[a]?.updatedAt || 0) - (store[b]?.updatedAt || 0));
+    for (let i = 0; i < allKeys.length - 100; i++) {
+      delete store[allKeys[i]];
+    }
+  }
+  writeTimesheetDraftStore(store);
+}
+function clearTimesheetDraftRows(driverName, weekTabName) {
+  const key = getTimesheetDraftEntryKey(driverName, weekTabName);
+  if (!key) return;
+  const store = readTimesheetDraftStore();
+  if (!Object.prototype.hasOwnProperty.call(store, key)) return;
+  delete store[key];
+  writeTimesheetDraftStore(store);
 }
 async function loginWithServer(name, pin) {
   const response = await fetch(AUTH_LOGIN_ENDPOINT, {
@@ -705,6 +794,7 @@ function App() {
     setRotaLoading(false);
   };
   const getWeekCommencing = () => weekLabel || "Loading...";
+  const activeTimesheetWeekKey = currentTabName || weekLabel || "";
   const filtered = React.useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return null;
@@ -758,11 +848,18 @@ function App() {
   }, [authed, screen, selectedDriver]);
   React.useEffect(() => {
     if (screen !== "timesheet" || !selectedDriver) return;
-    setTimesheetRows(buildTimesheetRowsForDriver(selectedDriver));
+    const baseRows = buildTimesheetRowsForDriver(selectedDriver);
+    const hydratedRows = readTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey, baseRows);
+    setTimesheetRows(hydratedRows);
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
-  }, [screen, selectedDriver, currentTabName]);
+  }, [screen, selectedDriver, activeTimesheetWeekKey]);
+  React.useEffect(() => {
+    if (screen !== "timesheet" || !selectedDriver || !activeTimesheetWeekKey) return;
+    if (!Array.isArray(timesheetRows) || timesheetRows.length !== DAYS.length) return;
+    saveTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey, timesheetRows);
+  }, [screen, selectedDriver, activeTimesheetWeekKey, timesheetRows]);
   if (sessionVerifying) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -2963,6 +3060,7 @@ function App() {
         const subject = `Driver Timesheet - ${selectedDriver} - ${getWeekCommencing()}`;
         const body = [`DRIVER TIMESHEET`, ``, `Driver: ${selectedDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
         window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+        clearTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey);
         setTimesheetSubmitted(true);
       } catch (err) {
         setTimesheetError(err?.message || "Unable to open your email app.");
