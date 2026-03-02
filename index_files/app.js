@@ -1,5 +1,5 @@
 (function (window) {
-  const { DUTY_CARDS, ROTA_NOTES, ACCESS_CONTROL } = window.JET_DATA;
+  const { DUTY_CARDS, ACCESS_CONTROL } = window.JET_DATA;
   const {
     getTodayRunout,
     getDriverRunout,
@@ -13,7 +13,7 @@
     DAYS,
     SHORT_DAYS
   } = window.JET_DATA_LAYER;
-  const { C, isDutyNumber, getSpecialDuty, getStatusStyle, filterNote } = window.JET_UI;
+  const { C, isDutyNumber, getSpecialDuty, getStatusStyle } = window.JET_UI;
 
 function readStoredSession() {
   try {
@@ -1725,7 +1725,7 @@ function App() {
     if (!isCurrentWeek) return null;
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
     const runout = getDriverRunout(selectedDriver);
-    const todayNote = filterNote(ROTA_NOTES[selectedDriver]?.[today]);
+    const todayNote = null;
     const dutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
     const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
     const runoutForDuty = dutyNum ? getTodayRunout(dutyNum) : null;
@@ -1733,7 +1733,7 @@ function App() {
 
     // Show a banner for today unless there is truly no data for the day.
     // REST now gets the same top-banner treatment as work duties.
-    if (!dutyCard && !activeRunout && !todayNote && todayVal === "—") return null;
+    if (!dutyCard && !activeRunout && todayVal === "—") return null;
     return /*#__PURE__*/React.createElement("div", {
       style: {
         background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
@@ -1941,7 +1941,7 @@ function App() {
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);
-    const cellNote = isCurrentWeek ? filterNote(ROTA_NOTES[selectedDriver]?.[i]) : null;
+    const cellNote = null;
     // Route Learning: extract duty number from RL prefix (e.g. RL307 → 307)
     const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
     const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
