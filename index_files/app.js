@@ -102,6 +102,14 @@ function inferDutyTravelCost(dutyCard) {
   if (startsOrFinishesAtPaddington) return PADDINGTON_TRAVEL_COST;
   return STANDARD_TRAVEL_COST;
 }
+function isAvrOrPrivateHireDutyCode(value) {
+  const code = String(value || "").toUpperCase().trim();
+  if (!code) return false;
+  if (code.includes("AVR")) return true;
+  if (/^PH\b/.test(code) || code.startsWith("PH")) return true;
+  if (/^P\d+/.test(code)) return true;
+  return false;
+}
 async function loginWithServer(name, pin) {
   const response = await fetch(AUTH_LOGIN_ENDPOINT, {
     method: "POST",
@@ -534,6 +542,7 @@ function App() {
   } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
   const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
     const dutyValue = dutyCode === null || dutyCode === undefined || dutyCode === "" ? "—" : String(dutyCode).trim();
+    const forceBlankTimesheetFields = isAvrOrPrivateHireDutyCode(dutyValue);
     const dutyNum = isDutyNumber(dutyValue) ? parseInt(dutyValue, 10) : null;
     const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
     const routeLearningMatch = dutyValue.match(/^RL\s*(\d+)$/i);
@@ -542,8 +551,8 @@ function App() {
     const special = getSpecialDuty(dutyValue);
     const startTimeRaw = dutyCard ? dutyCard.signOn : routeLearningCard ? routeLearningCard.signOn : special?.signOn && special.signOn !== "—" ? special.signOn : "";
     const finishTimeRaw = dutyCard ? dutyCard.signOff : routeLearningCard ? routeLearningCard.signOff : special?.signOff && special.signOff !== "—" ? special.signOff : "";
-    const startTime = isTimeValue(startTimeRaw) ? startTimeRaw : "";
-    const finishTime = isTimeValue(finishTimeRaw) ? finishTimeRaw : "";
+    const startTime = forceBlankTimesheetFields ? "" : isTimeValue(startTimeRaw) ? startTimeRaw : "";
+    const finishTime = forceBlankTimesheetFields ? "" : isTimeValue(finishTimeRaw) ? finishTimeRaw : "";
     const baseTravelCost = dutyCard ? inferDutyTravelCost(dutyCard) : routeLearningCard ? inferDutyTravelCost(routeLearningCard) : 0;
     const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION).label;
     return {
@@ -551,7 +560,7 @@ function App() {
       dutyLabel,
       startTime,
       finishTime,
-      travelCost: Number(baseTravelCost.toFixed(2))
+      travelCost: forceBlankTimesheetFields ? "" : Number(baseTravelCost.toFixed(2))
     };
   };
   const buildTimesheetRowsForDriver = driverName => {
@@ -3150,9 +3159,16 @@ function App() {
         type: "number",
         min: "0",
         step: "0.01",
-        value: Number.isFinite(row.travelCost) ? row.travelCost : 0,
+        value: row.travelCost === "" || row.travelCost === null || row.travelCost === undefined ? "" : row.travelCost,
         onChange: e => {
-          const next = parseFloat(e.target.value);
+          const raw = e.target.value;
+          if (raw === "") {
+            updateTimesheetRow(row.dayIndex, {
+              travelCost: ""
+            });
+            return;
+          }
+          const next = parseFloat(raw);
           updateTimesheetRow(row.dayIndex, {
             travelCost: Number.isFinite(next) ? Math.max(0, Number(next.toFixed(2))) : 0
           });
@@ -3239,15 +3255,7 @@ function App() {
         lineHeight: 1.5,
         margin: "6px 0 0"
       }
-    }, isSundayEvening ? "Sunday evening detected. Your timesheet can now be submitted." : "Tip: submit your final timesheet on Sunday evening after your last duty."), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: "10px",
-        color: C.textDim,
-        textAlign: "center",
-        lineHeight: 1.5,
-        margin: "2px 0 0"
-      }
-    }, "A6 duties that start/finish at Paddington are prefilled at \xA36.20. All other duties are \xA39.20 by default."));
+    }, isSundayEvening ? "Sunday evening detected. Your timesheet can now be submitted." : "Tip: submit your final timesheet on Sunday evening after your last duty."));
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
