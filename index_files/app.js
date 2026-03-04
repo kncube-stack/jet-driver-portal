@@ -103,22 +103,6 @@ function inferDutyTravelCost(dutyCard) {
   if (startsOrFinishesAtPaddington) return PADDINGTON_TRAVEL_COST;
   return STANDARD_TRAVEL_COST;
 }
-function isNextWeekUnlockedForDrivers() {
-  // Next week's rota becomes visible on Saturday at 12:00 London time.
-  try {
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Europe/London',
-      weekday: 'short',
-      hour: '2-digit',
-      hour12: false
-    }).formatToParts(new Date());
-    const weekday = parts.find(p => p.type === 'weekday')?.value || '';
-    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-    return weekday === 'Sun' || (weekday === 'Sat' && hour >= 12);
-  } catch {
-    return true;
-  }
-}
 function isAvrOrPrivateHireDutyCode(value) {
   const code = String(value || "").toUpperCase().trim();
   if (!code) return false;
@@ -1274,21 +1258,13 @@ function App() {
   }
 
   // ─── WEEK NAVIGATION ────────────────────────────────────
-  // Managers see all available weeks. Drivers only see next week from Saturday 12:00.
-  const visibleWeeks = React.useMemo(() => {
-    if (isManager || availableWeeks.length === 0) return availableWeeks;
-    const currentIdx = availableWeeks.findIndex(w => w.tabName === currentTabName);
-    if (currentIdx === -1) return availableWeeks;
-    const maxIdx = isNextWeekUnlockedForDrivers() ? currentIdx + 1 : currentIdx;
-    return availableWeeks.slice(0, Math.min(maxIdx + 1, availableWeeks.length));
-  }, [availableWeeks, currentTabName, isManager]);
-  const weekIndex = visibleWeeks.findIndex(w => w.tabName === currentTabName);
+  const weekIndex = availableWeeks.findIndex(w => w.tabName === currentTabName);
   const canGoBack = weekIndex > 0;
-  const canGoForward = weekIndex < visibleWeeks.length - 1;
+  const canGoForward = weekIndex < availableWeeks.length - 1;
   const goWeek = dir => {
     const nextIdx = weekIndex + dir;
-    if (nextIdx >= 0 && nextIdx < visibleWeeks.length) {
-      switchWeek(visibleWeeks[nextIdx].tabName);
+    if (nextIdx >= 0 && nextIdx < availableWeeks.length) {
+      switchWeek(availableWeeks[nextIdx].tabName);
     }
   };
 
