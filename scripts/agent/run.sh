@@ -22,10 +22,12 @@ git checkout -b "$BRANCH"
 echo "=== TASK ==="
 cat "$TASK_FILE"
 
+TASK="$(cat "$TASK_FILE")"
+
 if command -v codex >/dev/null 2>&1; then
   codex exec --full-auto "$TASK"
 elif command -v claude >/dev/null 2>&1; then
-  claude --prompt-file "$TASK_FILE"
+  claude "$TASK"
 else
   echo "No agent CLI found."
   exit 1
