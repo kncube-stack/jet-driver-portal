@@ -147,12 +147,19 @@ function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
     label: val
   };
 }
+function tachographBreakCalculator(drivingHours) {
+  const hours = Number(drivingHours);
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+  // Placeholder logic: 45-minute break required after 4.5 hours of driving.
+  return hours > 4.5 ? 45 : 0;
+}
 
   window.JET_UI = {
     C,
     isDutyNumber,
     getSpecialDuty,
     getStatusStyle,
-    filterNote
+    filterNote,
+    tachographBreakCalculator
   };
 })(window);
