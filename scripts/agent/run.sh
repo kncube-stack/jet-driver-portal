@@ -23,7 +23,7 @@ echo "=== TASK ==="
 cat "$TASK_FILE"
 
 if command -v codex >/dev/null 2>&1; then
-  codex exec --full-auto --prompt-file "$TASK_FILE"
+  codex exec --full-auto "$TASK"
 elif command -v claude >/dev/null 2>&1; then
   claude --prompt-file "$TASK_FILE"
 else
