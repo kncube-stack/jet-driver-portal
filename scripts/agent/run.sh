@@ -42,9 +42,22 @@ else
   exit 0
 fi
 
-if command -v gh >/dev/null 2>&1; then
-  gh pr create --title "$PR_TITLE" --body "$(cat "$TASK_FILE")"
-else
-  echo "Install GitHub CLI: brew install gh"
-  exit 1
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  echo "GITHUB_TOKEN not set; skipping PR creation."
+  exit 0
 fi
+
+REPO="${GITHUB_REPOSITORY}"
+API="https://api.github.com/repos/${REPO}/pulls"
+
+BODY="$(cat "$TASK_FILE")"
+
+curl -sS -X POST \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "${API}" \
+  -d "$(printf '{"title":"%s","head":"%s","base":"main","body":"%s"}' \
+      "$(printf '%s' "$PR_TITLE" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])')" \
+      "$(printf '%s' "$BRANCH"   | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])')" \
+      "$(printf '%s' "$BODY"     | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])')" \
+    )"

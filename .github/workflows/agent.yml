@@ -40,6 +40,8 @@ jobs:
           echo "0" > .agent/issue_number.txt
 
       - name: Run agent
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           chmod +x scripts/agent/run.sh
