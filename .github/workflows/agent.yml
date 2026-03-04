@@ -22,27 +22,21 @@ jobs:
         shell: bash
         run: |
           mkdir -p .agent
-          {
-            echo "TITLE: ${{ github.event.issue.title }}"
-            echo ""
-            echo "${{ github.event.issue.body }}"
-          } > .agent/task.txt
+          echo "${{ github.event.issue.title }}" > .agent/title.txt
+          echo "${{ github.event.issue.body }}" > .agent/body.txt
+          printf "TITLE: %s\n\n%s\n" "$(cat .agent/title.txt)" "$(cat .agent/body.txt)" > .agent/task.txt
           echo "${{ github.event.issue.number }}" > .agent/issue_number.txt
 
       - name: Manual dispatch task file
-        if: github.event_name != 'issues'
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           mkdir -p .agent
-          echo "TITLE: Manual run" > .agent/task.txt
-          echo "" >> .agent/task.txt
-          echo "Describe the task in the workflow_dispatch UI." >> .agent/task.txt
+          echo "Manual run" > .agent/task.txt
           echo "0" > .agent/issue_number.txt
 
       - name: Run agent
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           chmod +x scripts/agent/run.sh
-          scripts/agent/run.sh ".agent/task.txt" ".agent/issue_number.txt"
+          scripts/agent/run.sh .agent/task.txt .agent/issue_number.txt
