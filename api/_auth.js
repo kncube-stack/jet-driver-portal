@@ -204,9 +204,9 @@ function authenticateNamePin(nameInput, pinInput) {
 
   const hash = crypto.createHash("sha256").update(pin).digest("hex");
   const userHash = config.userPinHashes[name];
-  const passByUserPin = typeof userHash === "string" && userHash === hash;
-  const passByManagerPin = isManagerName && !!config.managerMasterPinHash && config.managerMasterPinHash === hash;
-  const passBySharedPin = config.mode !== "strict" && !!config.defaultDriverPinHash && config.defaultDriverPinHash === hash;
+  const passByUserPin = typeof userHash === "string" && safeEqual(userHash, hash);
+  const passByManagerPin = isManagerName && !!config.managerMasterPinHash && safeEqual(config.managerMasterPinHash, hash);
+  const passBySharedPin = config.mode !== "strict" && !!config.defaultDriverPinHash && safeEqual(config.defaultDriverPinHash, hash);
 
   if (!(passByUserPin || passByManagerPin || passBySharedPin)) {
     return {

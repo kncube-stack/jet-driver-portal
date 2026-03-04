@@ -41,6 +41,7 @@ async function discoverSheetTabs() {
   const res = await fetch(GSHEET_PUB_BASE + "/pubhtml", {
     cache: "no-store"
   });
+  if (!res.ok) throw new Error(`Rota source unavailable (${res.status}). Check your connection.`);
   const html = await res.text();
   const tabs = {};
   const regex = /name:\s*"(WC \d{2}\.\d{2}\.\d{4})".*?gid:\s*"(\d+)"/g;
@@ -86,6 +87,7 @@ async function fetchTabCSV(gid) {
   const res = await fetch(GSHEET_PUB_BASE + `/pub?gid=${gid}&single=true&output=csv`, {
     cache: "no-store"
   });
+  if (!res.ok) throw new Error(`Failed to fetch rota data (${res.status}). Check your connection.`);
   return await res.text();
 }
 function parseCSVRow(line) {
