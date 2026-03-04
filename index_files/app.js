@@ -621,6 +621,7 @@ function App() {
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
+  const [nameSearchActive, setNameSearchActive] = React.useState(false);
   const isManager = currentRole === "manager";
 
   // Derived data from live state
@@ -829,6 +830,7 @@ function App() {
       setSearch("");
       setDutySearch("");
       setNameSearch("");
+      setNameSearchActive(false);
       setAuthPin("");
     } catch (err) {
       setAuthError(err?.message || "Unable to verify PIN. Please try again.");
@@ -967,14 +969,20 @@ function App() {
       value: nameSearch,
       onChange: e => {
         setNameSearch(e.target.value);
+        setNameSearchActive(false);
         setAuthError("");
       },
       onKeyDown: e => {
-        if (e.key === "Enter" && nameFiltered.length > 0) {
+        if (e.key === "Enter") {
           e.preventDefault();
-          setAuthName(nameFiltered[0]);
-          setNameSearch("");
-          setAuthError("");
+          if (nameFiltered.length > 0 && nameSearchActive) {
+            setAuthName(nameFiltered[0]);
+            setNameSearch("");
+            setNameSearchActive(false);
+            setAuthError("");
+          } else {
+            setNameSearchActive(true);
+          }
         }
       },
       placeholder: "Search by name...",
@@ -1002,7 +1010,7 @@ function App() {
         color: C.textDim,
         fontSize: "14px"
       }
-    }, "\u2315")), (DRIVERS.length === 0 || nameQ) && /*#__PURE__*/React.createElement("div", {
+    }, "\u2315")), (DRIVERS.length === 0 || (nameSearchActive && nameQ)) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -1030,6 +1038,7 @@ function App() {
       onClick: () => {
         setAuthName(name);
         setNameSearch("");
+        setNameSearchActive(false);
         setAuthError("");
       },
       style: {
@@ -1286,6 +1295,7 @@ function App() {
     setAuthPin("");
     setAuthError("");
     setNameSearch("");
+    setNameSearchActive(false);
     setSearch("");
     setTimesheetRows([]);
     setTimesheetSubmitted(false);
