@@ -8,7 +8,7 @@ on:
 jobs:
   run:
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'agent:run'
-    runs-on: self-hosted
+    runs-on: [self-hosted, agent]
 
     permissions:
       contents: write
