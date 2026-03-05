@@ -673,11 +673,14 @@ function App() {
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
-  const [nameSearchActive, setNameSearchActive] = React.useState(false);
   const isManager = currentRole === "manager";
 
   // Derived data from live state
   const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const LOGIN_NAMES = React.useMemo(() => {
+    const merged = new Set([...(Array.isArray(DRIVERS) ? DRIVERS : []), ...(Array.isArray(ACCESS_CONTROL.managerNames) ? ACCESS_CONTROL.managerNames : [])]);
+    return Array.from(merged);
+  }, [DRIVERS]);
   const {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
@@ -882,7 +885,6 @@ function App() {
       setSearch("");
       setDutySearch("");
       setNameSearch("");
-      setNameSearchActive(false);
       setAuthPin("");
     } catch (err) {
       setAuthError(err?.message || "Unable to verify PIN. Please try again.");
@@ -947,10 +949,11 @@ function App() {
       if (idx >= 0) return 600 - idx / 100;
       return -1;
     };
-    const nameFiltered = nameQ ? DRIVERS.map(name => ({
+    const nameFiltered = nameQ ? LOGIN_NAMES.map(name => ({
       name,
       score: scoreNameMatch(name)
     })).filter(item => item.score >= 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(item => item.name).slice(0, 8) : [];
+    const getLoginNameLabel = name => DRIVER_SECTION_LABEL[name] || (ACCESS_CONTROL.managerNames?.includes(name) ? "Management Duties" : "Staff");
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
@@ -1021,19 +1024,15 @@ function App() {
       value: nameSearch,
       onChange: e => {
         setNameSearch(e.target.value);
-        setNameSearchActive(false);
         setAuthError("");
       },
       onKeyDown: e => {
         if (e.key === "Enter") {
           e.preventDefault();
-          if (nameFiltered.length > 0 && nameSearchActive) {
+          if (nameFiltered.length > 0) {
             setAuthName(nameFiltered[0]);
             setNameSearch("");
-            setNameSearchActive(false);
             setAuthError("");
-          } else {
-            setNameSearchActive(true);
           }
         }
       },
@@ -1062,7 +1061,7 @@ function App() {
         color: C.textDim,
         fontSize: "14px"
       }
-    }, "\u2315")), (DRIVERS.length === 0 || (nameSearchActive && nameQ)) && /*#__PURE__*/React.createElement("div", {
+    }, "\u2315")), (LOGIN_NAMES.length === 0 || !!nameQ) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -1071,7 +1070,7 @@ function App() {
         overflowY: "auto",
         marginBottom: "12px"
       }
-    }, DRIVERS.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    }, LOGIN_NAMES.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         padding: "24px",
@@ -1090,7 +1089,6 @@ function App() {
       onClick: () => {
         setAuthName(name);
         setNameSearch("");
-        setNameSearchActive(false);
         setAuthError("");
       },
       style: {
@@ -1118,7 +1116,7 @@ function App() {
         color: C.textDim,
         marginTop: "1px"
       }
-    }, idx === 0 ? `Best match \u00b7 ${DRIVER_SECTION_LABEL[name]}` : DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+    }, idx === 0 ? `Best match \u00b7 ${getLoginNameLabel(name)}` : getLoginNameLabel(name))), /*#__PURE__*/React.createElement("span", {
       style: {
         color: authName === name ? C.accent : C.textDim,
         fontSize: "12px"
@@ -1183,17 +1181,17 @@ function App() {
       }
     }, authError), /*#__PURE__*/React.createElement("button", {
       onClick: handleLogin,
-      disabled: !authName || !authPin || authLoading || DRIVERS.length === 0,
+      disabled: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0,
       style: {
         width: "100%",
         padding: "13px",
-        background: !authName || !authPin || authLoading || DRIVERS.length === 0 ? C.textDim + "44" : C.accent,
-        color: !authName || !authPin || authLoading || DRIVERS.length === 0 ? C.textDim : C.bg,
+        background: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? C.textDim + "44" : C.accent,
+        color: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "13px",
         fontWeight: 700,
-        cursor: !authName || !authPin || authLoading || DRIVERS.length === 0 ? "not-allowed" : "pointer",
+        cursor: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px"
       }
@@ -1347,7 +1345,6 @@ function App() {
     setAuthPin("");
     setAuthError("");
     setNameSearch("");
-    setNameSearchActive(false);
     setSearch("");
     setTimesheetRows([]);
     setTimesheetSubmitted(false);
