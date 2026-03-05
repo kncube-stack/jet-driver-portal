@@ -13,7 +13,13 @@
     DAYS,
     SHORT_DAYS
   } = window.JET_DATA_LAYER;
-  const { C, isDutyNumber, getSpecialDuty, getStatusStyle } = window.JET_UI;
+  const {
+    C,
+    isDutyNumber,
+    getSpecialDuty,
+    getStatusStyle,
+    tachographBreakCalculator: jetTachographBreakCalculator
+  } = window.JET_UI;
 
 function readStoredSession() {
   try {
@@ -68,6 +74,52 @@ const PADDINGTON_TRAVEL_COST = 6.2;
 const STANDARD_TRAVEL_COST = 9.2;
 function isTimeValue(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
+}
+function calculateTachographBreakMinutes(drivingHours) {
+  if (typeof jetTachographBreakCalculator === "function") {
+    return jetTachographBreakCalculator(drivingHours);
+  }
+  const hours = Number(drivingHours);
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+  if (hours <= 4.5) return 0;
+  if (hours <= 9) return 45;
+  return 90;
+}
+function parseDutyLengthHours(dutyLength) {
+  const raw = String(dutyLength || "").trim();
+  if (!raw || raw === "—") return null;
+  if (!/^(\d{1,2}):(\d{2})$/.test(raw)) return null;
+  const [hoursPart, minutesPart] = raw.split(":");
+  const hours = Number(hoursPart);
+  const minutes = Number(minutesPart);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours + minutes / 60;
+}
+function formatBreakDuration(minutes) {
+  const total = Math.max(0, Math.round(Number(minutes) || 0));
+  if (total <= 0) return "no mandatory break";
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours && mins) return `${hours}h ${mins}m`;
+  if (hours) return `${hours}h`;
+  return `${mins}m`;
+}
+function getTachographBreakWarning(dutyLength) {
+  const dutyHours = parseDutyLengthHours(dutyLength);
+  if (dutyHours === null) return null;
+  const breakMinutes = calculateTachographBreakMinutes(dutyHours);
+  if (breakMinutes <= 0) {
+    return `Tachograph break guide: ${dutyLength} duty length, no mandatory break before 4h 30m of driving.`;
+  }
+  return `Tachograph break guide: ${dutyLength} duty length, minimum ${formatBreakDuration(breakMinutes)} total break.`;
+}
+function buildDutyWarnings(duty) {
+  const reminders = Array.isArray(duty?.reminders) ? duty.reminders.filter(Boolean) : [];
+  const tachographWarning = getTachographBreakWarning(duty?.dutyLength);
+  if (!tachographWarning) return reminders;
+  const replaced = reminders.map(reminder => String(reminder || "").trim() === "Ensure you have a 45 minute break" ? tachographWarning : reminder);
+  if (replaced.some(reminder => String(reminder).trim() === tachographWarning)) return replaced;
+  return [tachographWarning, ...replaced];
 }
 function parseTimeValueToMinutes(value) {
   if (!isTimeValue(value)) return null;
@@ -621,11 +673,14 @@ function App() {
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
-  const [nameSearchActive, setNameSearchActive] = React.useState(false);
   const isManager = currentRole === "manager";
 
   // Derived data from live state
   const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const LOGIN_NAMES = React.useMemo(() => {
+    const merged = new Set([...(Array.isArray(DRIVERS) ? DRIVERS : []), ...(Array.isArray(ACCESS_CONTROL.managerNames) ? ACCESS_CONTROL.managerNames : [])]);
+    return Array.from(merged);
+  }, [DRIVERS]);
   const {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
@@ -830,7 +885,6 @@ function App() {
       setSearch("");
       setDutySearch("");
       setNameSearch("");
-      setNameSearchActive(false);
       setAuthPin("");
     } catch (err) {
       setAuthError(err?.message || "Unable to verify PIN. Please try again.");
@@ -895,10 +949,11 @@ function App() {
       if (idx >= 0) return 600 - idx / 100;
       return -1;
     };
-    const nameFiltered = nameQ ? DRIVERS.map(name => ({
+    const nameFiltered = nameQ ? LOGIN_NAMES.map(name => ({
       name,
       score: scoreNameMatch(name)
     })).filter(item => item.score >= 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(item => item.name).slice(0, 8) : [];
+    const getLoginNameLabel = name => DRIVER_SECTION_LABEL[name] || (ACCESS_CONTROL.managerNames?.includes(name) ? "Management Duties" : "Staff");
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
@@ -969,19 +1024,15 @@ function App() {
       value: nameSearch,
       onChange: e => {
         setNameSearch(e.target.value);
-        setNameSearchActive(false);
         setAuthError("");
       },
       onKeyDown: e => {
         if (e.key === "Enter") {
           e.preventDefault();
-          if (nameFiltered.length > 0 && nameSearchActive) {
+          if (nameFiltered.length > 0) {
             setAuthName(nameFiltered[0]);
             setNameSearch("");
-            setNameSearchActive(false);
             setAuthError("");
-          } else {
-            setNameSearchActive(true);
           }
         }
       },
@@ -1010,7 +1061,7 @@ function App() {
         color: C.textDim,
         fontSize: "14px"
       }
-    }, "\u2315")), (DRIVERS.length === 0 || (nameSearchActive && nameQ)) && /*#__PURE__*/React.createElement("div", {
+    }, "\u2315")), (LOGIN_NAMES.length === 0 || !!nameQ) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -1019,7 +1070,7 @@ function App() {
         overflowY: "auto",
         marginBottom: "12px"
       }
-    }, DRIVERS.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    }, LOGIN_NAMES.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         padding: "24px",
@@ -1038,7 +1089,6 @@ function App() {
       onClick: () => {
         setAuthName(name);
         setNameSearch("");
-        setNameSearchActive(false);
         setAuthError("");
       },
       style: {
@@ -1066,7 +1116,7 @@ function App() {
         color: C.textDim,
         marginTop: "1px"
       }
-    }, idx === 0 ? `Best match \u00b7 ${DRIVER_SECTION_LABEL[name]}` : DRIVER_SECTION_LABEL[name])), /*#__PURE__*/React.createElement("span", {
+    }, idx === 0 ? `Best match \u00b7 ${getLoginNameLabel(name)}` : getLoginNameLabel(name))), /*#__PURE__*/React.createElement("span", {
       style: {
         color: authName === name ? C.accent : C.textDim,
         fontSize: "12px"
@@ -1131,17 +1181,17 @@ function App() {
       }
     }, authError), /*#__PURE__*/React.createElement("button", {
       onClick: handleLogin,
-      disabled: !authName || !authPin || authLoading || DRIVERS.length === 0,
+      disabled: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0,
       style: {
         width: "100%",
         padding: "13px",
-        background: !authName || !authPin || authLoading || DRIVERS.length === 0 ? C.textDim + "44" : C.accent,
-        color: !authName || !authPin || authLoading || DRIVERS.length === 0 ? C.textDim : C.bg,
+        background: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? C.textDim + "44" : C.accent,
+        color: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "13px",
         fontWeight: 700,
-        cursor: !authName || !authPin || authLoading || DRIVERS.length === 0 ? "not-allowed" : "pointer",
+        cursor: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px"
       }
@@ -1295,7 +1345,6 @@ function App() {
     setAuthPin("");
     setAuthError("");
     setNameSearch("");
-    setNameSearchActive(false);
     setSearch("");
     setTimesheetRows([]);
     setTimesheetSubmitted(false);
@@ -3388,12 +3437,13 @@ function App() {
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
+    const dutyWarnings = buildDutyWarnings(duty);
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       ref: printRef,
       style: {
         display: "none"
       }
-    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), dutyWarnings.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       className: "warn"
     }, "\u26A0 ", r)), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
@@ -3577,7 +3627,7 @@ function App() {
         fontSize: "10px",
         color: C.textDim
       }
-    }, "Duty ", runout.takeoverFrom.duty))))), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, "Duty ", runout.takeoverFrom.duty))))), dutyWarnings.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
         background: C.warnBg,
