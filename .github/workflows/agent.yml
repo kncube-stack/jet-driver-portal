@@ -4,10 +4,27 @@ on:
   issues:
     types: [labeled]
   workflow_dispatch:
+    inputs:
+      task:
+        description: "Task for the agent to execute"
+        required: true
+        type: string
+      issue_number:
+        description: "Optional issue number to comment back on (default 0)"
+        required: false
+        default: "0"
+        type: string
 
 jobs:
   run:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == 'agent')
     runs-on: [self-hosted, agent]
+    timeout-minutes: 45
+    concurrency:
+      group: agent-${{ github.event_name }}-${{ github.event.issue.number || github.run_id }}
+      cancel-in-progress: false
 
     permissions:
       contents: write
@@ -22,9 +39,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p .agent
-          echo "${{ github.event.issue.title }}" > .agent/title.txt
-          echo "${{ github.event.issue.body }}" > .agent/body.txt
-          printf "TITLE: %s\n\n%s\n" "$(cat .agent/title.txt)" "$(cat .agent/body.txt)" > .agent/task.txt
+          printf "TITLE: %s\n\n%s\n" "${{ github.event.issue.title }}" "${{ github.event.issue.body }}" > .agent/task.txt
           echo "${{ github.event.issue.number }}" > .agent/issue_number.txt
 
       - name: Manual dispatch task file
@@ -32,8 +47,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p .agent
-          echo "Manual run" > .agent/task.txt
-          echo "0" > .agent/issue_number.txt
+          printf "TITLE: Manual run\n\n%s\n" "${{ inputs.task }}" > .agent/task.txt
+          echo "${{ inputs.issue_number }}" > .agent/issue_number.txt
 
       - name: Run agent
         env:
