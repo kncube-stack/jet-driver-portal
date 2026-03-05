@@ -623,7 +623,8 @@
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: "inherit",
-                padding: 0
+                padding: "8px 0",
+                minHeight: "40px"
               }
             },
             "\u2190 Back"
@@ -733,9 +734,10 @@
             border: `1px solid ${C.borderStrong}`,
             background: C.panel,
             color: C.text,
-            fontSize: "14px",
+            fontSize: "16px",
             outline: "none",
-            fontFamily: "inherit"
+            fontFamily: "inherit",
+            lineHeight: 1.35
           }
         }),
         h(
@@ -793,7 +795,8 @@
                 padding: "12px 14px",
                 cursor: "pointer",
                 fontFamily: "inherit",
-                transition: "border-color 120ms ease, background 120ms ease"
+                transition: "border-color 120ms ease, background 120ms ease",
+                minHeight: "66px"
               },
               onMouseEnter: e => {
                 e.currentTarget.style.borderColor = C.accent;
@@ -811,12 +814,13 @@
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  gap: "12px"
+                  gap: "12px",
+                  width: "100%"
                 }
               },
               h(
                 "div",
-                null,
+                { style: { minWidth: 0, flex: 1 } },
                 h(
                   "div",
                   {
@@ -846,7 +850,9 @@
                 "div",
                 {
                   style: {
-                    textAlign: "right"
+                    textAlign: "right",
+                    minWidth: "92px",
+                    flexShrink: 0
                   }
                 },
                 h(
@@ -1005,7 +1011,8 @@
                   gap: "12px",
                   padding: "10px 12px",
                   borderBottom: stopIndex < stops.length - 1 ? `1px solid ${C.border}` : "none",
-                  background: isBreak ? C.breakBg : "transparent"
+                  background: isBreak ? C.breakBg : "transparent",
+                  width: "100%"
                 }
               },
               h(
@@ -1024,7 +1031,7 @@
               ),
               h(
                 "div",
-                { style: { flex: 1, minWidth: 0 } },
+                { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } },
                 h(
                   "div",
                   {
@@ -1055,7 +1062,9 @@
                       style: {
                         color: "inherit",
                         textDecoration: "none",
-                        borderBottom: `1px dotted ${C.borderStrong}`
+                        borderBottom: `1px dotted ${C.borderStrong}`,
+                        overflowWrap: "anywhere",
+                        wordBreak: "break-word"
                       }
                     },
                     stop.stop
@@ -1123,7 +1132,8 @@
         style: {
           minHeight: "100vh",
           background: `linear-gradient(180deg, ${C.pageBg}, #eef2ff 120%)`,
-          color: C.text
+          color: C.text,
+          overflowX: "hidden"
         }
       },
       appHeader(selectedDutyNumber, () => setSelectedDutyNumber(null)),
@@ -1133,7 +1143,7 @@
           style: {
             maxWidth: "980px",
             margin: "0 auto",
-            padding: "16px"
+            padding: "12px"
           }
         },
         selectedDuty
