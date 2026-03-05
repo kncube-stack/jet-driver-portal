@@ -17,8 +17,7 @@
     C,
     isDutyNumber,
     getSpecialDuty,
-    getStatusStyle,
-    tachographBreakCalculator: jetTachographBreakCalculator
+    getStatusStyle
   } = window.JET_UI;
 
 function readStoredSession() {
@@ -74,52 +73,6 @@ const PADDINGTON_TRAVEL_COST = 6.2;
 const STANDARD_TRAVEL_COST = 9.2;
 function isTimeValue(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
-}
-function calculateTachographBreakMinutes(drivingHours) {
-  if (typeof jetTachographBreakCalculator === "function") {
-    return jetTachographBreakCalculator(drivingHours);
-  }
-  const hours = Number(drivingHours);
-  if (!Number.isFinite(hours) || hours <= 0) return 0;
-  if (hours <= 4.5) return 0;
-  if (hours <= 9) return 45;
-  return 90;
-}
-function parseDutyLengthHours(dutyLength) {
-  const raw = String(dutyLength || "").trim();
-  if (!raw || raw === "—") return null;
-  if (!/^(\d{1,2}):(\d{2})$/.test(raw)) return null;
-  const [hoursPart, minutesPart] = raw.split(":");
-  const hours = Number(hoursPart);
-  const minutes = Number(minutesPart);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-  return hours + minutes / 60;
-}
-function formatBreakDuration(minutes) {
-  const total = Math.max(0, Math.round(Number(minutes) || 0));
-  if (total <= 0) return "no mandatory break";
-  const hours = Math.floor(total / 60);
-  const mins = total % 60;
-  if (hours && mins) return `${hours}h ${mins}m`;
-  if (hours) return `${hours}h`;
-  return `${mins}m`;
-}
-function getTachographBreakWarning(dutyLength) {
-  const dutyHours = parseDutyLengthHours(dutyLength);
-  if (dutyHours === null) return null;
-  const breakMinutes = calculateTachographBreakMinutes(dutyHours);
-  if (breakMinutes <= 0) {
-    return `Tachograph break guide: ${dutyLength} duty length, no mandatory break before 4h 30m of driving.`;
-  }
-  return `Tachograph break guide: ${dutyLength} duty length, minimum ${formatBreakDuration(breakMinutes)} total break.`;
-}
-function buildDutyWarnings(duty) {
-  const reminders = Array.isArray(duty?.reminders) ? duty.reminders.filter(Boolean) : [];
-  const tachographWarning = getTachographBreakWarning(duty?.dutyLength);
-  if (!tachographWarning) return reminders;
-  const replaced = reminders.map(reminder => String(reminder || "").trim() === "Ensure you have a 45 minute break" ? tachographWarning : reminder);
-  if (replaced.some(reminder => String(reminder).trim() === tachographWarning)) return replaced;
-  return [tachographWarning, ...replaced];
 }
 function parseTimeValueToMinutes(value) {
   if (!isTimeValue(value)) return null;
@@ -3437,13 +3390,12 @@ function App() {
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
-    const dutyWarnings = buildDutyWarnings(duty);
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       ref: printRef,
       style: {
         display: "none"
       }
-    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), dutyWarnings.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       className: "warn"
     }, "\u26A0 ", r)), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
@@ -3627,7 +3579,7 @@ function App() {
         fontSize: "10px",
         color: C.textDim
       }
-    }, "Duty ", runout.takeoverFrom.duty))))), dutyWarnings.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, "Duty ", runout.takeoverFrom.duty))))), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
         background: C.warnBg,
