@@ -601,6 +601,8 @@ function openStopInPreferredMapsApp(event, target) {
   if (!event || !target) return;
   const ua = (navigator.userAgent || "").toLowerCase();
   const isMobile = ua.includes("android") || ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod");
+  const isIOS = ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod");
+  const isStandaloneMode = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   if (!isMobile) return;
   event.preventDefault();
   const appUrl = getPreferredMapsAppUrl(target);
@@ -614,28 +616,41 @@ function openStopInPreferredMapsApp(event, target) {
     }
     document.removeEventListener("visibilitychange", handleVisibility);
     window.removeEventListener("pagehide", handlePageHide);
+    window.removeEventListener("blur", handleBlur);
+  };
+  const markHandoff = () => {
+    handoffToAppDetected = true;
+    cleanup();
   };
   const handleVisibility = () => {
     if (document.hidden) {
-      handoffToAppDetected = true;
-      cleanup();
+      markHandoff();
     }
   };
   const handlePageHide = () => {
-    handoffToAppDetected = true;
-    cleanup();
+    markHandoff();
+  };
+  const handleBlur = () => {
+    markHandoff();
   };
   document.addEventListener("visibilitychange", handleVisibility);
   window.addEventListener("pagehide", handlePageHide, {
     once: true
   });
+  window.addEventListener("blur", handleBlur, {
+    once: true
+  });
   fallbackTimer = window.setTimeout(() => {
     cleanup();
     if (!handoffToAppDetected && fallbackUrl) {
-      // Keep the portal tab intact; fallback map opens in a new tab if app handoff fails.
-      window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+      if (isStandaloneMode && isIOS) {
+        // In iOS home-screen mode, avoid forcing a web fallback that can replace app view.
+        return;
+      }
+      // Fallback in the same tab avoids the iOS blank interim tab issue.
+      window.location.replace(fallbackUrl);
     }
-  }, 700);
+  }, isStandaloneMode ? 2200 : 1400);
   window.location.href = appUrl;
 }
 
