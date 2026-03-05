@@ -4,3 +4,4 @@
 output/
 tmp/
 .agent/
+test-results/

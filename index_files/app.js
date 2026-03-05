@@ -601,7 +601,6 @@ function openStopInPreferredMapsApp(event, target) {
   if (!event || !target) return;
   const ua = (navigator.userAgent || "").toLowerCase();
   const isMobile = ua.includes("android") || ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod");
-  const isIOS = ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod");
   const isStandaloneMode = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   if (!isMobile) return;
   event.preventDefault();
@@ -643,10 +642,6 @@ function openStopInPreferredMapsApp(event, target) {
   fallbackTimer = window.setTimeout(() => {
     cleanup();
     if (!handoffToAppDetected && fallbackUrl) {
-      if (isStandaloneMode && isIOS) {
-        // In iOS home-screen mode, avoid forcing a web fallback that can replace app view.
-        return;
-      }
       // Fallback in the same tab avoids the iOS blank interim tab issue.
       window.location.replace(fallbackUrl);
     }
