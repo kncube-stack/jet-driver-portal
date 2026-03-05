@@ -147,20 +147,12 @@ function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
     label: val
   };
 }
-function tachographBreakCalculator(drivingHours) {
-  const hours = Number(drivingHours);
-  if (!Number.isFinite(hours) || hours <= 0) return 0;
-  if (hours <= 4.5) return 0;
-  if (hours <= 9) return 45;
-  return 90;
-}
 
   window.JET_UI = {
     C,
     isDutyNumber,
     getSpecialDuty,
     getStatusStyle,
-    filterNote,
-    tachographBreakCalculator
+    filterNote
   };
 })(window);
