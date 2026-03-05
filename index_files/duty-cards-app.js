@@ -654,7 +654,7 @@
                   fontWeight: 600
                 }
               },
-              "DUTY CARDS DIRECTORY"
+              "Duty Card Directory"
             )
           )
         ),
@@ -667,7 +667,7 @@
               textAlign: "right"
             }
           },
-          "Standalone Search App"
+          ""
         )
       )
     );
