@@ -168,10 +168,9 @@ done
 
 FULL_REPOS=()
 if [[ "$APPLY_ALL" -eq 1 ]]; then
-  mapfile -t names < <(gh repo list "$OWNER" --limit 200 --json name --jq '.[].name')
-  for name in "${names[@]}"; do
+  while IFS= read -r name; do
     [[ -n "$name" ]] && FULL_REPOS+=("${OWNER}/${name}")
-  done
+  done < <(gh repo list "$OWNER" --limit 200 --json name --jq '.[].name')
 else
   IFS=',' read -r -a selected <<< "$REPOS_CSV"
   for raw in "${selected[@]}"; do
