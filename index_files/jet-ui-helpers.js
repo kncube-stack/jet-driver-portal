@@ -23,26 +23,27 @@ function filterNote(note) {
 }
 // ─── Colours ────────────────────────────────────────────────────
 const C = {
-  bg: "#0a0e17",
-  surface: "#131a2b",
-  surfaceHover: "#1a2340",
-  card: "#172033",
-  border: "#1e2d4a",
+  pageBg: "linear-gradient(180deg, #f8fafc, #eef2ff 120%)",
+  bg: "#0f172a",
+  surface: "#ffffff",
+  surfaceHover: "#f8fafc",
+  card: "#ffffff",
+  border: "#cbd5e1",
   accent: "#f59e0b",
-  text: "#e2e8f0",
-  textMuted: "#7a8ba8",
-  textDim: "#4a5a78",
-  white: "#ffffff",
-  green: "#22c55e",
-  breakBg: "#1a2e1a",
-  breakBorder: "#2d5a2d",
-  breakText: "#4ade80",
-  warnBg: "#2e2a1a",
-  warnBorder: "#5a4a2d",
-  warnText: "#fbbf24",
-  blue: "#3b82f6",
-  blueBg: "#1a1e2e",
-  blueBorder: "#2d3a5a"
+  text: "#0f172a",
+  textMuted: "#475569",
+  textDim: "#64748b",
+  white: "#0f172a",
+  green: "#16a34a",
+  breakBg: "#ecfdf5",
+  breakBorder: "#86efac",
+  breakText: "#166534",
+  warnBg: "#fff7ed",
+  warnBorder: "#fed7aa",
+  warnText: "#9a3412",
+  blue: "#2563eb",
+  blueBg: "#eff6ff",
+  blueBorder: "#bfdbfe"
 };
 
 // ─── Helpers ────────────────────────────────────────────────────

@@ -958,7 +958,7 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
-        background: C.bg,
+        background: C.pageBg,
         color: C.text,
         fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
         display: "flex",
@@ -995,7 +995,7 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
-        background: C.bg,
+        background: C.pageBg,
         color: C.text,
         fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
       }
@@ -1025,7 +1025,7 @@ function App() {
       style: {
         fontSize: "9px",
         letterSpacing: "1.5px",
-        color: "#ffffff",
+        color: C.textMuted,
         textTransform: "uppercase",
         marginBottom: "20px"
       }
@@ -1044,12 +1044,12 @@ function App() {
     }, "Select your name and enter your PIN")), rotaError && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: "12px",
-        background: "#ef444422",
-        border: "1px solid #ef444455",
+        background: "#fee2e2",
+        border: "1px solid #fca5a5",
         borderRadius: "8px",
         padding: "10px 12px",
         fontSize: "10px",
-        color: "#fecaca",
+        color: "#b91c1c",
         lineHeight: 1.5
       }
     }, "\u26A0 ", rotaError, " Showing directory names only until sync recovers."), /*#__PURE__*/React.createElement("div", {
@@ -1267,7 +1267,7 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
-        background: C.bg,
+        background: C.pageBg,
         color: C.text,
         fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
         display: "flex",
@@ -1291,7 +1291,7 @@ function App() {
       style: {
         fontSize: "9px",
         letterSpacing: "1.5px",
-        color: "#ffffff",
+        color: C.textMuted,
         textTransform: "uppercase",
         marginBottom: "32px"
       }
@@ -1312,7 +1312,7 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
-        background: C.bg,
+        background: C.pageBg,
         color: C.text,
         fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
         display: "flex",
@@ -1406,7 +1406,7 @@ function App() {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
-      background: C.bg,
+      background: C.pageBg,
       color: C.text,
       fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
     }
@@ -1492,7 +1492,7 @@ function App() {
     style: {
       fontSize: "9px",
       letterSpacing: "1.5px",
-      color: "#ffffff",
+      color: C.textMuted,
       textTransform: "uppercase",
       marginTop: "1px"
     }
@@ -1528,12 +1528,12 @@ function App() {
   }, rotaError && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: "12px",
-      background: "#ef444422",
-      border: "1px solid #ef444455",
+      background: "#fee2e2",
+      border: "1px solid #fca5a5",
       borderRadius: "8px",
       padding: "10px 12px",
       fontSize: "10px",
-      color: "#fecaca",
+      color: "#b91c1c",
       lineHeight: 1.5
     }
   }, "\u26A0 ", rotaError, " Some duties may be out of date."), screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -2447,10 +2447,10 @@ function App() {
       width: "100%",
       marginTop: "8px",
       padding: "14px",
-      background: "linear-gradient(135deg, #ffffff12, #ffffff08)",
-      border: "1px solid #ffffff25",
+      background: "linear-gradient(135deg, #f8fafc, #eef2ff)",
+      border: "1px solid #cbd5e1",
       borderRadius: "10px",
-      color: "#ffffff",
+      color: C.text,
       fontSize: "13px",
       fontWeight: 600,
       cursor: "pointer",
@@ -2458,10 +2458,10 @@ function App() {
       letterSpacing: "0.5px"
     },
     onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#ffffff44";
+      e.currentTarget.style.borderColor = "#94a3b8";
     },
     onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#ffffff25";
+      e.currentTarget.style.borderColor = "#cbd5e1";
     }
   }, "\uD83D\uDD04 Request Shift Swap"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -2483,10 +2483,10 @@ function App() {
       width: "100%",
       marginTop: "8px",
       padding: "14px",
-      background: "linear-gradient(135deg, #38bdf822, #0284c722)",
-      border: "1px solid #38bdf833",
+      background: "linear-gradient(135deg, #e0f2fe, #f0f9ff)",
+      border: "1px solid #bae6fd",
       borderRadius: "10px",
-      color: "#7dd3fc",
+      color: "#0369a1",
       fontSize: "13px",
       fontWeight: 600,
       cursor: "pointer",
@@ -2494,10 +2494,10 @@ function App() {
       letterSpacing: "0.5px"
     },
     onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#38bdf866";
+      e.currentTarget.style.borderColor = "#7dd3fc";
     },
     onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#38bdf833";
+      e.currentTarget.style.borderColor = "#bae6fd";
     }
   }, "\uD83E\uDDFE Generate Timesheet")), screen === "leave" && selectedDriver && (() => {
     const handleSubmit = () => {
@@ -2755,7 +2755,7 @@ function App() {
     }, leaveSending ? "Sending..." : "Submit Leave Request"), leaveError && /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "10px",
-        color: "#fda4af",
+        color: "#be123c",
         textAlign: "center",
         lineHeight: 1.5,
         margin: "2px 0 0"
@@ -3098,7 +3098,7 @@ function App() {
     }, swapSending ? "Sending..." : "Submit Swap Request"), swapError && /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "10px",
-        color: "#fda4af",
+        color: "#be123c",
         textAlign: "center",
         lineHeight: 1.5,
         margin: "2px 0 0"
@@ -3458,7 +3458,7 @@ function App() {
     }, timesheetSending ? "Sending..." : "Submit Timesheet"), timesheetError && /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "10px",
-        color: "#fda4af",
+        color: "#be123c",
         textAlign: "center",
         lineHeight: 1.5,
         margin: "6px 0 0"
