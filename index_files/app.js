@@ -102,6 +102,7 @@ function getMinuteGapWithMidnightWrap(startMinutes, endMinutes) {
 function buildBreakHintLookup(duty) {
   const lookup = new Map();
   if (!duty || !Array.isArray(duty.segments)) return lookup;
+  const isA6Duty = String(duty.route || "").toLowerCase().includes("a6");
   const hasBreakReminder = Array.isArray(duty.reminders) && duty.reminders.some(reminder => String(reminder || "").trim() === BREAK_REMINDER_TEXT);
   if (!hasBreakReminder) return lookup;
   let lastArrival = null;
@@ -114,7 +115,17 @@ function buildBreakHintLookup(duty) {
       if (stop?.dep && lastArrival && areStopsEquivalentForBreak(lastArrival.stopName, stopName)) {
         const gapMinutes = getMinuteGapWithMidnightWrap(lastArrival.timeMinutes, stopMinutes);
         if (gapMinutes !== null && gapMinutes >= 45) {
-          lookup.set(`${segmentIndex}:${stopIndex}`, {
+          let insertionIndex = stopIndex;
+          if (isA6Duty) {
+            for (let i = stopIndex - 1; i >= 0; i--) {
+              const candidate = String(stops[i]?.stop || "").toLowerCase();
+              if (candidate.includes("pull on stand")) {
+                insertionIndex = i;
+                break;
+              }
+            }
+          }
+          lookup.set(`${segmentIndex}:${insertionIndex}`, {
             location: stopName,
             arrivalTime: lastArrival.timeLabel,
             departureTime: stopTime
