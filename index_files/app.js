@@ -65,14 +65,77 @@ function clearSession() {
 }
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
+const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_DRAFTS_STORAGE_KEY = "jet_timesheet_drafts_v1";
 const PADDINGTON_TRAVEL_COST = 6.2;
 const STANDARD_TRAVEL_COST = 9.2;
+const BREAK_STOP_IGNORE_TOKENS = new Set(["coach", "station", "bus", "stop", "stn", "arrivals", "arrival", "departures", "departure", "airport"]);
 function isTimeValue(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
+}
+function normalizeBreakStopText(value) {
+  return String(value || "").toLowerCase().replace(/[\u2018\u2019']/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function getBreakStopTokens(value) {
+  return normalizeBreakStopText(value).split(" ").filter(token => token && !BREAK_STOP_IGNORE_TOKENS.has(token));
+}
+function areStopsEquivalentForBreak(stopA, stopB) {
+  const tokensA = getBreakStopTokens(stopA);
+  const tokensB = getBreakStopTokens(stopB);
+  if (tokensA.length === 0 || tokensB.length === 0) return false;
+  const setB = new Set(tokensB);
+  const overlapCount = tokensA.filter(token => setB.has(token)).length;
+  const requiredOverlap = Math.min(2, Math.min(tokensA.length, tokensB.length));
+  if (overlapCount >= requiredOverlap) return true;
+  const normalizedA = normalizeBreakStopText(stopA);
+  const normalizedB = normalizeBreakStopText(stopB);
+  if (!normalizedA || !normalizedB) return false;
+  return normalizedA.includes(normalizedB) || normalizedB.includes(normalizedA);
+}
+function getMinuteGapWithMidnightWrap(startMinutes, endMinutes) {
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) return null;
+  return endMinutes >= startMinutes ? endMinutes - startMinutes : endMinutes + 24 * 60 - startMinutes;
+}
+function buildBreakHintLookup(duty) {
+  const lookup = new Map();
+  if (!duty || !Array.isArray(duty.segments)) return lookup;
+  const hasBreakReminder = Array.isArray(duty.reminders) && duty.reminders.some(reminder => String(reminder || "").trim() === BREAK_REMINDER_TEXT);
+  if (!hasBreakReminder) return lookup;
+  let lastArrival = null;
+  duty.segments.forEach((segment, segmentIndex) => {
+    const stops = Array.isArray(segment?.stops) ? segment.stops : [];
+    stops.forEach((stop, stopIndex) => {
+      const stopName = String(stop?.stop || "");
+      const stopTime = String(stop?.time || "");
+      const stopMinutes = parseTimeValueToMinutes(stopTime);
+      if (stop?.dep && lastArrival && areStopsEquivalentForBreak(lastArrival.stopName, stopName)) {
+        const gapMinutes = getMinuteGapWithMidnightWrap(lastArrival.timeMinutes, stopMinutes);
+        if (gapMinutes !== null && gapMinutes >= 45) {
+          lookup.set(`${segmentIndex}:${stopIndex}`, {
+            location: stopName,
+            arrivalTime: lastArrival.timeLabel,
+            departureTime: stopTime
+          });
+        }
+        lastArrival = null;
+      }
+      if (stop?.arr) {
+        lastArrival = {
+          stopName,
+          timeMinutes: stopMinutes,
+          timeLabel: stopTime
+        };
+      }
+    });
+  });
+  return lookup;
+}
+function getVisibleDutyReminders(duty) {
+  const reminders = Array.isArray(duty?.reminders) ? duty.reminders : [];
+  return reminders.filter(reminder => String(reminder || "").trim() !== BREAK_REMINDER_TEXT);
 }
 function parseTimeValueToMinutes(value) {
   if (!isTimeValue(value)) return null;
@@ -3390,12 +3453,14 @@ function App() {
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
     const runout = getTodayRunout(selectedDuty);
+    const visibleReminders = getVisibleDutyReminders(duty);
+    const breakHintLookup = buildBreakHintLookup(duty);
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       ref: printRef,
       style: {
         display: "none"
       }
-    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("h1", null, "Duty ", duty.number, " \u2014 ", duty.route), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Days:"), " ", duty.days, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign On:"), " ", duty.signOn, " | ", /*#__PURE__*/React.createElement("strong", null, "Sign Off:"), " ", duty.signOff, " | ", /*#__PURE__*/React.createElement("strong", null, "Length:"), " ", duty.dutyLength, " | ", /*#__PURE__*/React.createElement("strong", null, "Coach:"), " ", duty.coach, runout ? ` (${runout.vehicle})` : ""), visibleReminders.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       className: "warn"
     }, "\u26A0 ", r)), duty.segments.map((seg, si) => /*#__PURE__*/React.createElement("div", {
@@ -3579,7 +3644,7 @@ function App() {
         fontSize: "10px",
         color: C.textDim
       }
-    }, "Duty ", runout.takeoverFrom.duty))))), duty.reminders?.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    }, "Duty ", runout.takeoverFrom.duty))))), visibleReminders.map((r, i) => /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
         background: C.warnBg,
@@ -3627,8 +3692,43 @@ function App() {
       const isTakeover = s.notes?.includes("Takeover");
       const isSignal = s.dep || s.arr;
       const mapTarget = resolveStopMapTarget(s.stop, duty, seg.title);
-      return /*#__PURE__*/React.createElement("div", {
-        key: j,
+      const breakHint = breakHintLookup.get(`${si}:${j}`);
+      return /*#__PURE__*/React.createElement(React.Fragment, {
+        key: `${si}-${j}`
+      }, breakHint && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          padding: "10px 14px",
+          borderBottom: `1px solid ${C.border}22`,
+          background: C.breakBg + "44"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: "50px",
+          fontSize: "11px",
+          fontWeight: 700,
+          color: C.breakText,
+          letterSpacing: "0.4px",
+          flexShrink: 0
+        }
+      }, "BREAK"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "12px",
+          color: C.breakText,
+          fontWeight: 700
+        }
+      }, "Take 45 minute break"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, breakHint.location, " \u00b7 ARR ", breakHint.arrivalTime, " \u2192 DEP ", breakHint.departureTime))), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           alignItems: "flex-start",
@@ -3682,7 +3782,7 @@ function App() {
           color: isTakeover ? C.blue : C.textMuted,
           marginTop: "2px"
         }
-      }, s.notes)));
+      }, s.notes))));
     })))), /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
