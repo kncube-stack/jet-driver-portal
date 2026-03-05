@@ -498,6 +498,19 @@
       const destinationTerms = collectDestinationTerms(duty);
       const allStops = collectDutyStops(duty);
       const normalizedStops = allStops.map(label => normalizeStopText(label)).filter(Boolean);
+      const nonOperationalStops = [];
+      const nonOperationalStopSet = new Set();
+      allStops.forEach(label => {
+        if (isOperationalStop(label)) return;
+        const normalized = normalizeStopText(label);
+        if (!normalized) return;
+        nonOperationalStops.push({
+          label,
+          normalized,
+          tokens: tokenizeSearchText(label)
+        });
+        nonOperationalStopSet.add(normalized);
+      });
       const stopTerms = new Set();
       normalizedStops.forEach(stopLabel => {
         tokenizeSearchText(stopLabel).forEach(token => stopTerms.add(token));
@@ -528,9 +541,64 @@
         destinationTerms,
         stopTerms,
         stopCodes,
-        searchBlob
+        searchBlob,
+        nonOperationalStops,
+        nonOperationalStopSet
       };
     });
+  }
+
+  function buildStopChoiceIndex(allDutyIndex) {
+    const byNormalized = new Map();
+    allDutyIndex.forEach(entry => {
+      entry.nonOperationalStops.forEach(stop => {
+        if (!stop?.normalized) return;
+        if (!byNormalized.has(stop.normalized)) {
+          byNormalized.set(stop.normalized, {
+            normalized: stop.normalized,
+            label: stop.label,
+            dutyNumbers: new Set([entry.number]),
+            tokens: new Set(stop.tokens || []),
+            popularity: 1
+          });
+          return;
+        }
+        const existing = byNormalized.get(stop.normalized);
+        existing.dutyNumbers.add(entry.number);
+        existing.popularity += 1;
+        (stop.tokens || []).forEach(token => existing.tokens.add(token));
+      });
+    });
+    return Array.from(byNormalized.values()).map(choice => ({
+      normalized: choice.normalized,
+      label: choice.label,
+      dutyNumbers: Array.from(choice.dutyNumbers).sort((a, b) => a - b),
+      dutyCount: choice.dutyNumbers.size,
+      tokens: Array.from(choice.tokens),
+      popularity: choice.popularity
+    }));
+  }
+
+  function scoreStopChoice(choice, query) {
+    const rawQuery = String(query || "").trim();
+    if (!rawQuery) return 0;
+    const normalizedQuery = normalizeStopText(rawQuery);
+    if (!normalizedQuery) return 0;
+    const queryTokens = tokenizeSearchText(normalizedQuery);
+    let score = 0;
+
+    if (choice.normalized === normalizedQuery) score += 1300;
+    if (choice.normalized.startsWith(normalizedQuery)) score += 700;
+    if (choice.normalized.includes(normalizedQuery)) score += 350;
+
+    if (queryTokens.length > 0) {
+      const tokenSet = new Set(choice.tokens);
+      const overlap = queryTokens.filter(token => tokenSet.has(token)).length;
+      score += overlap * 120;
+      if (overlap === queryTokens.length) score += 220;
+    }
+    score += Math.min(80, choice.popularity * 8);
+    return score;
   }
 
   function scoreDutyMatch(entry, query) {
@@ -680,7 +748,12 @@
       query,
       onChangeQuery,
       duties,
-      onSelectDuty
+      onSelectDuty,
+      stopChoices,
+      showStopChoices,
+      selectedStopChoice,
+      onSelectStopChoice,
+      onClearStopChoice
     } = props;
 
     return h(
@@ -756,132 +829,249 @@
           "\u2315"
         )
       ),
-      duties.length === 0
-        ? h(
+      selectedStopChoice && h(
+        "div",
+        {
+          style: {
+            borderRadius: "10px",
+            border: `1px solid ${C.accent}55`,
+            background: C.accentSoft,
+            color: C.text,
+            padding: "10px 12px",
+            marginBottom: "10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px"
+          }
+        },
+        h(
           "div",
-          {
-            style: {
-              borderRadius: "10px",
-              border: `1px solid ${C.border}`,
-              background: C.panel,
-              textAlign: "center",
-              padding: "24px",
-              color: C.textMuted,
-              fontSize: "12px"
-            }
-          },
-          `No duties found matching "${query}".`
-        )
-        : h(
-          "div",
-          {
-            style: {
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: "8px"
-            }
-          },
-          duties.map(duty => h(
-            "button",
+          { style: { minWidth: 0 } },
+          h(
+            "div",
+            { style: { fontSize: "10px", color: C.textMuted, marginBottom: "2px", fontWeight: 600 } },
+            "Selected stop"
+          ),
+          h(
+            "div",
             {
-              key: duty.number,
-              onClick: () => onSelectDuty(duty.number),
               style: {
-                width: "100%",
-                textAlign: "left",
-                borderRadius: "10px",
-                border: `1px solid ${C.border}`,
-                background: C.panel,
-                color: C.text,
-                padding: "12px 14px",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "border-color 120ms ease, background 120ms ease",
-                minHeight: "66px"
-              },
-              onMouseEnter: e => {
-                e.currentTarget.style.borderColor = C.accent;
-                e.currentTarget.style.background = C.panelAlt;
-              },
-              onMouseLeave: e => {
-                e.currentTarget.style.borderColor = C.border;
-                e.currentTarget.style.background = C.panel;
+                fontSize: "12px",
+                fontWeight: 700,
+                overflowWrap: "anywhere"
               }
             },
-            h(
-              "div",
+            selectedStopChoice.label
+          )
+        ),
+        h(
+          "button",
+          {
+            onClick: onClearStopChoice,
+            style: {
+              border: `1px solid ${C.borderStrong}`,
+              borderRadius: "7px",
+              background: C.panel,
+              color: C.text,
+              fontSize: "11px",
+              fontWeight: 700,
+              padding: "8px 10px",
+              minHeight: "36px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              flexShrink: 0
+            }
+          },
+          "Change"
+        )
+      ),
+      showStopChoices
+        ? h(
+          "div",
+          null,
+          h(
+            "div",
+            {
+              style: {
+                marginBottom: "8px",
+                fontSize: "11px",
+                color: C.textMuted
+              }
+            },
+            "Matching stops. Select one to see only duties that run through it."
+          ),
+          h(
+            "div",
+            {
+              style: {
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "7px"
+              }
+            },
+            stopChoices.map(choice => h(
+              "button",
               {
+                key: `stop-${choice.normalized}`,
+                onClick: () => onSelectStopChoice(choice),
                 style: {
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "12px",
-                  width: "100%"
+                  width: "100%",
+                  textAlign: "left",
+                  borderRadius: "10px",
+                  border: `1px solid ${C.border}`,
+                  background: C.panel,
+                  color: C.text,
+                  padding: "11px 12px",
+                  cursor: "pointer",
+                  fontFamily: "inherit"
                 }
               },
               h(
                 "div",
-                { style: { minWidth: 0, flex: 1 } },
-                h(
-                  "div",
-                  {
-                    style: {
-                      fontSize: "20px",
-                      fontWeight: 700,
-                      color: C.text,
-                      lineHeight: 1
-                    }
-                  },
-                  "Duty ",
-                  duty.number
-                ),
-                h(
-                  "div",
-                  {
-                    style: {
-                      marginTop: "5px",
-                      fontSize: "11px",
-                      color: C.textMuted
-                    }
-                  },
-                  formatDutySummary(duty)
-                )
+                { style: { fontSize: "12px", fontWeight: 700, overflowWrap: "anywhere" } },
+                choice.label
               ),
               h(
                 "div",
                 {
                   style: {
-                    textAlign: "right",
-                    minWidth: "92px",
-                    flexShrink: 0
+                    marginTop: "4px",
+                    fontSize: "10px",
+                    color: C.textMuted
+                  }
+                },
+                `Used in ${choice.dutyCount} dut${choice.dutyCount === 1 ? "y" : "ies"}`
+              )
+            ))
+          )
+        )
+        : duties.length === 0
+          ? h(
+            "div",
+            {
+              style: {
+                borderRadius: "10px",
+                border: `1px solid ${C.border}`,
+                background: C.panel,
+                textAlign: "center",
+                padding: "24px",
+                color: C.textMuted,
+                fontSize: "12px"
+              }
+            },
+            `No duties found matching "${query}".`
+          )
+          : h(
+            "div",
+            {
+              style: {
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "8px"
+              }
+            },
+            duties.map(duty => h(
+              "button",
+              {
+                key: duty.number,
+                onClick: () => onSelectDuty(duty.number),
+                style: {
+                  width: "100%",
+                  textAlign: "left",
+                  borderRadius: "10px",
+                  border: `1px solid ${C.border}`,
+                  background: C.panel,
+                  color: C.text,
+                  padding: "12px 14px",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  transition: "border-color 120ms ease, background 120ms ease",
+                  minHeight: "66px"
+                },
+                onMouseEnter: e => {
+                  e.currentTarget.style.borderColor = C.accent;
+                  e.currentTarget.style.background = C.panelAlt;
+                },
+                onMouseLeave: e => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.background = C.panel;
+                }
+              },
+              h(
+                "div",
+                {
+                  style: {
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "12px",
+                    width: "100%"
                   }
                 },
                 h(
                   "div",
-                  {
-                    style: {
-                      fontSize: "11px",
-                      color: C.textMuted
-                    }
-                  },
-                  `${duty.signOn} - ${duty.signOff}`
+                  { style: { minWidth: 0, flex: 1 } },
+                  h(
+                    "div",
+                    {
+                      style: {
+                        fontSize: "20px",
+                        fontWeight: 700,
+                        color: C.text,
+                        lineHeight: 1
+                      }
+                    },
+                    "Duty ",
+                    duty.number
+                  ),
+                  h(
+                    "div",
+                    {
+                      style: {
+                        marginTop: "5px",
+                        fontSize: "11px",
+                        color: C.textMuted
+                      }
+                    },
+                    formatDutySummary(duty)
+                  )
                 ),
                 h(
                   "div",
                   {
                     style: {
-                      marginTop: "4px",
-                      fontSize: "11px",
-                      color: C.accent,
-                      fontWeight: 700
+                      textAlign: "right",
+                      minWidth: "92px",
+                      flexShrink: 0
                     }
                   },
-                  "View Card \u2192"
+                  h(
+                    "div",
+                    {
+                      style: {
+                        fontSize: "11px",
+                        color: C.textMuted
+                      }
+                    },
+                    `${duty.signOn} - ${duty.signOff}`
+                  ),
+                  h(
+                    "div",
+                    {
+                      style: {
+                        marginTop: "4px",
+                        fontSize: "11px",
+                        color: C.accent,
+                        fontWeight: 700
+                      }
+                    },
+                    "View Card \u2192"
+                  )
                 )
               )
-            )
-          ))
-        )
+            ))
+          )
     );
   }
 
@@ -1106,10 +1296,51 @@
 
   function App() {
     const allDutyIndex = React.useMemo(() => buildDutySearchIndex(DUTY_CARDS), []);
+    const stopChoiceIndex = React.useMemo(() => buildStopChoiceIndex(allDutyIndex), [allDutyIndex]);
     const [query, setQuery] = React.useState("");
     const [selectedDutyNumber, setSelectedDutyNumber] = React.useState(null);
+    const [selectedStopChoice, setSelectedStopChoice] = React.useState(null);
+
+    const normalizedQuery = React.useMemo(() => normalizeStopText(query || ""), [query]);
+    const destinationExactMatch = React.useMemo(() => {
+      if (!normalizedQuery) return false;
+      return allDutyIndex.some(entry => entry.destinationTerms.has(normalizedQuery));
+    }, [allDutyIndex, normalizedQuery]);
+
+    const stopChoices = React.useMemo(() => {
+      const rawQuery = String(query || "").trim();
+      if (!rawQuery) return [];
+      return stopChoiceIndex
+        .map(choice => ({
+          ...choice,
+          score: scoreStopChoice(choice, rawQuery)
+        }))
+        .filter(row => row.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          if (b.dutyCount !== a.dutyCount) return b.dutyCount - a.dutyCount;
+          return a.label.localeCompare(b.label);
+        })
+        .slice(0, 40);
+    }, [query, stopChoiceIndex]);
+
+    const isDutyNumberLike = React.useMemo(() => /^\d+$/.test(String(query || "").trim()), [query]);
+    const isRouteCodeLike = React.useMemo(() => /^(A\d+|\d{3})$/i.test(String(query || "").trim()), [query]);
+    const showStopChoices = React.useMemo(() => {
+      const rawQuery = String(query || "").trim();
+      if (!rawQuery) return false;
+      if (selectedStopChoice) return false;
+      if (isDutyNumberLike || isRouteCodeLike) return false;
+      if (destinationExactMatch) return false;
+      return stopChoices.length > 0;
+    }, [query, selectedStopChoice, isDutyNumberLike, isRouteCodeLike, destinationExactMatch, stopChoices.length]);
 
     const sortedDuties = React.useMemo(() => {
+      if (selectedStopChoice?.normalized) {
+        return allDutyIndex
+          .filter(entry => entry.nonOperationalStopSet.has(selectedStopChoice.normalized))
+          .map(entry => entry.duty);
+      }
       const rawQuery = String(query || "").trim();
       if (!rawQuery) return allDutyIndex.map(entry => entry.duty);
       return allDutyIndex
@@ -1123,7 +1354,26 @@
           return a.entry.number - b.entry.number;
         })
         .map(row => row.entry.duty);
-    }, [allDutyIndex, query]);
+    }, [allDutyIndex, query, selectedStopChoice]);
+
+    const handleQueryChange = React.useCallback(nextQuery => {
+      setQuery(nextQuery);
+      if (!selectedStopChoice) return;
+      const nextNormalized = normalizeStopText(nextQuery || "");
+      if (nextNormalized !== selectedStopChoice.normalized) {
+        setSelectedStopChoice(null);
+      }
+    }, [selectedStopChoice]);
+
+    const handleSelectStopChoice = React.useCallback(choice => {
+      setSelectedStopChoice(choice);
+      setQuery(choice.label);
+    }, []);
+
+    const handleClearStopChoice = React.useCallback(() => {
+      setSelectedStopChoice(null);
+      setQuery("");
+    }, []);
 
     const selectedDuty = selectedDutyNumber ? DUTY_CARDS[selectedDutyNumber] : null;
 
@@ -1151,9 +1401,14 @@
           ? React.createElement(DutyDetailView, { duty: selectedDuty })
           : React.createElement(DutyListView, {
             query,
-            onChangeQuery: setQuery,
+            onChangeQuery: handleQueryChange,
             duties: sortedDuties,
-            onSelectDuty: setSelectedDutyNumber
+            onSelectDuty: setSelectedDutyNumber,
+            stopChoices,
+            showStopChoices,
+            selectedStopChoice,
+            onSelectStopChoice: handleSelectStopChoice,
+            onClearStopChoice: handleClearStopChoice
           })
       )
     );
