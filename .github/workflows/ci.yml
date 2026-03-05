@@ -6,7 +6,9 @@ on:
 
 jobs:
   sanity:
-    runs-on: [self-hosted, macOS, x64]
+    # Keep CI on self-hosted infrastructure, but avoid OS-specific labels
+    # so an always-on Linux cloud runner can pick jobs up when Mac is off.
+    runs-on: [self-hosted, agent]
     steps:
       - uses: actions/checkout@v4
       - name: Node checks (if package.json exists)
