@@ -416,7 +416,8 @@
     fallbackTimer = window.setTimeout(() => {
       cleanup();
       if (!handoffToAppDetected && fallbackUrl) {
-        window.location.href = fallbackUrl;
+        // Keep the duty-cards page in place; fallback map opens separately.
+        window.open(fallbackUrl, "_blank", "noopener,noreferrer");
       }
     }, 700);
     window.location.href = appUrl;

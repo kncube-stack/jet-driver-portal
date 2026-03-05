@@ -632,7 +632,8 @@ function openStopInPreferredMapsApp(event, target) {
   fallbackTimer = window.setTimeout(() => {
     cleanup();
     if (!handoffToAppDetected && fallbackUrl) {
-      window.location.href = fallbackUrl;
+      // Keep the portal tab intact; fallback map opens in a new tab if app handoff fails.
+      window.open(fallbackUrl, "_blank", "noopener,noreferrer");
     }
   }, 700);
   window.location.href = appUrl;
