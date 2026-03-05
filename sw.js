@@ -1,17 +1,24 @@
-const CACHE_NAME = 'jet-portal-v10';
+const CACHE_NAME = 'jet-portal-v11';
 const ASSETS = [
   '/',
   '/index.html',
+  '/duty-cards/',
+  '/duty-cards/index.html',
   '/manifest.json',
   '/index_files/jet-data.js',
   '/index_files/jet-data-layer.js',
   '/index_files/jet-ui-helpers.js',
   '/index_files/jet-stop-directory.js',
+  '/index_files/duty-cards-app.js',
   '/index_files/app.js'
 ];
 const NETWORK_FIRST_PATHS = new Set([
+  '/',
   '/index.html',
+  '/duty-cards/',
+  '/duty-cards/index.html',
   '/index_files/app.js',
+  '/index_files/duty-cards-app.js',
   '/index_files/jet-data.js',
   '/index_files/jet-data-layer.js',
   '/index_files/jet-ui-helpers.js',
