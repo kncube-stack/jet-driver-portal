@@ -13,6 +13,17 @@
 </head>
 <body>
   <div id="root"></div>
+  <script>
+    (function () {
+      var host = (window.location.hostname || "").toLowerCase();
+      var path = window.location.pathname || "/";
+      var isDutyCardsHost = host === "jet-duty-cards.vercel.app" || host.indexOf("jet-duty-cards-") === 0;
+      var isRootPath = path === "/" || path === "/index.html";
+      if (isDutyCardsHost && isRootPath) {
+        window.location.replace("/duty-cards/");
+      }
+    })();
+  </script>
   <script src="/index_files/jet-data.js"></script>
   <script src="/index_files/jet-data-layer.js"></script>
   <script src="/index_files/jet-ui-helpers.js"></script>
