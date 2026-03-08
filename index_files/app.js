@@ -796,6 +796,7 @@ function App() {
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
   const [theme, setTheme] = React.useState(() => { try { return localStorage.getItem("jet_theme") || "light"; } catch { return "light"; } });
+  const [viewportWidth, setViewportWidth] = React.useState(() => typeof window === "undefined" ? 1280 : window.innerWidth);
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
@@ -803,6 +804,14 @@ function App() {
   };
   const C = THEMES[theme] || _defaultC;
   const isManager = currentRole === "manager";
+  const isCompactWeekHeader = viewportWidth <= 640;
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Derived data from live state
   const DRIVERS = React.useMemo(() => buildDriverList(STAFF_SECTIONS), [STAFF_SECTIONS]);
@@ -1560,7 +1569,8 @@ function App() {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: "8px",
+      justifyContent: isCompactWeekHeader ? "flex-end" : "flex-start",
+      gap: isCompactWeekHeader ? "6px" : "8px",
       flexShrink: 0
     }
   }, isManager && selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
@@ -1573,7 +1583,7 @@ function App() {
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderRadius: "6px",
-      padding: "8px 12px",
+      padding: isCompactWeekHeader ? "8px 10px" : "8px 12px",
       cursor: "pointer",
       color: C.textMuted,
       fontSize: "10px",
@@ -1586,8 +1596,8 @@ function App() {
     disabled: rotaLoading,
     title: rotaLoading ? "Refreshing rota" : "Refresh rota",
     style: {
-      width: "40px",
-      height: "40px",
+      width: isCompactWeekHeader ? "38px" : "40px",
+      height: isCompactWeekHeader ? "38px" : "40px",
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderRadius: "10px",
@@ -1609,8 +1619,8 @@ function App() {
     onClick: () => setShowWeekMenu(open => !open),
     title: "Open actions menu",
     style: {
-      width: "40px",
-      height: "40px",
+      width: isCompactWeekHeader ? "38px" : "40px",
+      height: isCompactWeekHeader ? "38px" : "40px",
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderRadius: "10px",
@@ -1687,12 +1697,12 @@ function App() {
         alignItems: "flex-start",
         justifyContent: "space-between",
         gap: "12px",
-        flexWrap: "wrap",
+        flexWrap: isCompactWeekHeader ? "wrap" : "nowrap",
         marginBottom: "10px"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        flex: "1 1 220px",
+        flex: isCompactWeekHeader ? "1 1 100%" : "1 1 220px",
         minWidth: 0
       }
     }, /*#__PURE__*/React.createElement("h2", {
@@ -1710,8 +1720,9 @@ function App() {
       }
     }, DRIVER_SECTION_LABEL[selectedDriver])), /*#__PURE__*/React.createElement("div", {
       style: {
-        marginLeft: "auto",
-        flexShrink: 0
+        marginLeft: isCompactWeekHeader ? 0 : "auto",
+        flexShrink: 0,
+        width: isCompactWeekHeader ? "100%" : "auto"
       }
     }, renderWeekHeaderActions())), /*#__PURE__*/React.createElement("div", {
       style: {
