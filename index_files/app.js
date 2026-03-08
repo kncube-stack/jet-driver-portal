@@ -72,8 +72,6 @@ const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_DRAFTS_STORAGE_KEY = "jet_timesheet_drafts_v1";
-const AUTO_REFRESH_STORAGE_KEY = "jet_auto_refresh";
-const AUTO_REFRESH_INTERVAL_MS = 30 * 1000;
 const PADDINGTON_TRAVEL_COST = 6;
 const VICTORIA_TRAVEL_COST = 9;
 const BREAK_STOP_IGNORE_TOKENS = new Set(["coach", "station", "bus", "stop", "stn", "arrivals", "arrival", "departures", "departure", "airport"]);
@@ -718,6 +716,7 @@ function App() {
   const [dutySearch, setDutySearch] = React.useState("");
   const [showDutyLookup, setShowDutyLookup] = React.useState(false);
   const [dutyLookupSource, setDutyLookupSource] = React.useState(false);
+  const [showWeekMenu, setShowWeekMenu] = React.useState(false);
   const [leaveForm, setLeaveForm] = React.useState({
     dateFrom: "",
     dateTo: "",
@@ -761,24 +760,10 @@ function App() {
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
   const [theme, setTheme] = React.useState(() => { try { return localStorage.getItem("jet_theme") || "light"; } catch { return "light"; } });
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = React.useState(() => {
-    try {
-      return localStorage.getItem(AUTO_REFRESH_STORAGE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
     try { localStorage.setItem("jet_theme", next); } catch {}
-  };
-  const toggleAutoRefresh = () => {
-    setAutoRefreshEnabled(prev => {
-      const next = !prev;
-      try { localStorage.setItem(AUTO_REFRESH_STORAGE_KEY, next ? "1" : "0"); } catch {}
-      return next;
-    });
   };
   const C = THEMES[theme] || _defaultC;
   const isManager = currentRole === "manager";
@@ -981,14 +966,6 @@ function App() {
     }
     setRotaLoading(false);
   };
-  React.useEffect(() => {
-    if (!autoRefreshEnabled) return;
-    const timer = window.setInterval(() => {
-      if (document.hidden || rotaLoading) return;
-      refreshRota();
-    }, AUTO_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [autoRefreshEnabled, rotaLoading, currentTabName, allTabs]);
   const getWeekCommencing = () => weekLabel || "Loading...";
   const activeTimesheetWeekKey = currentTabName || weekLabel || "";
   const filtered = React.useMemo(() => {
@@ -1058,6 +1035,9 @@ function App() {
     if (!Array.isArray(timesheetRows) || timesheetRows.length !== DAYS.length) return;
     saveTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey, timesheetRows);
   }, [screen, selectedDriver, activeTimesheetWeekKey, timesheetRows]);
+  React.useEffect(() => {
+    setShowWeekMenu(false);
+  }, [screen, selectedDriver, currentUser]);
   if (sessionVerifying) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1420,6 +1400,631 @@ function App() {
   })();
   const canBrowseStaff = isManager;
   const showingDutyLookup = !canBrowseStaff || showDutyLookup;
+  const openDutyLookupScreen = () => {
+    setShowWeekMenu(false);
+    setShowDutyLookup(true);
+    setDutySearch("");
+    setScreen("home");
+  };
+  const openLeaveRequestScreen = () => {
+    setShowWeekMenu(false);
+    setLeaveSubmitted(false);
+    setLeaveSending(false);
+    setLeaveError("");
+    setLeaveForm({
+      dateFrom: "",
+      dateTo: "",
+      reason: "",
+      notes: ""
+    });
+    setScreen("leave");
+  };
+  const openSwapRequestScreen = () => {
+    setShowWeekMenu(false);
+    setSwapSubmitted(false);
+    setSwapSending(false);
+    setSwapError("");
+    setSwapForm({
+      dayIndex: "",
+      targetDriver: "",
+      notes: ""
+    });
+    setScreen("swap");
+  };
+  const openTimesheetScreen = () => {
+    setShowWeekMenu(false);
+    setTimesheetSubmitted(false);
+    setTimesheetSending(false);
+    setTimesheetError("");
+    if (selectedDriver) {
+      setTimesheetRows(buildTimesheetRowsForDriver(selectedDriver));
+    } else {
+      setTimesheetRows([]);
+    }
+    setScreen("timesheet");
+  };
+  const handleWeekMenuRefresh = () => {
+    setShowWeekMenu(false);
+    refreshRota();
+  };
+  const weekMenuButtonStyle = {
+    display: "block",
+    width: "100%",
+    background: "none",
+    border: "none",
+    color: C.text,
+    textAlign: "left",
+    padding: "11px 12px",
+    fontSize: "11px",
+    fontFamily: "inherit",
+    cursor: "pointer"
+  };
+  const renderWeekOverflowMenu = () => showWeekMenu ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: "46px",
+      right: 0,
+      width: "220px",
+      maxWidth: "calc(100vw - 48px)",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "12px",
+      boxShadow: "0 16px 40px rgba(15, 23, 42, 0.12)",
+      overflow: "hidden",
+      zIndex: 20
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleWeekMenuRefresh,
+    disabled: rotaLoading,
+    style: {
+      ...weekMenuButtonStyle,
+      color: rotaLoading ? C.textDim : C.text
+    }
+  }, rotaLoading ? "Refreshing..." : "Refresh Rota"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "1px",
+      background: C.border
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: openDutyLookupScreen,
+    style: weekMenuButtonStyle
+  }, "Browse Duty Cards"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "1px",
+      background: C.border
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: openLeaveRequestScreen,
+    style: weekMenuButtonStyle
+  }, "Request Annual Leave")) : null;
+  const renderWeekHeaderActions = () => /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      flexShrink: 0
+    }
+  }, isManager && selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setScreen("home");
+      setSelectedDriver(null);
+      setShowWeekMenu(false);
+    },
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "8px 12px",
+      cursor: "pointer",
+      color: C.textMuted,
+      fontSize: "10px",
+      fontWeight: 600,
+      fontFamily: "inherit",
+      letterSpacing: "0.5px"
+    }
+  }, "All Staff"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowWeekMenu(open => !open),
+    title: "Open actions menu",
+    style: {
+      width: "40px",
+      height: "40px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "10px",
+      cursor: "pointer",
+      color: showWeekMenu ? C.accent : C.textMuted,
+      fontSize: "18px",
+      fontFamily: "inherit",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0
+    }
+  }, "\u2630"), renderWeekOverflowMenu()));
+  const renderWeekPrimaryActions = () => /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: "10px",
+      marginTop: "20px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: openSwapRequestScreen,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      width: "100%",
+      minWidth: 0,
+      padding: "14px 12px",
+      background: "linear-gradient(135deg, #f8fafc, #eef2ff)",
+      border: "1px solid #cbd5e1",
+      borderRadius: "10px",
+      color: C.text,
+      fontSize: "13px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px",
+      textAlign: "center"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = "#94a3b8";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = "#cbd5e1";
+    }
+  }, "\uD83D\uDD04 Swap Request"), /*#__PURE__*/React.createElement("button", {
+    onClick: openTimesheetScreen,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      width: "100%",
+      minWidth: 0,
+      padding: "14px 12px",
+      background: "linear-gradient(135deg, #e0f2fe, #f0f9ff)",
+      border: "1px solid #bae6fd",
+      borderRadius: "10px",
+      color: "#0369a1",
+      fontSize: "13px",
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      letterSpacing: "0.5px",
+      textAlign: "center"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = "#7dd3fc";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = "#bae6fd";
+    }
+  }, "\uD83E\uDDFE Generate Timesheet"));
+  const renderWeekScreen = () => {
+    if (!selectedDriver) return null;
+    const todayVal = ROTA[selectedDriver]?.[today] || "—";
+    const runout = getDriverRunoutLive(selectedDriver);
+    const todayNote = null;
+    const todayDutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
+    const todayDutyCard = todayDutyNum && DUTY_CARDS[todayDutyNum] ? DUTY_CARDS[todayDutyNum] : null;
+    const runoutForDuty = todayDutyNum ? getTodayRunoutLive(todayDutyNum) : null;
+    const activeRunout = runout || runoutForDuty;
+    const showTodayBanner = isCurrentWeek && (todayDutyCard || activeRunout || todayVal !== "—");
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: "20px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: "12px",
+        flexWrap: "wrap",
+        marginBottom: "10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: "1 1 220px",
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: "17px",
+        fontWeight: 600,
+        margin: 0,
+        color: C.white
+      }
+    }, selectedDriver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "4px"
+      }
+    }, DRIVER_SECTION_LABEL[selectedDriver])), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginLeft: "auto",
+        flexShrink: 0
+      }
+    }, renderWeekHeaderActions())), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => goWeek(-1),
+      disabled: !canGoBack || rotaLoading,
+      style: {
+        background: "none",
+        border: "none",
+        color: canGoBack && !rotaLoading ? C.accent : C.textDim,
+        fontSize: "16px",
+        cursor: canGoBack && !rotaLoading ? "pointer" : "not-allowed",
+        padding: "2px 6px",
+        fontFamily: "inherit"
+      }
+    }, "\u2039"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "12px",
+        color: C.white,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "w/c ", getWeekCommencing()), /*#__PURE__*/React.createElement("button", {
+      onClick: () => goWeek(1),
+      disabled: !canGoForward || rotaLoading,
+      style: {
+        background: "none",
+        border: "none",
+        color: canGoForward && !rotaLoading ? C.accent : C.textDim,
+        fontSize: "16px",
+        cursor: canGoForward && !rotaLoading ? "pointer" : "not-allowed",
+        padding: "2px 6px",
+        fontFamily: "inherit"
+      }
+    }, "\u203A"), rotaLoading && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.accent
+      }
+    }, "\u23F3"))), showTodayBanner && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
+        border: `1px solid ${C.accent}33`,
+        borderRadius: "10px",
+        padding: "14px 16px",
+        marginBottom: "16px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.accent,
+        letterSpacing: "1.5px",
+        marginBottom: "10px"
+      }
+    }, SHORT_DAYS[today].toUpperCase(), " \u2014 ", new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    })), todayDutyCard && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: "10px",
+        marginBottom: activeRunout ? "10px" : "0",
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "18px",
+        fontWeight: 700,
+        color: C.white
+      }
+    }, "Duty ", todayVal), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, todayDutyCard.route, " \xB7 ", todayDutyCard.signOn, " \u2013 ", todayDutyCard.signOff)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setSelectedDuty(todayDutyNum);
+        setScreen("duty");
+      },
+      style: {
+        background: C.accent,
+        color: C.bg,
+        border: "none",
+        borderRadius: "6px",
+        padding: "7px 14px",
+        fontSize: "11px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "View Card \u2192")), !todayDutyCard && todayVal === "R" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
+      }
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label)), !todayDutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: activeRunout ? "10px" : "0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
+      }
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.textMuted,
+        marginTop: "2px"
+      }
+    }, getSpecialDuty(todayVal).signOn, " \u2013 ", getSpecialDuty(todayVal).signOff)), activeRunout && activeRunout.vehicle && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.surface,
+        borderRadius: "8px",
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "COACH"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        color: C.white,
+        letterSpacing: "1px"
+      }
+    }, activeRunout.vehicle)), activeRunout.handoverTo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, activeRunout.handoverTo.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", activeRunout.handoverTo.duty, " \xB7 ", activeRunout.handoverTo.signOn))), activeRunout.takeoverFrom && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: "4px",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: C.textMuted,
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        color: C.white
+      }
+    }, activeRunout.takeoverFrom.driver), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Duty ", activeRunout.takeoverFrom.duty)))), todayNote && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "8px",
+        background: C.warnBg,
+        border: `1px solid ${C.warnBorder}`,
+        borderRadius: "6px",
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        fontWeight: 700,
+        color: C.warnText,
+        letterSpacing: "0.5px",
+        marginBottom: "2px"
+      }
+    }, "NOTE"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: C.white,
+        lineHeight: 1.4,
+        whiteSpace: "pre-line"
+      }
+    }, todayNote))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "5px"
+      }
+    }, DAYS.map((day, i) => {
+      const val = ROTA[selectedDriver]?.[i] || "—";
+      const isToday = isCurrentWeek && i === today;
+      const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION, C);
+      const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
+      const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
+      const special = getSpecialDuty(val);
+      const cellNote = null;
+      const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
+      const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
+      return /*#__PURE__*/React.createElement("div", {
+        key: day,
+        style: {
+          background: isToday ? C.accent + "08" : C.surface,
+          border: `1px solid ${isToday ? C.accent + "33" : C.border}`,
+          borderRadius: "8px",
+          overflow: "hidden"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          padding: "12px 14px",
+          gap: "10px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: "38px",
+          textAlign: "center"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "11px",
+          fontWeight: 700,
+          color: C.textMuted,
+          letterSpacing: "1px"
+        }
+      }, SHORT_DAYS[i])), /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1,
+          minWidth: 0
+        }
+      }, isDutyNumber(val) ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "15px",
+          fontWeight: 700,
+          color: C.white
+        }
+      }, "Duty ", val), dutyCard && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, dutyCard.route, " \xB7 ", dutyCard.signOn, " sign on")) : rlDutyCard ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "15px",
+          fontWeight: 700,
+          color: C.blue
+        }
+      }, "Route Learning ", rlDutyNum), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, rlDutyCard.route, " \xB7 ", rlDutyCard.signOn, " sign on")) : special ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "13px",
+          color: special.color,
+          fontWeight: 600
+        }
+      }, special.label), special.signOn !== "—" && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, special.signOn, " \u2013 ", special.signOff)) : /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "13px",
+          color: st.color,
+          fontWeight: 500
+        }
+      }, st.label), cellNote && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.white,
+          marginTop: "3px",
+          lineHeight: 1.3,
+          whiteSpace: "pre-line"
+        }
+      }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
+        onClick: () => {
+          setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
+          setScreen("duty");
+        },
+        style: {
+          background: isToday ? C.accent : C.accent + "22",
+          color: isToday ? C.bg : C.accent,
+          border: "none",
+          borderRadius: "6px",
+          padding: "7px 12px",
+          fontSize: "11px",
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          letterSpacing: "0.5px",
+          flexShrink: 0
+        },
+        onMouseEnter: e => {
+          e.currentTarget.style.background = C.accent;
+          e.currentTarget.style.color = C.bg;
+        },
+        onMouseLeave: e => {
+          if (!isToday) {
+            e.currentTarget.style.background = C.accent + "22";
+            e.currentTarget.style.color = C.accent;
+          }
+        }
+      }, "View Card \u2192")), isToday && /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: "2px",
+          background: `linear-gradient(90deg, ${C.accent}, transparent)`
+        }
+      }));
+    })), renderWeekPrimaryActions());
+  };
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -1518,42 +2123,19 @@ function App() {
       fontSize: "11px",
       color: C.textMuted,
       textAlign: "right",
-      lineHeight: 1.4
+      lineHeight: 1.4,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-end",
+      gap: "4px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 600
     }
   }, currentUser), /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", gap: "10px", alignItems: "center" }
+    style: { display: "flex", gap: "10px", alignItems: "center", justifyContent: "flex-end" }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: refreshRota,
-    disabled: rotaLoading,
-    title: "Refresh live portal data",
-    style: {
-      background: "none",
-      border: "none",
-      color: rotaLoading ? C.textDim : C.accent,
-      fontSize: "13px",
-      cursor: rotaLoading ? "not-allowed" : "pointer",
-      padding: 0,
-      fontFamily: "inherit",
-      lineHeight: 1
-    }
-  }, rotaLoading ? "\u23F3" : "\u21BB"), /*#__PURE__*/React.createElement("button", {
-    onClick: toggleAutoRefresh,
-    title: "Toggle auto refresh every 30 seconds",
-    style: {
-      background: "none",
-      border: "none",
-      color: autoRefreshEnabled ? C.accent : C.textDim,
-      fontSize: "9px",
-      cursor: "pointer",
-      padding: 0,
-      fontFamily: "inherit",
-      textDecoration: autoRefreshEnabled ? "underline" : "none"
-    }
-  }, autoRefreshEnabled ? "Auto 30s" : "Auto off"), /*#__PURE__*/React.createElement("button", {
     onClick: toggleTheme,
     style: {
       background: "none",
@@ -1996,584 +2578,7 @@ function App() {
         fontSize: "12px"
       }
     }, "\u203A"))));
-  })()))), screen === "week" && selectedDriver && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: "20px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: "4px"
-    }
-  }, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontSize: "17px",
-      fontWeight: 600,
-      margin: 0,
-      color: C.white
-    }
-  }, selectedDriver), isManager && selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setScreen("home");
-      setSelectedDriver(null);
-    },
-    style: {
-      background: C.surface,
-      border: `1px solid ${C.border}`,
-      borderRadius: "6px",
-      padding: "5px 10px",
-      cursor: "pointer",
-      color: C.textMuted,
-      fontSize: "10px",
-      fontWeight: 600,
-      fontFamily: "inherit",
-      letterSpacing: "0.5px"
-    }
-  }, "All Staff")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: "11px",
-      color: C.textMuted,
-      margin: 0
-    }
-  }, DRIVER_SECTION_LABEL[selectedDriver]), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: "10px",
-      marginTop: "8px"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => goWeek(-1),
-    disabled: !canGoBack || rotaLoading,
-    style: {
-      background: "none",
-      border: "none",
-      color: canGoBack && !rotaLoading ? C.accent : C.textDim,
-      fontSize: "16px",
-      cursor: canGoBack && !rotaLoading ? "pointer" : "not-allowed",
-      padding: "2px 6px",
-      fontFamily: "inherit"
-    }
-  }, "\u2039"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: "12px",
-      color: C.white,
-      fontWeight: 600,
-      letterSpacing: "0.5px"
-    }
-  }, "w/c ", getWeekCommencing()), /*#__PURE__*/React.createElement("button", {
-    onClick: () => goWeek(1),
-    disabled: !canGoForward || rotaLoading,
-    style: {
-      background: "none",
-      border: "none",
-      color: canGoForward && !rotaLoading ? C.accent : C.textDim,
-      fontSize: "16px",
-      cursor: canGoForward && !rotaLoading ? "pointer" : "not-allowed",
-      padding: "2px 6px",
-      fontFamily: "inherit"
-    }
-  }, "\u203A"), rotaLoading && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: "10px",
-      color: C.accent
-    }
-  }, "\u23F3"), /*#__PURE__*/React.createElement("button", {
-    onClick: refreshRota,
-    disabled: rotaLoading,
-    style: {
-      marginLeft: "auto",
-      background: C.surface,
-      border: `1px solid ${C.border}`,
-      borderRadius: "6px",
-      padding: "6px 10px",
-      cursor: rotaLoading ? "not-allowed" : "pointer",
-      color: rotaLoading ? C.textDim : C.textMuted,
-      fontSize: "11px",
-      fontWeight: 600,
-      fontFamily: "inherit",
-      letterSpacing: "0.4px"
-    }
-  }, rotaLoading ? "Refreshing..." : "\u21BB Refresh"))), (() => {
-    if (!isCurrentWeek) return null;
-    const todayVal = ROTA[selectedDriver]?.[today] || "—";
-    const runout = getDriverRunoutLive(selectedDriver);
-    const todayNote = null;
-    const dutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
-    const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
-    const runoutForDuty = dutyNum ? getTodayRunoutLive(dutyNum) : null;
-    const activeRunout = runout || runoutForDuty;
-
-    // Show a banner for today unless there is truly no data for the day.
-    // REST now gets the same top-banner treatment as work duties.
-    if (!dutyCard && !activeRunout && todayVal === "—") return null;
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: `linear-gradient(135deg, ${C.accent}08, ${C.accent}04)`,
-        border: `1px solid ${C.accent}33`,
-        borderRadius: "10px",
-        padding: "14px 16px",
-        marginBottom: "16px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        fontWeight: 700,
-        color: C.accent,
-        letterSpacing: "1.5px",
-        marginBottom: "10px"
-      }
-    }, SHORT_DAYS[today].toUpperCase(), " \u2014 ", new Date().toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    })), dutyCard && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: activeRunout ? "10px" : "0"
-      }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "18px",
-        fontWeight: 700,
-        color: C.white
-      }
-    }, "Duty ", todayVal), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "11px",
-        color: C.textMuted,
-        marginTop: "2px"
-      }
-    }, dutyCard.route, " \xB7 ", dutyCard.signOn, " \u2013 ", dutyCard.signOff)), /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setSelectedDuty(dutyNum);
-        setScreen("duty");
-      },
-      style: {
-        background: C.accent,
-        color: C.bg,
-        border: "none",
-        borderRadius: "6px",
-        padding: "7px 14px",
-        fontSize: "11px",
-        fontWeight: 600,
-        cursor: "pointer",
-        fontFamily: "inherit"
-      }
-    }, "View Card \u2192")), !dutyCard && todayVal === "R" && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: activeRunout ? "10px" : "0"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "16px",
-        fontWeight: 700,
-        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
-      }
-    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label)), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: activeRunout ? "10px" : "0"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "16px",
-        fontWeight: 700,
-        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
-      }
-    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "11px",
-        color: C.textMuted,
-        marginTop: "2px"
-      }
-    }, getSpecialDuty(todayVal).signOn, " \u2013 ", getSpecialDuty(todayVal).signOff)), activeRunout && activeRunout.vehicle && /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: C.surface,
-        borderRadius: "8px",
-        padding: "10px 12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        fontWeight: 600,
-        letterSpacing: "0.5px"
-      }
-    }, "COACH"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "14px",
-        fontWeight: 700,
-        color: C.white,
-        letterSpacing: "1px"
-      }
-    }, activeRunout.vehicle)), activeRunout.handoverTo && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingTop: "4px",
-        borderTop: `1px solid ${C.border}`
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        fontWeight: 600,
-        letterSpacing: "0.5px"
-      }
-    }, "HANDING OVER TO"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "right"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "12px",
-        fontWeight: 600,
-        color: C.white
-      }
-    }, activeRunout.handoverTo.driver), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.textDim
-      }
-    }, "Duty ", activeRunout.handoverTo.duty, " \xB7 ", activeRunout.handoverTo.signOn))), activeRunout.takeoverFrom && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingTop: "4px",
-        borderTop: `1px solid ${C.border}`
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        fontWeight: 600,
-        letterSpacing: "0.5px"
-      }
-    }, "TAKING OVER FROM"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "right"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "12px",
-        fontWeight: 600,
-        color: C.white
-      }
-    }, activeRunout.takeoverFrom.driver), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.textDim
-      }
-    }, "Duty ", activeRunout.takeoverFrom.duty)))), todayNote && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: "8px",
-        background: C.warnBg,
-        border: `1px solid ${C.warnBorder}`,
-        borderRadius: "6px",
-        padding: "8px 10px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        fontWeight: 700,
-        color: C.warnText,
-        letterSpacing: "0.5px",
-        marginBottom: "2px"
-      }
-    }, "NOTE"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "11px",
-        color: C.white,
-        lineHeight: 1.4,
-        whiteSpace: "pre-line"
-      }
-    }, todayNote)));
-  })(), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "5px"
-    }
-  }, DAYS.map((day, i) => {
-    const val = ROTA[selectedDriver]?.[i] || "—";
-    const isToday = isCurrentWeek && i === today;
-    const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION, C);
-    const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
-    const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
-    const special = getSpecialDuty(val);
-    const cellNote = null;
-    // Route Learning: extract duty number from RL prefix (e.g. RL307 → 307)
-    const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
-    const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
-    return /*#__PURE__*/React.createElement("div", {
-      key: day,
-      style: {
-        background: isToday ? C.accent + "08" : C.surface,
-        border: `1px solid ${isToday ? C.accent + "33" : C.border}`,
-        borderRadius: "8px",
-        overflow: "hidden"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        padding: "12px 14px",
-        gap: "10px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: "38px",
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "11px",
-        fontWeight: 700,
-        color: C.textMuted,
-        letterSpacing: "1px"
-      }
-    }, SHORT_DAYS[i])), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, isDutyNumber(val) ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "15px",
-        fontWeight: 700,
-        color: C.white
-      }
-    }, "Duty ", val), dutyCard && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        marginTop: "2px"
-      }
-    }, dutyCard.route, " \xB7 ", dutyCard.signOn, " sign on")) : rlDutyCard ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "15px",
-        fontWeight: 700,
-        color: C.blue
-      }
-    }, "Route Learning ", rlDutyNum), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        marginTop: "2px"
-      }
-    }, rlDutyCard.route, " \xB7 ", rlDutyCard.signOn, " sign on")) : special ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "13px",
-        color: special.color,
-        fontWeight: 600
-      }
-    }, special.label), special.signOn !== "—" && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.textMuted,
-        marginTop: "2px"
-      }
-    }, special.signOn, " \u2013 ", special.signOff)) : /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "13px",
-        color: st.color,
-        fontWeight: 500
-      }
-    }, st.label), cellNote && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "10px",
-        color: C.white,
-        marginTop: "3px",
-        lineHeight: 1.3,
-        whiteSpace: "pre-line"
-      }
-    }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
-        setScreen("duty");
-      },
-      style: {
-        background: isToday ? C.accent : C.accent + "22",
-        color: isToday ? C.bg : C.accent,
-        border: "none",
-        borderRadius: "6px",
-        padding: "7px 12px",
-        fontSize: "11px",
-        fontWeight: 600,
-        cursor: "pointer",
-        fontFamily: "inherit",
-        letterSpacing: "0.5px"
-      },
-      onMouseEnter: e => {
-        e.currentTarget.style.background = C.accent;
-        e.currentTarget.style.color = C.bg;
-      },
-      onMouseLeave: e => {
-        if (!isToday) {
-          e.currentTarget.style.background = C.accent + "22";
-          e.currentTarget.style.color = C.accent;
-        }
-      }
-    }, "View Card \u2192")), isToday && /*#__PURE__*/React.createElement("div", {
-      style: {
-        height: "2px",
-        background: `linear-gradient(90deg, ${C.accent}, transparent)`
-      }
-    }));
-  })), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setShowDutyLookup(true);
-      setDutySearch("");
-      setScreen("home");
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px",
-      width: "100%",
-      marginTop: "20px",
-      padding: "14px",
-      background: "linear-gradient(135deg, #14b8a622, #0f766e22)",
-      border: "1px solid #14b8a633",
-      borderRadius: "10px",
-      color: "#2dd4bf",
-      fontSize: "13px",
-      fontWeight: 600,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: "0.5px"
-    },
-    onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#14b8a666";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#14b8a633";
-    }
-  }, "\uD83D\uDCD8 Browse Duty Cards"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setLeaveSubmitted(false);
-      setLeaveSending(false);
-      setLeaveError("");
-      setLeaveForm({
-        dateFrom: "",
-        dateTo: "",
-        reason: "",
-        notes: ""
-      });
-      setScreen("leave");
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px",
-      width: "100%",
-      marginTop: "8px",
-      padding: "14px",
-      background: "linear-gradient(135deg, #a78bfa22, #8b5cf622)",
-      border: "1px solid #a78bfa33",
-      borderRadius: "10px",
-      color: "#a78bfa",
-      fontSize: "13px",
-      fontWeight: 600,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: "0.5px"
-    },
-    onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#a78bfa66";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#a78bfa33";
-    }
-  }, "\uD83D\uDCCB Request Annual Leave"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setSwapSubmitted(false);
-      setSwapSending(false);
-      setSwapError("");
-      setSwapForm({
-        dayIndex: "",
-        targetDriver: "",
-        notes: ""
-      });
-      setScreen("swap");
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px",
-      width: "100%",
-      marginTop: "8px",
-      padding: "14px",
-      background: "linear-gradient(135deg, #f8fafc, #eef2ff)",
-      border: "1px solid #cbd5e1",
-      borderRadius: "10px",
-      color: C.text,
-      fontSize: "13px",
-      fontWeight: 600,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: "0.5px"
-    },
-    onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#94a3b8";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#cbd5e1";
-    }
-  }, "\uD83D\uDD04 Request Shift Swap"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setTimesheetSubmitted(false);
-      setTimesheetSending(false);
-      setTimesheetError("");
-      if (selectedDriver) {
-        setTimesheetRows(buildTimesheetRowsForDriver(selectedDriver));
-      } else {
-        setTimesheetRows([]);
-      }
-      setScreen("timesheet");
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px",
-      width: "100%",
-      marginTop: "8px",
-      padding: "14px",
-      background: "linear-gradient(135deg, #e0f2fe, #f0f9ff)",
-      border: "1px solid #bae6fd",
-      borderRadius: "10px",
-      color: "#0369a1",
-      fontSize: "13px",
-      fontWeight: 600,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: "0.5px"
-    },
-    onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#7dd3fc";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#bae6fd";
-    }
-  }, "\uD83E\uDDFE Generate Timesheet")), screen === "leave" && selectedDriver && (() => {
+  })()))), screen === "week" && selectedDriver && renderWeekScreen(), screen === "leave" && selectedDriver && (() => {
     const handleSubmit = () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
