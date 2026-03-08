@@ -4933,7 +4933,7 @@ const STAFF_DIRECTORY = [{
 }, {
   key: "controllers",
   label: "Duty Managers",
-  drivers: ["Kennedy Ncube", "J. Ferreira", "M. Ali", "D. Howards"]
+  drivers: ["Kennedy Ncube", "J. Ferreira", "M. Ali", "D. Howards", "Umair Akram", "Adrian Koprowski"]
 }, {
   key: "cleaners",
   label: "Cleaners",
