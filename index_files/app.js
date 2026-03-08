@@ -804,7 +804,8 @@ function App() {
   };
   const C = THEMES[theme] || _defaultC;
   const isManager = currentRole === "manager";
-  const isCompactWeekHeader = viewportWidth <= 640;
+  const isNarrowWeekHeader = viewportWidth <= 480;
+  const shouldWrapWeekHeader = viewportWidth <= 430;
 
   React.useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1569,8 +1570,8 @@ function App() {
     style: {
       display: "flex",
       alignItems: "center",
-      justifyContent: isCompactWeekHeader ? "flex-end" : "flex-start",
-      gap: isCompactWeekHeader ? "6px" : "8px",
+      justifyContent: shouldWrapWeekHeader ? "flex-end" : "flex-start",
+      gap: isNarrowWeekHeader ? "6px" : "8px",
       flexShrink: 0
     }
   }, isManager && selectedDriver === currentUser && /*#__PURE__*/React.createElement("button", {
@@ -1583,7 +1584,7 @@ function App() {
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderRadius: "6px",
-      padding: isCompactWeekHeader ? "8px 10px" : "8px 12px",
+      padding: isNarrowWeekHeader ? "8px 10px" : "8px 12px",
       cursor: "pointer",
       color: C.textMuted,
       fontSize: "10px",
@@ -1596,8 +1597,8 @@ function App() {
     disabled: rotaLoading,
     title: rotaLoading ? "Refreshing rota" : "Refresh rota",
     style: {
-      width: isCompactWeekHeader ? "38px" : "40px",
-      height: isCompactWeekHeader ? "38px" : "40px",
+      width: isNarrowWeekHeader ? "38px" : "40px",
+      height: isNarrowWeekHeader ? "38px" : "40px",
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderRadius: "10px",
@@ -1619,8 +1620,8 @@ function App() {
     onClick: () => setShowWeekMenu(open => !open),
     title: "Open actions menu",
     style: {
-      width: isCompactWeekHeader ? "38px" : "40px",
-      height: isCompactWeekHeader ? "38px" : "40px",
+      width: isNarrowWeekHeader ? "38px" : "40px",
+      height: isNarrowWeekHeader ? "38px" : "40px",
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderRadius: "10px",
@@ -1697,12 +1698,12 @@ function App() {
         alignItems: "flex-start",
         justifyContent: "space-between",
         gap: "12px",
-        flexWrap: isCompactWeekHeader ? "wrap" : "nowrap",
+        flexWrap: shouldWrapWeekHeader ? "wrap" : "nowrap",
         marginBottom: "10px"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        flex: isCompactWeekHeader ? "1 1 100%" : "1 1 220px",
+        flex: shouldWrapWeekHeader ? "1 1 100%" : "1 1 220px",
         minWidth: 0
       }
     }, /*#__PURE__*/React.createElement("h2", {
@@ -1720,9 +1721,9 @@ function App() {
       }
     }, DRIVER_SECTION_LABEL[selectedDriver])), /*#__PURE__*/React.createElement("div", {
       style: {
-        marginLeft: isCompactWeekHeader ? 0 : "auto",
+        marginLeft: shouldWrapWeekHeader ? 0 : "auto",
         flexShrink: 0,
-        width: isCompactWeekHeader ? "100%" : "auto"
+        width: shouldWrapWeekHeader ? "100%" : "auto"
       }
     }, renderWeekHeaderActions())), /*#__PURE__*/React.createElement("div", {
       style: {
