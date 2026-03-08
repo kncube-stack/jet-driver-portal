@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
     const blob = await put(
       `rota/${weekCommencing}.json`,
       JSON.stringify({ sections, rota }),
-      { access: "public", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true }
+      { access: "public", contentType: "application/json", addRandomSuffix: false }
     );
 
     const driverCount = Object.keys(rota).length;
@@ -42,6 +42,6 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     console.error("Rota ingest failed:", error);
-    return res.status(500).json({ ok: false, error: "Failed to store rota data." });
+    return res.status(500).json({ ok: false, error: "Failed to store rota data.", detail: error.message });
   }
 };

@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
     await put(
       `allocation/${date}.json`,
       JSON.stringify(allocation),
-      { access: "public", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true }
+      { access: "public", contentType: "application/json", addRandomSuffix: false }
     );
 
     const dutyCount = Object.keys(allocation).length;
@@ -42,6 +42,6 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     console.error("Allocation ingest failed:", error);
-    return res.status(500).json({ ok: false, error: "Failed to store allocation data." });
+    return res.status(500).json({ ok: false, error: "Failed to store allocation data.", detail: error.message });
   }
 };
