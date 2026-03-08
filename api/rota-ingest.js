@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
     const blob = await put(
       `rota/${weekCommencing}.json`,
       JSON.stringify({ sections, rota }),
-      { access: "private", contentType: "application/json", addRandomSuffix: false }
+      { access: "public", contentType: "application/json", addRandomSuffix: false }
     );
 
     const driverCount = Object.keys(rota).length;

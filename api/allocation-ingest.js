@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
     await put(
       `allocation/${date}.json`,
       JSON.stringify(allocation),
-      { access: "private", contentType: "application/json", addRandomSuffix: false }
+      { access: "public", contentType: "application/json", addRandomSuffix: false }
     );
 
     const dutyCount = Object.keys(allocation).length;
