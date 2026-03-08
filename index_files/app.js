@@ -903,14 +903,16 @@ function App() {
     return DRIVERS.filter(d => d.toLowerCase().includes(q));
   }, [search, DRIVERS]);
   const handleLogin = async () => {
-    const name = authName.trim();
+    const rawName = authName.trim();
     const pin = authPin.trim();
-    if (!name || !pin) {
+    if (!rawName || !pin) {
       setAuthError("Enter your name and PIN.");
       return;
     }
-    const isManagerName = ACCESS_CONTROL.managerNames?.includes(name);
-    const knownDriver = DRIVERS.includes(name);
+    const lowerRaw = rawName.toLowerCase();
+    const name = LOGIN_NAMES.find(n => n.toLowerCase() === lowerRaw) || rawName;
+    const isManagerName = ACCESS_CONTROL.managerNames?.some(n => n.toLowerCase() === lowerRaw);
+    const knownDriver = DRIVERS.some(d => d.toLowerCase() === lowerRaw);
     if (!knownDriver && !isManagerName) {
       setAuthError("Name not found on this week's rota.");
       return;

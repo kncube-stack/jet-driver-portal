@@ -185,13 +185,24 @@ function parseRequestBody(req) {
 
 function authenticateNamePin(nameInput, pinInput) {
   const config = getAuthConfig();
-  const name = typeof nameInput === "string" ? nameInput.trim() : "";
+  const rawName = typeof nameInput === "string" ? nameInput.trim() : "";
   const pin = typeof pinInput === "string" ? pinInput.trim() : "";
-  if (!name || !pin) {
+  if (!rawName || !pin) {
     return {
       ok: false,
       error: "Name and PIN are required."
     };
+  }
+  // Case-insensitive canonical name lookup
+  const lowerRaw = rawName.toLowerCase();
+  let name = rawName;
+  for (const n of config.allowedNames) {
+    if (n.toLowerCase() === lowerRaw) { name = n; break; }
+  }
+  if (name === rawName) {
+    for (const n of config.managerNames) {
+      if (n.toLowerCase() === lowerRaw) { name = n; break; }
+    }
   }
   const isManagerName = config.managerNames.includes(name);
   const isKnownName = config.allowedNames.has(name);

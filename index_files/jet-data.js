@@ -4894,7 +4894,7 @@ const SECTION_LABEL_MAP = {
   late_network: "Late Network",
   part_time: "Part Time",
   spare: "Spare / Private Hire / Tour",
-  management: "Management Duties",
+  management: "Management",
   controllers: "Controllers",
   cleaners: "Cleaners",
   shunters: "Shunters"
@@ -4925,15 +4925,15 @@ const STAFF_DIRECTORY = [{
 }, {
   key: "spare",
   label: "Spare / Private Hire / Tour",
-  drivers: ["Ash Singh", "Kennedy Ncube", "Alfie Hoque", "George Hall", "Joseph Goodwin", "Nash Bridges", "Salomon Castro", "Gordon Jones", "Wegles Carter", "Adrian Koprowski", "Piotr Gawrys"]
+  drivers: ["Ash Singh", "George Hall", "Joseph Goodwin", "Nash Bridges", "Salomon Castro", "Gordon Jones", "Wegles Carter", "Adrian Koprowski", "Piotr Gawrys"]
 }, {
   key: "management",
-  label: "Management Duties",
-  drivers: ["Errol Thomas"]
+  label: "Management",
+  drivers: ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube", "J. Ferreira", "M. Ali"]
 }, {
   key: "controllers",
   label: "Controllers",
-  drivers: ["M. Ali", "D. Howards", "J. Ferreira"]
+  drivers: ["D. Howards"]
 }, {
   key: "cleaners",
   label: "Cleaners",

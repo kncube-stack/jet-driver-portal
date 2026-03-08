@@ -286,8 +286,16 @@ const ROTA_DATA_ADAPTERS = {
     async fetchWeekByGid(weekCommencing) {
       const res = await fetch(`/api/rota-read?week=${weekCommencing}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch rota data (${res.status}). Check your connection.`);
-      const { ok, sections, rota, error } = await res.json();
+      const { ok, rota: blobRota, error } = await res.json();
       if (!ok) throw new Error(error || "Failed to load rota data.");
+      // Use in-app directory for section structure; overlay duty assignments from blob
+      const sections = getStaffDirectorySections();
+      const rota = buildEmptyRotaFromSections(sections);
+      if (blobRota && typeof blobRota === "object") {
+        Object.keys(rota).forEach(name => {
+          if (Array.isArray(blobRota[name])) rota[name] = blobRota[name];
+        });
+      }
       return { sections, rota };
     }
   }
