@@ -1624,6 +1624,31 @@ function App() {
       padding: 0
     }
   }, "\u2630"), renderWeekOverflowMenu()));
+  const weekPrimaryActionStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    width: "100%",
+    minWidth: 0,
+    padding: "14px 12px",
+    background: theme === "dark" ? "linear-gradient(135deg, #1e293b, #243247)" : "linear-gradient(135deg, #f8fafc, #eef2ff)",
+    border: theme === "dark" ? "1px solid #475569" : "1px solid #cbd5e1",
+    borderRadius: "10px",
+    color: theme === "dark" ? C.white : C.text,
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    letterSpacing: "0.5px",
+    textAlign: "center"
+  };
+  const handleWeekPrimaryActionMouseEnter = e => {
+    e.currentTarget.style.borderColor = theme === "dark" ? "#64748b" : "#94a3b8";
+  };
+  const handleWeekPrimaryActionMouseLeave = e => {
+    e.currentTarget.style.borderColor = theme === "dark" ? "#475569" : "#cbd5e1";
+  };
   const renderWeekPrimaryActions = () => /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
@@ -1633,58 +1658,14 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: openSwapRequestScreen,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px",
-      width: "100%",
-      minWidth: 0,
-      padding: "14px 12px",
-      background: theme === "dark" ? "linear-gradient(135deg, #1e293b, #243247)" : "linear-gradient(135deg, #f8fafc, #eef2ff)",
-      border: theme === "dark" ? "1px solid #475569" : "1px solid #cbd5e1",
-      borderRadius: "10px",
-      color: theme === "dark" ? C.white : C.text,
-      fontSize: "13px",
-      fontWeight: 600,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: "0.5px",
-      textAlign: "center"
-    },
-    onMouseEnter: e => {
-      e.currentTarget.style.borderColor = theme === "dark" ? "#64748b" : "#94a3b8";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.borderColor = theme === "dark" ? "#475569" : "#cbd5e1";
-    }
+    style: weekPrimaryActionStyle,
+    onMouseEnter: handleWeekPrimaryActionMouseEnter,
+    onMouseLeave: handleWeekPrimaryActionMouseLeave
   }, "\uD83D\uDD04 Swap Request"), /*#__PURE__*/React.createElement("button", {
     onClick: openTimesheetScreen,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px",
-      width: "100%",
-      minWidth: 0,
-      padding: "14px 12px",
-      background: "linear-gradient(135deg, #e0f2fe, #f0f9ff)",
-      border: "1px solid #bae6fd",
-      borderRadius: "10px",
-      color: "#0369a1",
-      fontSize: "13px",
-      fontWeight: 600,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      letterSpacing: "0.5px",
-      textAlign: "center"
-    },
-    onMouseEnter: e => {
-      e.currentTarget.style.borderColor = "#7dd3fc";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.borderColor = "#bae6fd";
-    }
+    style: weekPrimaryActionStyle,
+    onMouseEnter: handleWeekPrimaryActionMouseEnter,
+    onMouseLeave: handleWeekPrimaryActionMouseLeave
   }, "\uD83E\uDDFE Generate Timesheet"));
   const renderWeekScreen = () => {
     if (!selectedDriver) return null;
