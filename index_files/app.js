@@ -694,6 +694,13 @@ function openStopInPreferredMapsApp(event, target) {
   }, isStandaloneMode ? 2200 : 1400);
   window.location.href = appUrl;
 }
+function openNativeDatePicker(input) {
+  if (!input) return;
+  try {
+    input.focus();
+    if (typeof input.showPicker === "function") input.showPicker();
+  } catch {}
+}
 
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
@@ -2628,6 +2635,11 @@ function App() {
       outline: "none",
       boxSizing: "border-box"
     };
+    const dateInputStyle = {
+      ...inputStyle,
+      colorScheme: "dark",
+      cursor: "pointer"
+    };
     if (leaveSubmitted) return /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
@@ -2712,6 +2724,8 @@ function App() {
     }, "FIRST DAY OF LEAVE"), /*#__PURE__*/React.createElement("input", {
       type: "date",
       value: leaveForm.dateFrom,
+      onClick: e => openNativeDatePicker(e.currentTarget),
+      onFocus: e => openNativeDatePicker(e.currentTarget),
       onChange: e => {
         const v = e.target.value;
         setLeaveForm(f => ({
@@ -2720,10 +2734,7 @@ function App() {
           dateTo: f.dateTo && f.dateTo < v ? v : f.dateTo
         }));
       },
-      style: {
-        ...inputStyle,
-        colorScheme: "dark"
-      }
+      style: dateInputStyle
     })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
       style: {
         display: "block",
@@ -2737,14 +2748,13 @@ function App() {
       type: "date",
       value: leaveForm.dateTo,
       min: leaveForm.dateFrom || undefined,
+      onClick: e => openNativeDatePicker(e.currentTarget),
+      onFocus: e => openNativeDatePicker(e.currentTarget),
       onChange: e => setLeaveForm(f => ({
         ...f,
         dateTo: e.target.value
       })),
-      style: {
-        ...inputStyle,
-        colorScheme: "dark"
-      }
+      style: dateInputStyle
     })), leaveForm.dateFrom && leaveForm.dateTo && (() => {
       const d1 = new Date(leaveForm.dateFrom);
       const d2 = new Date(leaveForm.dateTo);
