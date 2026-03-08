@@ -67,6 +67,7 @@ function clearSession() {
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
+const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
@@ -397,6 +398,30 @@ async function fetchLiveAllocationData() {
   } catch {
     return null;
   }
+}
+async function sendPortalRequestEmail(kind, payload) {
+  const session = readStoredSession();
+  const token = session?.token || "";
+  if (!token) {
+    throw new Error("Session expired. Please sign in again.");
+  }
+  const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    cache: "no-store",
+    body: JSON.stringify({
+      kind,
+      payload
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || "Unable to send request email right now.");
+  }
+  return data;
 }
 const STOP_DIRECTORY = Array.isArray(window.JET_STOP_DIRECTORY) ? window.JET_STOP_DIRECTORY : [];
 const STOP_OPERATION_PATTERNS = [/^sign on/i, /^sign off/i, /^empty to/i, /^take over/i, /^hand over/i, /^pull on stand/i, /^travel on tube/i, /^arrive for loading/i];
@@ -2613,15 +2638,24 @@ function App() {
       const diffDays = Math.max(1, Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1);
       setLeaveSending(true);
       setLeaveError("");
-      try {
-        const subject = `Annual Leave Request - ${selectedDriver}`;
-        const body = [`ANNUAL LEAVE REQUEST`, ``, `Driver: ${selectedDriver}`, `From: ${fromDate}`, `To: ${toDate}`, `Total days: ${diffDays}`, `Reason: ${leaveForm.reason || "Annual leave"}`, leaveForm.notes ? `Notes: ${leaveForm.notes}` : `Notes: None`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
-        window.open(`mailto:${LEAVE_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+      const submittedAtIso = new Date().toISOString();
+      sendPortalRequestEmail("leave", {
+        driverName: selectedDriver,
+        dateFrom: leaveForm.dateFrom,
+        dateTo: leaveForm.dateTo,
+        fromDateLabel: fromDate,
+        toDateLabel: toDate,
+        totalDays: diffDays,
+        reason: leaveForm.reason || "Annual leave",
+        notes: leaveForm.notes || "",
+        submittedAtIso
+      }).then(() => {
         setLeaveSubmitted(true);
-      } catch (err) {
-        setLeaveError(err?.message || "Unable to open your email app.");
-      }
-      setLeaveSending(false);
+      }).catch(err => {
+        setLeaveError(err?.message || "Unable to send your leave request right now.");
+      }).finally(() => {
+        setLeaveSending(false);
+      });
     };
     const inputStyle = {
       width: "100%",
@@ -2664,7 +2698,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your annual leave request draft is ready in your email app. Send it to submit the request."), /*#__PURE__*/React.createElement("button", {
+    }, "Your annual leave request has been sent to office staff."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setLeaveSubmitted(false);
@@ -2865,7 +2899,7 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This opens your email app with the request ready to send to office staff.")));
+    }, "This sends your leave request directly to office staff.")));
   })(), screen === "swap" && selectedDriver && (() => {
     const myRota = ROTA[selectedDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
@@ -2877,15 +2911,22 @@ function App() {
       const dayName = DAYS[parseInt(swapForm.dayIndex)];
       setSwapSending(true);
       setSwapError("");
-      try {
-        const subject = `Shift Swap Request - ${selectedDriver} <-> ${swapForm.targetDriver}`;
-        const body = [`SHIFT SWAP REQUEST`, ``, `Requesting Driver: ${selectedDriver}`, `Current duty (${dayName}): ${selectedDayDuty || "—"}`, ``, `Swap With: ${swapForm.targetDriver}`, `Their duty (${dayName}): ${targetDayDuty || "—"}`, swapForm.notes ? `Notes: ${swapForm.notes}` : `Notes: None`, ``, `Both drivers must agree to this swap.`, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
-        window.open(`mailto:${SWAP_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+      const submittedAtIso = new Date().toISOString();
+      sendPortalRequestEmail("swap", {
+        requestingDriver: selectedDriver,
+        targetDriver: swapForm.targetDriver,
+        dayName,
+        requestingDuty: selectedDayDuty || "—",
+        targetDuty: targetDayDuty || "—",
+        notes: swapForm.notes || "",
+        submittedAtIso
+      }).then(() => {
         setSwapSubmitted(true);
-      } catch (err) {
-        setSwapError(err?.message || "Unable to open your email app.");
-      }
-      setSwapSending(false);
+      }).catch(err => {
+        setSwapError(err?.message || "Unable to send your swap request right now.");
+      }).finally(() => {
+        setSwapSending(false);
+      });
     };
     const inputStyle = {
       width: "100%",
@@ -2923,7 +2964,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your shift swap request draft is ready in your email app. Send it to submit the request."), /*#__PURE__*/React.createElement("button", {
+    }, "Your shift swap request has been sent to office staff."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setSwapSubmitted(false);
@@ -3208,7 +3249,7 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This opens your email app with the swap request ready to send.")));
+    }, "This sends your swap request directly to office staff.")));
   })(), screen === "timesheet" && selectedDriver && (() => {
     const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(selectedDriver);
     const updateTimesheetRow = (dayIndex, patch) => {
