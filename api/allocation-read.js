@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
       return res.status(404).json({ ok: false, error: `No allocation found for ${date}.` });
     }
 
-    const response = await fetch(blobs[0].url);
+    const response = await fetch(blobs[0].downloadUrl);
     if (!response.ok) {
       throw new Error(`Blob fetch failed (${response.status})`);
     }
