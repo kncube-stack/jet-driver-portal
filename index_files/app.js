@@ -1267,8 +1267,20 @@ function App() {
 
   // ─── WEEK NAVIGATION ────────────────────────────────────
   const weekIndex = availableWeeks.findIndex(w => w.tabName === currentTabName);
-  const canGoBack = weekIndex > 0;
-  const canGoForward = weekIndex < availableWeeks.length - 1;
+  // For drivers, limit navigation to current calendar week ± 1
+  const calendarWeekIdx = (() => {
+    const now = new Date();
+    const diffToMon = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - diffToMon);
+    const dd = String(mon.getDate()).padStart(2, "0");
+    const mm = String(mon.getMonth() + 1).padStart(2, "0");
+    const key = `WC ${dd}.${mm}.${mon.getFullYear()}`;
+    const idx = availableWeeks.findIndex(w => w.tabName === key);
+    return idx >= 0 ? idx : weekIndex;
+  })();
+  const canGoBack = weekIndex > 0 && (isManager || weekIndex > calendarWeekIdx - 1);
+  const canGoForward = weekIndex < availableWeeks.length - 1 && (isManager || weekIndex < calendarWeekIdx + 1);
   const goWeek = dir => {
     const nextIdx = weekIndex + dir;
     if (nextIdx >= 0 && nextIdx < availableWeeks.length) {
