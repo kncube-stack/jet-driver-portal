@@ -787,6 +787,10 @@ function App() {
   const [rotaError, setRotaError] = React.useState(null);
   const [lastFetchTime, setLastFetchTime] = React.useState(null);
   const [liveAllocation, setLiveAllocation] = React.useState(null);
+  const currentTabNameRef = React.useRef("");
+  const allTabsRef = React.useRef({});
+  const refreshInFlightRef = React.useRef(false);
+  const queuedRefreshTabRef = React.useRef(null);
 
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
@@ -851,6 +855,38 @@ function App() {
       };
     });
   };
+  const applyRotaSnapshot = snapshot => {
+    if (!snapshot) return;
+    setStaffSections(snapshot.sections);
+    setRota(snapshot.rota);
+    setWeekLabel(formatWeekCommencing(snapshot.tabName));
+    setCurrentTabName(snapshot.tabName);
+    setAvailableWeeks(snapshot.availableWeeks);
+    setAllTabs(snapshot.tabs);
+    setLiveAllocation(snapshot.allocation);
+    setLastFetchTime(new Date().toLocaleTimeString());
+  };
+  const fetchRotaSnapshot = async preferredTabName => {
+    const fallbackTabs = allTabsRef.current && typeof allTabsRef.current === "object" ? allTabsRef.current : {};
+    const requestedTabName = String(preferredTabName || "").trim();
+    const canSpeculateWeek = requestedTabName && fallbackTabs[requestedTabName];
+    const speculativeWeekPromise = canSpeculateWeek ? fetchWeekRota(fallbackTabs, requestedTabName).catch(() => null) : Promise.resolve(null);
+    const [liveData, allocation, speculativeWeekData] = await Promise.all([fetchLiveRota(), fetchLiveAllocationData(), speculativeWeekPromise]);
+    const targetTabName = requestedTabName && liveData.tabs[requestedTabName] ? requestedTabName : liveData.tabName;
+    const canReuseSpeculativeWeek = requestedTabName && targetTabName === requestedTabName && speculativeWeekData && fallbackTabs[requestedTabName] && fallbackTabs[requestedTabName] === liveData.tabs[requestedTabName];
+    const targetWeekData = targetTabName === liveData.tabName ? {
+      sections: liveData.sections,
+      rota: liveData.rota
+    } : canReuseSpeculativeWeek ? speculativeWeekData : await fetchWeekRota(liveData.tabs, targetTabName);
+    return {
+      sections: targetWeekData.sections,
+      rota: targetWeekData.rota,
+      tabName: targetTabName,
+      availableWeeks: liveData.availableWeeks,
+      tabs: liveData.tabs,
+      allocation
+    };
+  };
   React.useEffect(() => {
     let cancelled = false;
     if (!storedSession?.token) {
@@ -914,19 +950,19 @@ function App() {
 
   // Fetch live rota on mount
   React.useEffect(() => {
+    currentTabNameRef.current = currentTabName;
+  }, [currentTabName]);
+  React.useEffect(() => {
+    allTabsRef.current = allTabs;
+  }, [allTabs]);
+
+  React.useEffect(() => {
     let cancelled = false;
     setRotaLoading(true);
     setRotaError(null);
-    Promise.all([fetchLiveRota(), fetchLiveAllocationData()]).then(([data, allocation]) => {
+    fetchRotaSnapshot("").then(snapshot => {
       if (cancelled) return;
-      setStaffSections(data.sections);
-      setRota(data.rota);
-      setWeekLabel(formatWeekCommencing(data.tabName));
-      setCurrentTabName(data.tabName);
-      setAvailableWeeks(data.availableWeeks);
-      setAllTabs(data.tabs);
-      setLiveAllocation(allocation);
-      setLastFetchTime(new Date().toLocaleTimeString());
+      applyRotaSnapshot(snapshot);
       setRotaLoading(false);
     }).catch(err => {
       if (cancelled) return;
@@ -975,29 +1011,31 @@ function App() {
   };
 
   // Refresh current week data
-  const refreshRota = async () => {
+  async function refreshRota(preferredTabName = currentTabNameRef.current) {
+    if (refreshInFlightRef.current) {
+      queuedRefreshTabRef.current = String(preferredTabName || "").trim();
+      return;
+    }
+    refreshInFlightRef.current = true;
     setRotaLoading(true);
     setRotaError(null);
     try {
-      const [liveData, allocation] = await Promise.all([fetchLiveRota(), fetchLiveAllocationData()]);
-      const targetTabName = currentTabName && liveData.tabs[currentTabName] ? currentTabName : liveData.tabName;
-      const targetWeekData = targetTabName === liveData.tabName ? {
-        sections: liveData.sections,
-        rota: liveData.rota
-      } : await fetchWeekRota(liveData.tabs, targetTabName);
-      setStaffSections(targetWeekData.sections);
-      setRota(targetWeekData.rota);
-      setWeekLabel(formatWeekCommencing(targetTabName));
-      setCurrentTabName(targetTabName);
-      setAvailableWeeks(liveData.availableWeeks);
-      setAllTabs(liveData.tabs);
-      setLiveAllocation(allocation);
-      setLastFetchTime(new Date().toLocaleTimeString());
+      const snapshot = await fetchRotaSnapshot(preferredTabName);
+      applyRotaSnapshot(snapshot);
     } catch (err) {
       setRotaError("Refresh failed.");
+    } finally {
+      refreshInFlightRef.current = false;
+      setRotaLoading(false);
+      if (queuedRefreshTabRef.current !== null) {
+        const queuedTabName = queuedRefreshTabRef.current;
+        queuedRefreshTabRef.current = null;
+        window.setTimeout(() => {
+          refreshRota(queuedTabName);
+        }, 0);
+      }
     }
-    setRotaLoading(false);
-  };
+  }
   const getWeekCommencing = () => weekLabel || "Loading...";
   const activeTimesheetWeekKey = currentTabName || weekLabel || "";
   const filtered = React.useMemo(() => {
@@ -1028,6 +1066,7 @@ function App() {
       const role = session.role === "manager" ? "manager" : "driver";
       const resolvedKnownDriver = DRIVERS.includes(resolvedName);
       writeSession(resolvedName, role, session.token, session.expiresAt || null);
+      await refreshRota("");
       setAuthed(true);
       setCurrentRole(role);
       setCurrentUser(resolvedName);
