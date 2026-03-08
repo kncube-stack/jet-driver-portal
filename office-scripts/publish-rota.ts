@@ -42,18 +42,17 @@ async function main(workbook: ExcelScript.Workbook): Promise<void> {
     shunters: "Shunters",
   };
 
-  // ── STEP 1: identify the active sheet and derive weekCommencing ──
-  const sheet = workbook.getActiveWorksheet();
-  const tabName = sheet.getName();
-
-  const weekCommencing = parseWeekCommencing(tabName);
-  if (!weekCommencing) {
+  // ── STEP 1: auto-find the current week's rota sheet ─────────
+  const sheet = findCurrentWeekSheet(workbook);
+  if (!sheet) {
     console.log(
-      `ERROR: Sheet name "${tabName}" does not match the expected format "WC DD.MM.YYYY". ` +
-      `Please select the correct weekly rota sheet tab and run again.`
+      "ERROR: Could not find a sheet tab for the current week (or next week). " +
+      "Make sure the tab is named in the format \"WC DD.MM.YYYY\"."
     );
     return;
   }
+  const tabName = sheet.getName();
+  const weekCommencing = parseWeekCommencing(tabName)!;
 
   console.log(`Sheet: "${tabName}" → week commencing ${weekCommencing}`);
 
@@ -112,6 +111,33 @@ async function main(workbook: ExcelScript.Workbook): Promise<void> {
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
+
+/**
+ * Scan all sheets for the current week's rota tab (format "WC DD.MM.YYYY").
+ * Also checks next week so the button works when publishing ahead on Saturday.
+ */
+function findCurrentWeekSheet(workbook: ExcelScript.Workbook): ExcelScript.Worksheet | null {
+  const now = new Date();
+  const diffToMon = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMon);
+
+  function wcKey(d: Date): string {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `WC ${dd}.${mm}.${d.getFullYear()}`;
+  }
+
+  const nextMonday = new Date(monday);
+  nextMonday.setDate(monday.getDate() + 7);
+
+  const sheets = workbook.getWorksheets();
+  for (const key of [wcKey(monday), wcKey(nextMonday)]) {
+    const match = sheets.find(s => s.getName() === key);
+    if (match) return match;
+  }
+  return null;
+}
 
 /** Convert "WC DD.MM.YYYY" tab name to "YYYY-MM-DD". Returns null if format doesn't match. */
 function parseWeekCommencing(tabName: string): string | null {

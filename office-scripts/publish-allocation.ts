@@ -19,11 +19,19 @@ async function main(workbook: ExcelScript.Workbook): Promise<void> {
   const date = getTodayUKDate();
   console.log(`Publishing allocation for ${date}`);
 
-  // ── STEP 2: read the active sheet ────────────────────────────
-  const sheet = workbook.getActiveWorksheet();
+  // ── STEP 2: auto-find the allocation sheet ───────────────────
+  const sheet = findAllocationSheet(workbook);
+  if (!sheet) {
+    console.log(
+      "ERROR: Could not find the allocation sheet. " +
+      "Make sure the sheet with DUTIES, VEHICLE, DRIVER, and SIGN ON columns is in this workbook."
+    );
+    return;
+  }
+  console.log(`Using sheet: "${sheet.getName()}"`);
   const range = sheet.getUsedRange();
   if (!range) {
-    console.log("ERROR: Sheet appears to be empty.");
+    console.log("ERROR: Allocation sheet appears to be empty.");
     return;
   }
   // Use getTexts() so sign-on times come back as "01:20" strings
@@ -89,6 +97,19 @@ async function main(workbook: ExcelScript.Workbook): Promise<void> {
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
+
+/**
+ * Scan all sheets for the one containing the allocation data
+ * (identified by having DUTIES, VEHICLE, DRIVER, SIGN ON headers).
+ */
+function findAllocationSheet(workbook: ExcelScript.Workbook): ExcelScript.Worksheet | null {
+  for (const sheet of workbook.getWorksheets()) {
+    const range = sheet.getUsedRange();
+    if (!range) continue;
+    if (findHeaderRow(range.getTexts())) return sheet;
+  }
+  return null;
+}
 
 /** Returns today's date in YYYY-MM-DD format using the Europe/London timezone. */
 function getTodayUKDate(): string {
