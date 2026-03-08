@@ -268,9 +268,31 @@ const ROTA_DATA_ADAPTERS = {
       const csv = await fetchTabCSV(gid);
       return parseRotaCSV(csv);
     }
+  },
+  backend: {
+    async discoverTabs() {
+      const res = await fetch("/api/rota-weeks", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Rota source unavailable (${res.status}). Check your connection.`);
+      const { ok, weeks, error } = await res.json();
+      if (!ok) throw new Error(error || "Failed to load available weeks.");
+      // Convert ["2026-03-09", ...] → { "WC 09.03.2026": "2026-03-09", ... }
+      const tabs = {};
+      weeks.forEach(dateStr => {
+        const [yyyy, mm, dd] = dateStr.split("-");
+        tabs[`WC ${dd}.${mm}.${yyyy}`] = dateStr;
+      });
+      return tabs;
+    },
+    async fetchWeekByGid(weekCommencing) {
+      const res = await fetch(`/api/rota-read?week=${weekCommencing}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Failed to fetch rota data (${res.status}). Check your connection.`);
+      const { ok, sections, rota, error } = await res.json();
+      if (!ok) throw new Error(error || "Failed to load rota data.");
+      return { sections, rota };
+    }
   }
 };
-const ACTIVE_ROTA_ADAPTER_KEY = "googleSheets";
+const ACTIVE_ROTA_ADAPTER_KEY = "backend";
 const ACTIVE_ROTA_ADAPTER = ROTA_DATA_ADAPTERS[ACTIVE_ROTA_ADAPTER_KEY];
 
 async function fetchLiveRota() {

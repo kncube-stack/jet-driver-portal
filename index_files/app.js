@@ -14,7 +14,8 @@
     SHORT_DAYS
   } = window.JET_DATA_LAYER;
   const {
-    C,
+    C: _defaultC,
+    THEMES,
     isDutyNumber,
     getSpecialDuty,
     getStatusStyle
@@ -654,7 +655,7 @@ function App() {
   const storedSession = React.useMemo(() => readStoredSession(), []);
   const [authed, setAuthed] = React.useState(() => !!storedSession);
   const [sessionVerifying, setSessionVerifying] = React.useState(() => !!storedSession?.token);
-  const [authName, setAuthName] = React.useState(() => storedSession?.name || "");
+  const [authName, setAuthName] = React.useState("");
   const [authPin, setAuthPin] = React.useState("");
   const [authError, setAuthError] = React.useState("");
   const [authLoading, setAuthLoading] = React.useState(false);
@@ -711,6 +712,13 @@ function App() {
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
+  const [theme, setTheme] = React.useState(() => { try { return localStorage.getItem("jet_theme") || "light"; } catch { return "light"; } });
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    try { localStorage.setItem("jet_theme", next); } catch {}
+  };
+  const C = THEMES[theme] || _defaultC;
   const isManager = currentRole === "manager";
 
   // Derived data from live state
@@ -737,7 +745,7 @@ function App() {
     const startTime = forceBlankTimesheetFields ? "" : isTimeValue(startTimeRaw) ? startTimeRaw : "";
     const finishTime = forceBlankTimesheetFields ? "" : isTimeValue(finishTimeRaw) ? finishTimeRaw : "";
     const baseTravelCost = dutyCard ? inferDutyTravelCost(dutyCard) : routeLearningCard ? inferDutyTravelCost(routeLearningCard) : 0;
-    const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION).label;
+    const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION, C).label;
     return {
       dutyCode: dutyValue,
       dutyLabel,
@@ -841,7 +849,7 @@ function App() {
     }).catch(err => {
       if (cancelled) return;
       console.error("Rota fetch failed:", err);
-      setRotaError("Failed to load rota from Google Sheets. Check your connection.");
+      setRotaError("Failed to load rota. Check your connection.");
       setRotaLoading(false);
     });
     return () => {
@@ -898,7 +906,7 @@ function App() {
     const name = authName.trim();
     const pin = authPin.trim();
     if (!name || !pin) {
-      setAuthError("Select your name and enter your PIN.");
+      setAuthError("Enter your name and PIN.");
       return;
     }
     const isManagerName = ACCESS_CONTROL.managerNames?.includes(name);
@@ -974,24 +982,6 @@ function App() {
     }, "Verifying session..."));
   }
   if (!authed) {
-    const nameQ = nameSearch.toLowerCase().trim();
-    const scoreNameMatch = name => {
-      const n = name.toLowerCase();
-      if (!nameQ) return -1;
-      if (n === nameQ) return 1000;
-      if (n.startsWith(nameQ)) return 900 - n.length / 100;
-      const words = n.split(/\s+/).filter(Boolean);
-      const wordPrefixIdx = words.findIndex(w => w.startsWith(nameQ));
-      if (wordPrefixIdx >= 0) return 750 - wordPrefixIdx;
-      const idx = n.indexOf(nameQ);
-      if (idx >= 0) return 600 - idx / 100;
-      return -1;
-    };
-    const nameFiltered = nameQ ? LOGIN_NAMES.map(name => ({
-      name,
-      score: scoreNameMatch(name)
-    })).filter(item => item.score >= 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(item => item.name).slice(0, 8) : [];
-    const getLoginNameLabel = name => DRIVER_SECTION_LABEL[name] || (ACCESS_CONTROL.managerNames?.includes(name) ? "Management Duties" : "Staff");
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
@@ -1041,7 +1031,7 @@ function App() {
         fontSize: "10px",
         color: C.textDim
       }
-    }, "Select your name and enter your PIN")), rotaError && /*#__PURE__*/React.createElement("div", {
+    }, "Enter your name and PIN")), rotaError && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: "12px",
         background: "#fee2e2",
@@ -1052,121 +1042,22 @@ function App() {
         color: "#b91c1c",
         lineHeight: 1.5
       }
-    }, "\u26A0 ", rotaError, " Showing directory names only until sync recovers."), /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: "relative",
-        marginBottom: "12px"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
+    }, "\u26A0 ", rotaError, " Showing directory names only until sync recovers."), /*#__PURE__*/React.createElement("input", {
       type: "text",
-      value: nameSearch,
+      value: authName,
       onChange: e => {
-        setNameSearch(e.target.value);
+        setAuthName(e.target.value);
         setAuthError("");
       },
       onKeyDown: e => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (nameFiltered.length > 0) {
-            setAuthName(nameFiltered[0]);
-            setNameSearch("");
-            setAuthError("");
-          }
-        }
+        if (e.key === "Enter" && authName && authPin) handleLogin();
       },
-      placeholder: "Search by name...",
-      autoFocus: true,
-      style: {
-        width: "100%",
-        padding: "13px 16px 13px 38px",
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: "8px",
-        color: C.white,
-        fontSize: "14px",
-        fontFamily: "inherit",
-        outline: "none",
-        boxSizing: "border-box"
-      },
-      onFocus: e => e.target.style.borderColor = C.accent,
-      onBlur: e => e.target.style.borderColor = C.border
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        position: "absolute",
-        left: "14px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        color: C.textDim,
-        fontSize: "14px"
-      }
-    }, "\u2315")), (LOGIN_NAMES.length === 0 || !!nameQ) && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: "4px",
-        maxHeight: "34vh",
-        overflowY: "auto",
-        marginBottom: "12px"
-      }
-    }, LOGIN_NAMES.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        padding: "24px",
-        color: C.textDim,
-        fontSize: "12px"
-      }
-    }, rotaLoading ? "Loading staff list..." : "No staff available") : nameFiltered.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        padding: "24px",
-        color: C.textDim,
-        fontSize: "12px"
-      }
-    }, "No staff found") : nameFiltered.map((name, idx) => /*#__PURE__*/React.createElement("button", {
-      key: name,
-      onClick: () => {
-        setAuthName(name);
-        setNameSearch("");
-        setAuthError("");
-      },
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        background: authName === name ? C.accent + "18" : C.surface,
-        border: `1px solid ${authName === name ? C.accent + "66" : C.border}`,
-        borderRadius: "8px",
-        padding: "11px 14px",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: "100%"
-      }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: C.white,
-        fontSize: "13px",
-        fontWeight: 500
-      }
-    }, name), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "9px",
-        color: C.textDim,
-        marginTop: "1px"
-      }
-    }, idx === 0 ? `Best match \u00b7 ${getLoginNameLabel(name)}` : getLoginNameLabel(name))), /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: authName === name ? C.accent : C.textDim,
-        fontSize: "12px"
-      }
-    }, authName === name ? "\u2713" : "\u203A")))), /*#__PURE__*/React.createElement("input", {
-      type: "text",
-      value: authName,
       placeholder: "Name",
-      readOnly: true,
+      autoFocus: true,
+      autoComplete: "off",
       style: {
         width: "100%",
-        padding: "12px 14px",
+        padding: "14px 16px",
         background: C.surface,
         border: `1px solid ${C.border}`,
         borderRadius: "8px",
@@ -1175,9 +1066,10 @@ function App() {
         fontFamily: "inherit",
         outline: "none",
         boxSizing: "border-box",
-        marginBottom: "8px",
-        opacity: authName ? 1 : 0.9
-      }
+        marginBottom: "8px"
+      },
+      onFocus: e => e.target.style.borderColor = C.accent,
+      onBlur: e => e.target.style.borderColor = C.border
     }), /*#__PURE__*/React.createElement("input", {
       type: "password",
       value: authPin,
@@ -1219,27 +1111,44 @@ function App() {
       }
     }, authError), /*#__PURE__*/React.createElement("button", {
       onClick: handleLogin,
-      disabled: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0,
+      disabled: !authName || !authPin || authLoading,
       style: {
         width: "100%",
         padding: "13px",
-        background: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? C.textDim + "44" : C.accent,
-        color: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? C.textDim : C.bg,
+        background: !authName || !authPin || authLoading ? C.textDim + "44" : C.accent,
+        color: !authName || !authPin || authLoading ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "13px",
         fontWeight: 700,
-        cursor: !authName || !authPin || authLoading || LOGIN_NAMES.length === 0 ? "not-allowed" : "pointer",
+        cursor: !authName || !authPin || authLoading ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px"
       }
-    }, authLoading ? "Checking..." : "Continue"), /*#__PURE__*/React.createElement("p", {
+    }, authLoading ? "Checking..." : "Continue"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "center",
+        marginTop: "16px"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: toggleTheme,
+      style: {
+        background: "none",
+        border: "none",
+        color: C.textDim,
+        fontSize: "11px",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        padding: "4px 8px"
+      }
+    }, theme === "light" ? "\u263D Dark mode" : "\u2600 Light mode")), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "9px",
         color: C.textDim,
         textAlign: "center",
         lineHeight: 1.5,
-        marginTop: "16px"
+        marginTop: "8px"
       }
     }, ACCESS_CONTROL.mode === "soft" ? "Soft mode enabled for testing. Shared driver PIN is active." : "Strict mode enabled. Per-user PIN required.", /*#__PURE__*/React.createElement("br", null), "This portal contains staff data protected under UK GDPR.")));
   }
@@ -1507,7 +1416,21 @@ function App() {
     style: {
       fontWeight: 600
     }
-  }, currentUser), /*#__PURE__*/React.createElement("button", {
+  }, currentUser), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: "10px", alignItems: "center" }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: toggleTheme,
+    style: {
+      background: "none",
+      border: "none",
+      color: C.textDim,
+      fontSize: "13px",
+      cursor: "pointer",
+      padding: 0,
+      fontFamily: "inherit",
+      lineHeight: 1
+    }
+  }, theme === "light" ? "\u263D" : "\u2600"), /*#__PURE__*/React.createElement("button", {
     onClick: switchUser,
     style: {
       background: "none",
@@ -1519,7 +1442,7 @@ function App() {
       fontFamily: "inherit",
       textDecoration: "underline"
     }
-  }, "Log out"))), /*#__PURE__*/React.createElement("main", {
+  }, "Log out")))), /*#__PURE__*/React.createElement("main", {
     style: {
       maxWidth: "640px",
       margin: "0 auto",
@@ -1682,7 +1605,7 @@ function App() {
     }
   }, "No staff found matching \"", search, "\""), filtered.map(driver => {
     const todayVal = ROTA[driver]?.[today] || "—";
-    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION);
+    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION, C);
     return /*#__PURE__*/React.createElement("button", {
       key: driver,
       onClick: () => {
@@ -1766,7 +1689,7 @@ function App() {
     }
   }, "(", section.drivers.length, ")")), section.drivers.map(driver => {
     const todayVal = ROTA[driver]?.[today] || "—";
-    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION);
+    const st = getStatusStyle(todayVal, driver, false, DRIVER_SECTION, C);
     return /*#__PURE__*/React.createElement("button", {
       key: driver,
       onClick: () => {
@@ -2098,9 +2021,9 @@ function App() {
       style: {
         fontSize: "16px",
         fontWeight: 700,
-        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).color
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
       }
-    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).label)), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label)), !dutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: activeRunout ? "10px" : "0"
       }
@@ -2108,9 +2031,9 @@ function App() {
       style: {
         fontSize: "16px",
         fontWeight: 700,
-        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).color
+        color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
       }
-    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label), getSpecialDuty(todayVal)?.signOn !== "—" && getSpecialDuty(todayVal) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.textMuted,
@@ -2238,7 +2161,7 @@ function App() {
   }, DAYS.map((day, i) => {
     const val = ROTA[selectedDriver]?.[i] || "—";
     const isToday = isCurrentWeek && i === today;
-    const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION);
+    const st = getStatusStyle(val, selectedDriver, true, DRIVER_SECTION, C);
     const hasDutyCard = isDutyNumber(val) && DUTY_CARDS[parseInt(val)];
     const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
     const special = getSpecialDuty(val);

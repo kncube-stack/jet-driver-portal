@@ -22,7 +22,7 @@ function filterNote(note) {
   return kept.join("\n");
 }
 // ─── Colours ────────────────────────────────────────────────────
-const C = {
+const LIGHT_THEME = {
   pageBg: "linear-gradient(180deg, #f8fafc, #eef2ff 120%)",
   bg: "#0f172a",
   surface: "#ffffff",
@@ -45,6 +45,31 @@ const C = {
   blueBg: "#eff6ff",
   blueBorder: "#bfdbfe"
 };
+const DARK_THEME = {
+  pageBg: "linear-gradient(180deg, #0f172a, #0c1322 120%)",
+  bg: "#0f172a",
+  surface: "#1e293b",
+  surfaceHover: "#263349",
+  card: "#1e293b",
+  border: "#334155",
+  accent: "#f59e0b",
+  text: "#e2e8f0",
+  textMuted: "#94a3b8",
+  textDim: "#64748b",
+  white: "#f1f5f9",
+  green: "#22c55e",
+  breakBg: "#052e16",
+  breakBorder: "#166534",
+  breakText: "#4ade80",
+  warnBg: "#431407",
+  warnBorder: "#9a3412",
+  warnText: "#fb923c",
+  blue: "#60a5fa",
+  blueBg: "#1e3a5f",
+  blueBorder: "#1d4ed8"
+};
+const THEMES = { light: LIGHT_THEME, dark: DARK_THEME };
+const C = LIGHT_THEME;
 
 // ─── Helpers ────────────────────────────────────────────────────
 // getWeekCommencing is now state-driven from the Google Sheets tab name
@@ -74,15 +99,16 @@ function getSpecialDuty(val) {
   };
   return null;
 }
-function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
+function getStatusStyle(val, driverName, showTimes, driverSectionLookup, colors) {
+  const _C = colors || C;
   if (val === null || val === undefined || val === "—") return {
-    color: C.textDim,
+    color: _C.textDim,
     bg: "transparent",
     label: "—"
   };
   if (val === "R") return {
-    color: C.green,
-    bg: C.green + "15",
+    color: _C.green,
+    bg: _C.green + "15",
     label: "REST"
   };
   if (val === "HOL") return {
@@ -91,8 +117,8 @@ function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
     label: "HOLIDAY"
   };
   if (val === "OFF") return {
-    color: C.textMuted,
-    bg: C.textMuted + "15",
+    color: _C.textMuted,
+    bg: _C.textMuted + "15",
     label: "OFF"
   };
   if (val === "SICK") return {
@@ -110,25 +136,25 @@ function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
     if (sec === "cleaners") {
       const isDay = driverName === "Angelina Braganca";
       return {
-        color: C.white,
+        color: _C.white,
         bg: "transparent",
         label: showTimes ? isDay ? "WORK · 10:00–15:00" : "WORK · 22:00–05:00" : "WORK"
       };
     }
     if (sec === "shunters") return {
-      color: C.white,
+      color: _C.white,
       bg: "transparent",
       label: showTimes ? "WORK · 22:00–05:00" : "WORK"
     };
     return {
-      color: C.white,
+      color: _C.white,
       bg: "transparent",
       label: "WORK"
     };
   }
   if (val?.startsWith("RL")) return {
-    color: C.blue,
-    bg: C.blue + "15",
+    color: _C.blue,
+    bg: _C.blue + "15",
     label: `Route Learning ${val.slice(2)}`
   };
   const special = getSpecialDuty(val);
@@ -138,19 +164,20 @@ function getStatusStyle(val, driverName, showTimes, driverSectionLookup) {
     label: special.label
   };
   if (isDutyNumber(val)) return {
-    color: C.accent,
+    color: _C.accent,
     bg: "transparent",
     label: `Duty ${val}`
   };
   return {
-    color: C.warnText,
-    bg: C.warnText + "15",
+    color: _C.warnText,
+    bg: _C.warnText + "15",
     label: val
   };
 }
 
   window.JET_UI = {
     C,
+    THEMES,
     isDutyNumber,
     getSpecialDuty,
     getStatusStyle,
