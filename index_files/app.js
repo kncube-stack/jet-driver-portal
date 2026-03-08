@@ -708,6 +708,7 @@ function App() {
   const [rotaLoading, setRotaLoading] = React.useState(true);
   const [rotaError, setRotaError] = React.useState(null);
   const [lastFetchTime, setLastFetchTime] = React.useState(null);
+  const [liveAllocation, setLiveAllocation] = React.useState(null);
 
   // ─── USER IDENTITY ────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
@@ -856,6 +857,28 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  // Fetch today's live allocation on mount (silent fail — falls back to static data)
+  React.useEffect(() => {
+    fetch("/api/allocation-read", { cache: "no-store" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data && data.ok && data.allocation) setLiveAllocation(data.allocation); })
+      .catch(() => {});
+  }, []);
+
+  const getTodayRunoutLive = dutyNum => {
+    if (liveAllocation) return liveAllocation[String(dutyNum)] || null;
+    return getTodayRunout(dutyNum);
+  };
+  const getDriverRunoutLive = driverName => {
+    if (liveAllocation) {
+      for (const [dutyNum, info] of Object.entries(liveAllocation)) {
+        if (info.driver === driverName) return { duty: parseInt(dutyNum, 10), ...info };
+      }
+      return null;
+    }
+    return getDriverRunout(driverName);
+  };
 
   // Week switcher
   const switchWeek = async tabName => {
@@ -1962,11 +1985,11 @@ function App() {
   }, "\u23F3"))), (() => {
     if (!isCurrentWeek) return null;
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
-    const runout = getDriverRunout(selectedDriver);
+    const runout = getDriverRunoutLive(selectedDriver);
     const todayNote = null;
     const dutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
     const dutyCard = dutyNum && DUTY_CARDS[dutyNum] ? DUTY_CARDS[dutyNum] : null;
-    const runoutForDuty = dutyNum ? getTodayRunout(dutyNum) : null;
+    const runoutForDuty = dutyNum ? getTodayRunoutLive(dutyNum) : null;
     const activeRunout = runout || runoutForDuty;
 
     // Show a banner for today unless there is truly no data for the day.
@@ -3411,7 +3434,7 @@ function App() {
     }, isSundayEvening ? "Sunday evening detected. Your timesheet can now be submitted." : "Tip: submit your final timesheet on Sunday evening after your last duty."));
   })(), screen === "duty" && selectedDuty && DUTY_CARDS[selectedDuty] && (() => {
     const duty = DUTY_CARDS[selectedDuty];
-    const runout = getTodayRunout(selectedDuty);
+    const runout = getTodayRunoutLive(selectedDuty);
     const visibleReminders = getVisibleDutyReminders(duty);
     const breakHintLookup = buildBreakHintLookup(duty);
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
