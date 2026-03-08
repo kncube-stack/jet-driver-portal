@@ -4895,7 +4895,7 @@ const SECTION_LABEL_MAP = {
   part_time: "Part Time",
   spare: "Spare / Private Hire / Tour",
   management: "Management",
-  controllers: "Controllers",
+  controllers: "Duty Managers",
   cleaners: "Cleaners",
   shunters: "Shunters"
 };
@@ -4929,11 +4929,11 @@ const STAFF_DIRECTORY = [{
 }, {
   key: "management",
   label: "Management",
-  drivers: ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube", "J. Ferreira", "M. Ali"]
+  drivers: ["Alfie Hoque", "Errol Thomas"]
 }, {
   key: "controllers",
-  label: "Controllers",
-  drivers: ["D. Howards"]
+  label: "Duty Managers",
+  drivers: ["Kennedy Ncube", "J. Ferreira", "M. Ali", "D. Howards"]
 }, {
   key: "cleaners",
   label: "Cleaners",
