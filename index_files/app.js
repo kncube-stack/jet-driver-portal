@@ -66,13 +66,16 @@ function clearSession() {
 }
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
+const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
 const TIMESHEET_DRAFTS_STORAGE_KEY = "jet_timesheet_drafts_v1";
-const PADDINGTON_TRAVEL_COST = 6.2;
-const STANDARD_TRAVEL_COST = 9.2;
+const AUTO_REFRESH_STORAGE_KEY = "jet_auto_refresh";
+const AUTO_REFRESH_INTERVAL_MS = 30 * 1000;
+const PADDINGTON_TRAVEL_COST = 6;
+const VICTORIA_TRAVEL_COST = 9;
 const BREAK_STOP_IGNORE_TOKENS = new Set(["coach", "station", "bus", "stop", "stn", "arrivals", "arrival", "departures", "departure", "airport"]);
 function isTimeValue(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
@@ -172,16 +175,46 @@ function formatMoneyPounds(value) {
   const amount = Number.isFinite(value) ? value : 0;
   return `£${amount.toFixed(2)}`;
 }
+function collectDutyReferenceText(dutyCard) {
+  if (!dutyCard) return "";
+  const parts = [String(dutyCard.route || "")];
+  if (Array.isArray(dutyCard.segments)) {
+    dutyCard.segments.forEach(segment => {
+      parts.push(String(segment?.title || ""));
+      if (Array.isArray(segment?.stops)) {
+        segment.stops.forEach(stop => {
+          parts.push(String(stop?.stop || ""));
+        });
+      }
+    });
+  }
+  return parts.join(" ").toLowerCase();
+}
+function resolveDutyTimesFromCard(dutyCard) {
+  if (!dutyCard) return {
+    startTime: "",
+    finishTime: ""
+  };
+  const startTime = isTimeValue(dutyCard.signOn) ? dutyCard.signOn : "";
+  const finishTime = isTimeValue(dutyCard.signOff) ? dutyCard.signOff : "";
+  if (startTime && finishTime) {
+    return {
+      startTime,
+      finishTime
+    };
+  }
+  const timedStops = Array.isArray(dutyCard.segments) ? dutyCard.segments.flatMap(segment => Array.isArray(segment?.stops) ? segment.stops : []).filter(stop => isTimeValue(stop?.time)) : [];
+  return {
+    startTime: startTime || (timedStops[0]?.time || ""),
+    finishTime: finishTime || (timedStops[timedStops.length - 1]?.time || "")
+  };
+}
 function inferDutyTravelCost(dutyCard) {
   if (!dutyCard) return 0;
-  const routeLabel = String(dutyCard.route || "").toLowerCase();
-  if (!routeLabel.includes("a6")) return STANDARD_TRAVEL_COST;
-  const allStops = Array.isArray(dutyCard.segments) ? dutyCard.segments.flatMap(seg => Array.isArray(seg.stops) ? seg.stops : []).map(stop => String(stop?.stop || "").trim()).filter(Boolean) : [];
-  const firstStop = (allStops[0] || "").toLowerCase();
-  const lastStop = (allStops[allStops.length - 1] || "").toLowerCase();
-  const startsOrFinishesAtPaddington = firstStop.includes("paddington") || lastStop.includes("paddington");
-  if (startsOrFinishesAtPaddington) return PADDINGTON_TRAVEL_COST;
-  return STANDARD_TRAVEL_COST;
+  const dutyRefText = collectDutyReferenceText(dutyCard);
+  if (dutyRefText.includes("paddington")) return PADDINGTON_TRAVEL_COST;
+  if (dutyRefText.includes("victoria")) return VICTORIA_TRAVEL_COST;
+  return VICTORIA_TRAVEL_COST;
 }
 function isAvrOrPrivateHireDutyCode(value) {
   const code = String(value || "").toUpperCase().trim();
@@ -230,6 +263,9 @@ function hydrateTimesheetRowsFromDraft(baseRows, draftRows) {
   return baseRows.map(baseRow => {
     const draft = byDay.get(baseRow.dayIndex);
     if (!draft) return baseRow;
+    const draftDutyCode = String(draft.dutyCode || "").trim();
+    const baseDutyCode = String(baseRow.dutyCode || "").trim();
+    if (draftDutyCode && baseDutyCode && draftDutyCode !== baseDutyCode) return baseRow;
     const startTime = isTimeValue(draft.startTime) ? draft.startTime : "";
     const finishTime = isTimeValue(draft.finishTime) ? draft.finishTime : "";
     return {
@@ -253,6 +289,7 @@ function saveTimesheetDraftRows(driverName, weekTabName, rows) {
   if (!key || !Array.isArray(rows) || rows.length === 0) return;
   const compactRows = rows.map(row => ({
     dayIndex: row.dayIndex,
+    dutyCode: String(row.dutyCode || "").trim(),
     startTime: row.startTime || "",
     finishTime: row.finishTime || "",
     travelCost: row.travelCost === "" || row.travelCost === null || row.travelCost === undefined ? "" : normalizeTimesheetTravelCost(row.travelCost, "")
@@ -352,6 +389,16 @@ async function verifyServerSession(token) {
     throw unavailableError;
   }
   return data.session;
+}
+async function fetchLiveAllocationData() {
+  try {
+    const response = await fetch(ALLOCATION_READ_ENDPOINT, { cache: "no-store" });
+    if (!response.ok) return null;
+    const data = await response.json().catch(() => null);
+    return data && data.ok && data.allocation ? data.allocation : null;
+  } catch {
+    return null;
+  }
 }
 const STOP_DIRECTORY = Array.isArray(window.JET_STOP_DIRECTORY) ? window.JET_STOP_DIRECTORY : [];
 const STOP_OPERATION_PATTERNS = [/^sign on/i, /^sign off/i, /^empty to/i, /^take over/i, /^hand over/i, /^pull on stand/i, /^travel on tube/i, /^arrive for loading/i];
@@ -714,10 +761,24 @@ function App() {
   const [currentUser, setCurrentUser] = React.useState(() => storedSession?.name || null);
   const [nameSearch, setNameSearch] = React.useState("");
   const [theme, setTheme] = React.useState(() => { try { return localStorage.getItem("jet_theme") || "light"; } catch { return "light"; } });
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = React.useState(() => {
+    try {
+      return localStorage.getItem(AUTO_REFRESH_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
     try { localStorage.setItem("jet_theme", next); } catch {}
+  };
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled(prev => {
+      const next = !prev;
+      try { localStorage.setItem(AUTO_REFRESH_STORAGE_KEY, next ? "1" : "0"); } catch {}
+      return next;
+    });
   };
   const C = THEMES[theme] || _defaultC;
   const isManager = currentRole === "manager";
@@ -741,10 +802,12 @@ function App() {
     const routeLearningNum = routeLearningMatch ? parseInt(routeLearningMatch[1], 10) : null;
     const routeLearningCard = routeLearningNum && DUTY_CARDS[routeLearningNum] ? DUTY_CARDS[routeLearningNum] : null;
     const special = getSpecialDuty(dutyValue);
-    const startTimeRaw = dutyCard ? dutyCard.signOn : routeLearningCard ? routeLearningCard.signOn : special?.signOn && special.signOn !== "—" ? special.signOn : "";
-    const finishTimeRaw = dutyCard ? dutyCard.signOff : routeLearningCard ? routeLearningCard.signOff : special?.signOff && special.signOff !== "—" ? special.signOff : "";
-    const startTime = forceBlankTimesheetFields ? "" : isTimeValue(startTimeRaw) ? startTimeRaw : "";
-    const finishTime = forceBlankTimesheetFields ? "" : isTimeValue(finishTimeRaw) ? finishTimeRaw : "";
+    const resolvedDutyTimes = dutyCard ? resolveDutyTimesFromCard(dutyCard) : routeLearningCard ? resolveDutyTimesFromCard(routeLearningCard) : {
+      startTime: special?.signOn && special.signOn !== "—" && isTimeValue(special.signOn) ? special.signOn : "",
+      finishTime: special?.signOff && special.signOff !== "—" && isTimeValue(special.signOff) ? special.signOff : ""
+    };
+    const startTime = forceBlankTimesheetFields ? "" : resolvedDutyTimes.startTime;
+    const finishTime = forceBlankTimesheetFields ? "" : resolvedDutyTimes.finishTime;
     const baseTravelCost = dutyCard ? inferDutyTravelCost(dutyCard) : routeLearningCard ? inferDutyTravelCost(routeLearningCard) : 0;
     const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION, C).label;
     return {
@@ -837,7 +900,7 @@ function App() {
     let cancelled = false;
     setRotaLoading(true);
     setRotaError(null);
-    fetchLiveRota().then(data => {
+    Promise.all([fetchLiveRota(), fetchLiveAllocationData()]).then(([data, allocation]) => {
       if (cancelled) return;
       setStaffSections(data.sections);
       setRota(data.rota);
@@ -845,6 +908,7 @@ function App() {
       setCurrentTabName(data.tabName);
       setAvailableWeeks(data.availableWeeks);
       setAllTabs(data.tabs);
+      setLiveAllocation(allocation);
       setLastFetchTime(new Date().toLocaleTimeString());
       setRotaLoading(false);
     }).catch(err => {
@@ -856,14 +920,6 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Fetch today's live allocation on mount (silent fail — falls back to static data)
-  React.useEffect(() => {
-    fetch("/api/allocation-read", { cache: "no-store" })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data && data.ok && data.allocation) setLiveAllocation(data.allocation); })
-      .catch(() => {});
   }, []);
 
   const getTodayRunoutLive = dutyNum => {
@@ -885,12 +941,13 @@ function App() {
     setRotaLoading(true);
     setRotaError(null);
     try {
-      const data = await fetchWeekRota(allTabs, tabName);
+      const [data, allocation] = await Promise.all([fetchWeekRota(allTabs, tabName), fetchLiveAllocationData()]);
       if (data) {
         setStaffSections(data.sections);
         setRota(data.rota);
         setWeekLabel(formatWeekCommencing(tabName));
         setCurrentTabName(tabName);
+        setLiveAllocation(allocation);
         setLastFetchTime(new Date().toLocaleTimeString());
       }
     } catch (err) {
@@ -905,19 +962,33 @@ function App() {
     setRotaLoading(true);
     setRotaError(null);
     try {
-      const data = await fetchLiveRota();
-      setStaffSections(data.sections);
-      setRota(data.rota);
-      setWeekLabel(formatWeekCommencing(data.tabName));
-      setCurrentTabName(data.tabName);
-      setAvailableWeeks(data.availableWeeks);
-      setAllTabs(data.tabs);
+      const [liveData, allocation] = await Promise.all([fetchLiveRota(), fetchLiveAllocationData()]);
+      const targetTabName = currentTabName && liveData.tabs[currentTabName] ? currentTabName : liveData.tabName;
+      const targetWeekData = targetTabName === liveData.tabName ? {
+        sections: liveData.sections,
+        rota: liveData.rota
+      } : await fetchWeekRota(liveData.tabs, targetTabName);
+      setStaffSections(targetWeekData.sections);
+      setRota(targetWeekData.rota);
+      setWeekLabel(formatWeekCommencing(targetTabName));
+      setCurrentTabName(targetTabName);
+      setAvailableWeeks(liveData.availableWeeks);
+      setAllTabs(liveData.tabs);
+      setLiveAllocation(allocation);
       setLastFetchTime(new Date().toLocaleTimeString());
     } catch (err) {
       setRotaError("Refresh failed.");
     }
     setRotaLoading(false);
   };
+  React.useEffect(() => {
+    if (!autoRefreshEnabled) return;
+    const timer = window.setInterval(() => {
+      if (document.hidden || rotaLoading) return;
+      refreshRota();
+    }, AUTO_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [autoRefreshEnabled, rotaLoading, currentTabName, allTabs]);
   const getWeekCommencing = () => weekLabel || "Loading...";
   const activeTimesheetWeekKey = currentTabName || weekLabel || "";
   const filtered = React.useMemo(() => {
@@ -1456,6 +1527,33 @@ function App() {
   }, currentUser), /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", gap: "10px", alignItems: "center" }
   }, /*#__PURE__*/React.createElement("button", {
+    onClick: refreshRota,
+    disabled: rotaLoading,
+    title: "Refresh live portal data",
+    style: {
+      background: "none",
+      border: "none",
+      color: rotaLoading ? C.textDim : C.accent,
+      fontSize: "13px",
+      cursor: rotaLoading ? "not-allowed" : "pointer",
+      padding: 0,
+      fontFamily: "inherit",
+      lineHeight: 1
+    }
+  }, rotaLoading ? "\u23F3" : "\u21BB"), /*#__PURE__*/React.createElement("button", {
+    onClick: toggleAutoRefresh,
+    title: "Toggle auto refresh every 30 seconds",
+    style: {
+      background: "none",
+      border: "none",
+      color: autoRefreshEnabled ? C.accent : C.textDim,
+      fontSize: "9px",
+      cursor: "pointer",
+      padding: 0,
+      fontFamily: "inherit",
+      textDecoration: autoRefreshEnabled ? "underline" : "none"
+    }
+  }, autoRefreshEnabled ? "Auto 30s" : "Auto off"), /*#__PURE__*/React.createElement("button", {
     onClick: toggleTheme,
     style: {
       background: "none",
