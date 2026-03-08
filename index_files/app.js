@@ -1212,7 +1212,7 @@ function App() {
         color: C.accent,
         marginBottom: "8px"
       }
-    }, "\u23F3 Loading rota from Google Sheets..."), /*#__PURE__*/React.createElement("div", {
+    }, "\u23F3 Loading rota..."), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "9px",
         color: C.textDim
@@ -1527,7 +1527,7 @@ function App() {
       color: C.textDim,
       marginTop: "4px"
     }
-  }, "\uD83D\uDFE2 Live from Google Sheets \xB7 Updated ", lastFetchTime)), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDFE2 Live \xB7 Updated ", lastFetchTime)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       marginBottom: "14px",
