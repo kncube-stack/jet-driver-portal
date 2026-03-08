@@ -1,4 +1,4 @@
-const { list } = require("@vercel/blob");
+const { getJsonBlob } = require("./_blob-json");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") {
@@ -9,18 +9,11 @@ module.exports = async function handler(req, res) {
   const date = (req.query && req.query.date) || getTodayUK();
 
   try {
-    const { blobs } = await list({ prefix: `allocation/${date}.json` });
-    if (blobs.length === 0) {
+    const blob = await getJsonBlob(`allocation/${date}.json`);
+    if (!blob) {
       return res.status(404).json({ ok: false, error: `No allocation found for ${date}.` });
     }
-
-    const response = await fetch(blobs[0].downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Blob fetch failed (${response.status})`);
-    }
-
-    const allocation = await response.json();
-    return res.status(200).json({ ok: true, date, allocation });
+    return res.status(200).json({ ok: true, date, allocation: blob.data });
   } catch (error) {
     console.error("Allocation read failed:", error);
     return res.status(500).json({ ok: false, error: "Failed to read allocation data." });

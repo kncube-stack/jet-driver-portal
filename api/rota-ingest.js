@@ -1,4 +1,4 @@
-const { put } = require("@vercel/blob");
+const { putJsonBlob } = require("./_blob-json");
 const { verifyIngestKey, parseBody } = require("./_ingest-auth");
 
 module.exports = async function handler(req, res) {
@@ -35,11 +35,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const blob = await put(
-      `rota/${weekCommencing}.json`,
-      JSON.stringify({ sections, rota }),
-      { access: "public", contentType: "application/json", addRandomSuffix: false }
-    );
+    const blob = await putJsonBlob(`rota/${weekCommencing}.json`, { sections, rota });
 
     const driverCount = Object.keys(rota).length;
     return res.status(200).json({

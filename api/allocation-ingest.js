@@ -1,4 +1,4 @@
-const { put } = require("@vercel/blob");
+const { putJsonBlob } = require("./_blob-json");
 const { verifyIngestKey, parseBody } = require("./_ingest-auth");
 
 module.exports = async function handler(req, res) {
@@ -35,11 +35,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    await put(
-      `allocation/${date}.json`,
-      JSON.stringify(allocation),
-      { access: "public", contentType: "application/json", addRandomSuffix: false }
-    );
+    await putJsonBlob(`allocation/${date}.json`, allocation);
 
     const dutyCount = Object.keys(allocation).length;
     return res.status(200).json({

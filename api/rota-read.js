@@ -1,4 +1,4 @@
-const { list } = require("@vercel/blob");
+const { getJsonBlob } = require("./_blob-json");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") {
@@ -12,18 +12,11 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { blobs } = await list({ prefix: `rota/${week}.json` });
-    if (blobs.length === 0) {
+    const blob = await getJsonBlob(`rota/${week}.json`);
+    if (!blob) {
       return res.status(404).json({ ok: false, error: `No rota found for week ${week}.` });
     }
-
-    const response = await fetch(blobs[0].downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Blob fetch failed (${response.status})`);
-    }
-
-    const data = await response.json();
-    return res.status(200).json({ ok: true, weekCommencing: week, ...data });
+    return res.status(200).json({ ok: true, weekCommencing: week, ...blob.data });
   } catch (error) {
     console.error("Rota read failed:", error);
     return res.status(500).json({ ok: false, error: "Failed to read rota data." });
