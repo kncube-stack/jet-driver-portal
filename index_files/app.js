@@ -1474,18 +1474,6 @@ function App() {
       zIndex: 20
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleWeekMenuRefresh,
-    disabled: rotaLoading,
-    style: {
-      ...weekMenuButtonStyle,
-      color: rotaLoading ? C.textDim : C.text
-    }
-  }, rotaLoading ? "Refreshing..." : "Refresh Rota"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: "1px",
-      background: C.border
-    }
-  }), /*#__PURE__*/React.createElement("button", {
     onClick: openDutyLookupScreen,
     style: weekMenuButtonStyle
   }, "Browse Duty Cards"), /*#__PURE__*/React.createElement("div", {
@@ -1522,7 +1510,27 @@ function App() {
       fontFamily: "inherit",
       letterSpacing: "0.5px"
     }
-  }, "All Staff"), /*#__PURE__*/React.createElement("div", {
+  }, "All Staff"), /*#__PURE__*/React.createElement("button", {
+    onClick: handleWeekMenuRefresh,
+    disabled: rotaLoading,
+    title: rotaLoading ? "Refreshing rota" : "Refresh rota",
+    style: {
+      width: "40px",
+      height: "40px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "10px",
+      cursor: rotaLoading ? "not-allowed" : "pointer",
+      color: rotaLoading ? C.textDim : C.accent,
+      fontSize: "18px",
+      fontFamily: "inherit",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      flexShrink: 0
+    }
+  }, rotaLoading ? "\u23F3" : "\u21BB"), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
