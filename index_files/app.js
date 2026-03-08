@@ -2080,7 +2080,23 @@ function App() {
       fontSize: "10px",
       color: C.accent
     }
-  }, "\u23F3"))), (() => {
+  }, "\u23F3"), /*#__PURE__*/React.createElement("button", {
+    onClick: refreshRota,
+    disabled: rotaLoading,
+    style: {
+      marginLeft: "auto",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "6px 10px",
+      cursor: rotaLoading ? "not-allowed" : "pointer",
+      color: rotaLoading ? C.textDim : C.textMuted,
+      fontSize: "11px",
+      fontWeight: 600,
+      fontFamily: "inherit",
+      letterSpacing: "0.4px"
+    }
+  }, rotaLoading ? "Refreshing..." : "\u21BB Refresh"))), (() => {
     if (!isCurrentWeek) return null;
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
     const runout = getDriverRunoutLive(selectedDriver);

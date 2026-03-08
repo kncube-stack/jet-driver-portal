@@ -1,6 +1,6 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 08 March 2026 (UK time) — updated same day after second session
+Last updated: 08 March 2026 (UK time) — updated same day after fourth session
 
 ## 1) Project purpose (problem we are solving)
 
@@ -124,7 +124,10 @@ New (added 08 March 2026):
   - User selects the target week's sheet tab, runs the script once per week.
   - Script is saved to the user's Microsoft 365 account — does not need to be re-pasted each week.
   - Requires `INGEST_URL` and `API_KEY` constants to be filled in before first use.
-- Allocation script (Script 2) is NOT yet built — daily allocation spreadsheet layout still needs to be mapped.
+- **Allocation script (Script 2) is built** — file: `office-scripts/publish-allocation.ts`.
+  - Script auto-detects the allocation sheet by looking for `DUTIES`, `VEHICLE`, `DRIVER`, and `SIGN ON` headers.
+  - It posts today's UK-date allocation to `/api/allocation-ingest`.
+  - It also derives handover/takeover relationships when the same vehicle appears on two duties in a day.
 
 ## 7) Key functional features already implemented
 
@@ -136,6 +139,8 @@ New (added 08 March 2026):
 2. Weekly rota view:
    - today banner for duty and REST states,
    - week navigation,
+   - visible manual refresh control on the weekly driver screen,
+   - optional in-app auto refresh toggle (30-second interval),
    - status coloring by duty type.
 
 3. Duty card details:
@@ -156,8 +161,13 @@ New (added 08 March 2026):
 6. Requests and timesheet:
    - Leave request and shift swap currently open user email app (`mailto`) with prefilled text.
    - Timesheet generator with editable start/finish/travel fields.
+   - Timesheet defaults now follow duty-card `signOn` / `signOff` times.
+   - Timesheet draft restore ignores stale saved rows if the underlying duty code has changed.
    - Draft timesheet autosave in local storage.
    - AVR/PH logic uses blank defaults for manual fill.
+   - Travel defaults are now policy-based:
+     - Paddington duties -> `£6`
+     - Victoria duties -> `£9`
 
 7. Notes visibility:
    - management/internal note lines are filtered for driver-facing views.
@@ -168,7 +178,13 @@ New (added 08 March 2026):
   - Light theme: soft white/slate (current default).
   - Dark theme: dark navy baseline (original style).
   - Preference persisted in `localStorage("jet_theme")`.
-  - Toggle button: ☽/☀ icon in the main app header (next to Log out) and text link on the login page.
+  - Header controls now include:
+    - manual refresh,
+    - auto-refresh toggle (`Auto 30s`),
+    - theme toggle,
+    - log out.
+  - Drivers also have a dedicated refresh button on the weekly rota screen next to week navigation.
+  - Toggle button: ☽/☀ icon in the main app header and text link on the login page.
   - Theme tokens defined in `jet-ui-helpers.js` as `LIGHT_THEME` and `DARK_THEME`, exported via `THEMES`. Active theme is resolved inside `App()` — all `C.xxx` references respond automatically.
 - Standalone duty cards app remains light-themed (no toggle — separate app).
 - UI rule has been to preserve layout/interaction patterns and avoid disruptive redesigns.
@@ -190,7 +206,7 @@ New (added 08 March 2026):
 2. ~~Where JSON feed should be published~~ — resolved: Vercel Blob via backend ingest endpoints.
 3. ~~Portal frontend wired to backend adapter~~ — resolved: `ACTIVE_ROTA_ADAPTER_KEY = "backend"` live.
 4. ~~Remove name auto-population on login screen~~ — resolved: plain text input, no pre-fill.
-5. Daily allocation spreadsheet layout needs to be mapped for Office Script 2.
+5. Office Script 1 and Script 2 both need end-to-end testing with real operational files and production credentials.
 6. Planned security upgrade (not yet implemented):
    - Upgrade from 4-digit to 6-digit PIN.
 
@@ -200,9 +216,11 @@ New (added 08 March 2026):
 2. ~~Wire up portal frontend to backend adapter~~ — done: `ACTIVE_ROTA_ADAPTER_KEY = "backend"`.
 3. ~~Remove login name auto-population~~ — done: plain text input.
 4. Test Office Script 1 end-to-end with real rota data (WC 09.03.2026).
-5. Get daily allocation spreadsheet layout to build Office Script 2.
-6. Build Office Script 2 (allocation publish).
-7. Replace static `DAILY_RUNOUT` with fetch from `/api/allocation-read`.
+5. Test Office Script 2 end-to-end with a real allocation sheet publish.
+6. Monitor the new driver-facing refresh flow in real use:
+   - weekly-view manual refresh,
+   - header auto-refresh toggle (`30s`).
+7. Decide whether leave / swap should stay `mailto:` or be switched over to `/api/send-request`.
 8. Implement 6-digit PIN upgrade.
 
 ## 12) Known project docs and where to look first
@@ -224,6 +242,7 @@ Then inspect implementation files:
 6. `api/_auth.js`
 7. `api/_ingest-auth.js`
 8. `office-scripts/publish-rota.ts` — Office Script for rota publish
+9. `office-scripts/publish-allocation.ts` — Office Script for allocation publish
 
 ## 13) Environment variables currently relevant
 
