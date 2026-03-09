@@ -823,6 +823,11 @@ function App() {
     DRIVER_SECTION,
     DRIVER_SECTION_LABEL
   } = React.useMemo(() => buildSectionLookup(STAFF_SECTIONS), [STAFF_SECTIONS]);
+  const actionDriver = React.useMemo(() => {
+    if (currentUser && DRIVERS.includes(currentUser)) return currentUser;
+    if (selectedDriver && DRIVERS.includes(selectedDriver)) return selectedDriver;
+    return null;
+  }, [currentUser, selectedDriver, DRIVERS]);
   const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
     const dutyValue = dutyCode === null || dutyCode === undefined || dutyCode === "" ? "—" : String(dutyCode).trim();
     const forceBlankTimesheetFields = isAvrOrPrivateHireDutyCode(dutyValue);
@@ -1128,19 +1133,19 @@ function App() {
     }
   }, [authed, screen, selectedDriver]);
   React.useEffect(() => {
-    if (screen !== "timesheet" || !selectedDriver) return;
-    const baseRows = buildTimesheetRowsForDriver(selectedDriver);
-    const hydratedRows = readTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey, baseRows);
+    if (screen !== "timesheet" || !actionDriver) return;
+    const baseRows = buildTimesheetRowsForDriver(actionDriver);
+    const hydratedRows = readTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, baseRows);
     setTimesheetRows(hydratedRows);
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
-  }, [screen, selectedDriver, activeTimesheetWeekKey]);
+  }, [screen, actionDriver, activeTimesheetWeekKey]);
   React.useEffect(() => {
-    if (screen !== "timesheet" || !selectedDriver || !activeTimesheetWeekKey) return;
+    if (screen !== "timesheet" || !actionDriver || !activeTimesheetWeekKey) return;
     if (!Array.isArray(timesheetRows) || timesheetRows.length !== DAYS.length) return;
-    saveTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey, timesheetRows);
-  }, [screen, selectedDriver, activeTimesheetWeekKey, timesheetRows]);
+    saveTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, timesheetRows);
+  }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows]);
   React.useEffect(() => {
     setShowWeekMenu(false);
   }, [screen, selectedDriver, currentUser]);
@@ -1543,8 +1548,8 @@ function App() {
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
-    if (selectedDriver) {
-      setTimesheetRows(buildTimesheetRowsForDriver(selectedDriver));
+    if (actionDriver) {
+      setTimesheetRows(buildTimesheetRowsForDriver(actionDriver));
     } else {
       setTimesheetRows([]);
     }
@@ -2676,7 +2681,7 @@ function App() {
         fontSize: "12px"
       }
     }, "\u203A"))));
-  })()))), screen === "week" && selectedDriver && renderWeekScreen(), screen === "leave" && selectedDriver && (() => {
+  })()))), screen === "week" && selectedDriver && renderWeekScreen(), screen === "leave" && actionDriver && (() => {
     const handleSubmit = () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
@@ -2698,7 +2703,7 @@ function App() {
       setLeaveError("");
       const submittedAtIso = new Date().toISOString();
       sendPortalRequestEmail("leave", {
-        driverName: selectedDriver,
+        driverName: actionDriver,
         dateFrom: leaveForm.dateFrom,
         dateTo: leaveForm.dateTo,
         fromDateLabel: fromDate,
@@ -2798,7 +2803,7 @@ function App() {
         color: C.textMuted,
         margin: 0
       }
-    }, selectedDriver)), /*#__PURE__*/React.createElement("div", {
+    }, actionDriver)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -2958,9 +2963,9 @@ function App() {
         margin: "4px 0 0"
       }
     }, "This sends your leave request directly to office staff.")));
-  })(), screen === "swap" && selectedDriver && (() => {
-    const myRota = ROTA[selectedDriver] || [];
-    const otherDrivers = DRIVERS.filter(d => d !== selectedDriver);
+  })(), screen === "swap" && actionDriver && (() => {
+    const myRota = ROTA[actionDriver] || [];
+    const otherDrivers = DRIVERS.filter(d => d !== actionDriver);
     const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
     const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
     const targetDayDuty = swapForm.dayIndex !== "" && swapForm.targetDriver ? targetRota[parseInt(swapForm.dayIndex)] || "—" : null;
@@ -2971,7 +2976,7 @@ function App() {
       setSwapError("");
       const submittedAtIso = new Date().toISOString();
       sendPortalRequestEmail("swap", {
-        requestingDriver: selectedDriver,
+        requestingDriver: actionDriver,
         targetDriver: swapForm.targetDriver,
         dayName,
         requestingDuty: selectedDayDuty || "—",
@@ -3063,7 +3068,7 @@ function App() {
         color: C.textMuted,
         margin: 0
       }
-    }, selectedDriver)), /*#__PURE__*/React.createElement("div", {
+    }, actionDriver)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -3231,7 +3236,7 @@ function App() {
         fontSize: "11px",
         color: C.textMuted
       }
-    }, selectedDriver.split(" ")[0]), /*#__PURE__*/React.createElement("div", {
+    }, actionDriver.split(" ")[0]), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "15px",
         fontWeight: 700,
@@ -3308,11 +3313,11 @@ function App() {
         margin: "4px 0 0"
       }
     }, "This sends your swap request directly to office staff.")));
-  })(), screen === "timesheet" && selectedDriver && (() => {
-    const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(selectedDriver);
+  })(), screen === "timesheet" && actionDriver && (() => {
+    const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(actionDriver);
     const updateTimesheetRow = (dayIndex, patch) => {
       setTimesheetRows(prev => {
-        const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(selectedDriver);
+        const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(actionDriver);
         return baseRows.map(row => row.dayIndex === dayIndex ? {
           ...row,
           ...patch
@@ -3350,10 +3355,10 @@ function App() {
           const finishTime = isTimeValue(row.finishTime) ? row.finishTime : "--:--";
           return `${row.dayName}: Duty ${dutyCode} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
-        const subject = `Driver Timesheet - ${selectedDriver} - ${getWeekCommencing()}`;
-        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${selectedDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        const subject = `Driver Timesheet - ${actionDriver} - ${getWeekCommencing()}`;
+        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
         window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
-        clearTimesheetDraftRows(selectedDriver, activeTimesheetWeekKey);
+        clearTimesheetDraftRows(actionDriver, activeTimesheetWeekKey);
         setTimesheetSubmitted(true);
       } catch (err) {
         setTimesheetError(err?.message || "Unable to open your email app.");
@@ -3441,7 +3446,7 @@ function App() {
         color: C.textMuted,
         margin: 0
       }
-    }, selectedDriver, " \xB7 ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
+    }, actionDriver, " \xB7 ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
