@@ -999,6 +999,10 @@ function App() {
       setSwapRequestsLoading(false);
     }
   }, [actionDriver]);
+  const inboundSwapRequestCount = React.useMemo(() => {
+    if (!actionDriver || !Array.isArray(swapRequests)) return 0;
+    return swapRequests.filter(request => request.status === "pending" && request.targetDriver === actionDriver).length;
+  }, [swapRequests, actionDriver]);
   const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
     const dutyValue = dutyCode === null || dutyCode === undefined || dutyCode === "" ? "—" : String(dutyCode).trim();
     const forceBlankTimesheetFields = isAvrOrPrivateHireDutyCode(dutyValue);
@@ -1323,9 +1327,9 @@ function App() {
     saveTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, timesheetRows);
   }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows]);
   React.useEffect(() => {
-    if (!authed || screen !== "swap") return;
+    if (!authed || !actionDriver) return;
     loadSwapRequestsForActionDriver();
-  }, [authed, screen, loadSwapRequestsForActionDriver]);
+  }, [authed, actionDriver, loadSwapRequestsForActionDriver]);
   React.useEffect(() => {
     setShowWeekMenu(false);
   }, [screen, selectedDriver, currentUser]);
@@ -1883,7 +1887,33 @@ function App() {
     style: weekPrimaryActionStyle,
     onMouseEnter: handleWeekPrimaryActionMouseEnter,
     onMouseLeave: handleWeekPrimaryActionMouseLeave
-  }, "\uD83D\uDD04 Swap Request"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "relative",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px"
+    }
+  }, "\uD83D\uDD04 Swap Request", inboundSwapRequestCount > 0 && /*#__PURE__*/React.createElement("span", {
+    title: `${inboundSwapRequestCount} pending swap ${inboundSwapRequestCount === 1 ? "request" : "requests"} awaiting your approval`,
+    style: {
+      position: "absolute",
+      top: "-11px",
+      right: "-18px",
+      minWidth: "18px",
+      height: "18px",
+      padding: "0 5px",
+      borderRadius: "999px",
+      background: "#dc2626",
+      color: "#ffffff",
+      fontSize: "10px",
+      fontWeight: 700,
+      lineHeight: "18px",
+      textAlign: "center",
+      boxShadow: `0 0 0 2px ${theme === "dark" ? "#1e293b" : "#f8fafc"}`
+    }
+  }, inboundSwapRequestCount > 9 ? "9+" : String(inboundSwapRequestCount)))), /*#__PURE__*/React.createElement("button", {
     onClick: openTimesheetScreen,
     style: weekPrimaryActionStyle,
     onMouseEnter: handleWeekPrimaryActionMouseEnter,
