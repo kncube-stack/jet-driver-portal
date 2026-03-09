@@ -7,6 +7,7 @@ const DEFAULT_MANAGER_NAMES = ["Kennedy Ncube", "Errol Thomas"];
 const DEFAULT_DRIVER_PIN_HASH = "ed946f65d2c785d90e827c5ffd879ce3b49c68d4c88013074176a7e73bc58bcf";
 const DEFAULT_MANAGER_MASTER_PIN_HASH = "07c903ce633842c12f7430406521a6d57fd72de978b2c667a5bf8ec2cc7f9a9c";
 const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_COOKIE_NAME = "jet_portal_session";
 
 function getFallbackTokenSecret() {
   // Stable fallback to reduce unexpected logouts between deployments.
@@ -170,6 +171,61 @@ function extractBearerToken(req) {
   return header.slice(7).trim();
 }
 
+function parseCookies(req) {
+  const cookieHeader = (req.headers && (req.headers.cookie || req.headers.Cookie)) || "";
+  if (typeof cookieHeader !== "string" || !cookieHeader.trim()) return {};
+  return cookieHeader.split(";").reduce((cookies, part) => {
+    const idx = part.indexOf("=");
+    if (idx <= 0) return cookies;
+    const key = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (!key) return cookies;
+    cookies[key] = decodeURIComponent(value);
+    return cookies;
+  }, {});
+}
+
+function isSecureRequest(req) {
+  const proto = (req.headers && (req.headers["x-forwarded-proto"] || req.headers["X-Forwarded-Proto"])) || "";
+  if (typeof proto === "string" && proto.toLowerCase().includes("https")) return true;
+  const host = (req.headers && (req.headers.host || req.headers.Host)) || "";
+  return typeof host === "string" && !/localhost|127\.0\.0\.1/i.test(host);
+}
+
+function buildSessionCookie(token, expiresAt, req) {
+  const config = getAuthConfig();
+  const parts = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${config.tokenTtlSeconds}`
+  ];
+  if (expiresAt) parts.push(`Expires=${new Date(expiresAt).toUTCString()}`);
+  if (isSecureRequest(req)) parts.push("Secure");
+  return parts.join("; ");
+}
+
+function buildClearedSessionCookie(req) {
+  const parts = [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=0",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  ];
+  if (isSecureRequest(req)) parts.push("Secure");
+  return parts.join("; ");
+}
+
+function extractSessionToken(req) {
+  const cookies = parseCookies(req);
+  const cookieToken = cookies[SESSION_COOKIE_NAME];
+  if (typeof cookieToken === "string" && cookieToken.trim()) return cookieToken.trim();
+  return extractBearerToken(req);
+}
+
 function parseRequestBody(req) {
   let body = req.body;
   if (typeof body === "string") {
@@ -240,7 +296,7 @@ function authenticateNamePin(nameInput, pinInput) {
 }
 
 function verifyRequestSession(req) {
-  const token = extractBearerToken(req);
+  const token = extractSessionToken(req);
   if (!token) return null;
   const config = getAuthConfig();
   const payload = verifyToken(token, config);
@@ -255,5 +311,7 @@ function verifyRequestSession(req) {
 module.exports = {
   authenticateNamePin,
   verifyRequestSession,
-  parseRequestBody
+  parseRequestBody,
+  buildSessionCookie,
+  buildClearedSessionCookie
 };

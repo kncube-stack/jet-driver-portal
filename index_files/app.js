@@ -26,24 +26,23 @@ function readStoredSession() {
     const raw = localStorage.getItem("jet_session") || sessionStorage.getItem("jet_session");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.name || !parsed?.token) return null;
+    if (!parsed?.name) return null;
     if (parsed.expiresAt && Date.now() > new Date(parsed.expiresAt).getTime()) return null;
     return {
       name: parsed.name,
       role: parsed.role === "manager" ? "manager" : "driver",
-      token: parsed.token,
+      token: typeof parsed.token === "string" ? parsed.token : "",
       expiresAt: parsed.expiresAt || null
     };
   } catch {
     return null;
   }
 }
-function writeSession(name, role, token, expiresAt) {
+function writeSession(name, role, expiresAt) {
   try {
     const payload = JSON.stringify({
       name,
       role,
-      token,
       expiresAt: expiresAt || null
     });
     localStorage.setItem("jet_session", payload);
@@ -66,6 +65,7 @@ function clearSession() {
 }
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
+const AUTH_LOGOUT_ENDPOINT = "/api/auth-logout";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
 const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
@@ -321,6 +321,7 @@ async function loginWithServer(name, pin) {
     headers: {
       "Content-Type": "application/json"
     },
+    credentials: "same-origin",
     cache: "no-store",
     body: JSON.stringify({
       name,
@@ -331,27 +332,23 @@ async function loginWithServer(name, pin) {
   try {
     data = await response.json();
   } catch {}
-  if (!response.ok || !data?.ok || !data?.session?.token) {
+  if (!response.ok || !data?.ok || !data?.session?.name) {
     throw new Error(data?.error || "Unable to sign in.");
   }
   return data.session;
 }
-async function verifyServerSession(token) {
-  if (!token) {
-    const missingTokenError = new Error("Missing session token.");
-    missingTokenError.code = "SESSION_INVALID";
-    throw missingTokenError;
-  }
+async function verifyServerSession(token = "") {
   let response = null;
   let data = null;
   let lastNetworkError = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
       response = await fetch(AUTH_SESSION_ENDPOINT, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
+        headers,
+        credentials: "same-origin",
         cache: "no-store"
       });
     } catch (error) {
@@ -389,6 +386,13 @@ async function verifyServerSession(token) {
   }
   return data.session;
 }
+async function logoutServerSession() {
+  await fetch(AUTH_LOGOUT_ENDPOINT, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store"
+  }).catch(() => null);
+}
 async function fetchLiveAllocationData() {
   try {
     const response = await fetch(ALLOCATION_READ_ENDPOINT, { cache: "no-store" });
@@ -400,17 +404,12 @@ async function fetchLiveAllocationData() {
   }
 }
 async function sendPortalRequestEmail(kind, payload) {
-  const session = readStoredSession();
-  const token = session?.token || "";
-  if (!token) {
-    throw new Error("Session expired. Please sign in again.");
-  }
   const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
+      "Content-Type": "application/json"
     },
+    credentials: "same-origin",
     cache: "no-store",
     body: JSON.stringify({
       kind,
@@ -730,8 +729,8 @@ function openNativeDatePicker(input) {
 // ─── APP ────────────────────────────────────────────────────────
 function App() {
   const storedSession = React.useMemo(() => readStoredSession(), []);
-  const [authed, setAuthed] = React.useState(() => !!storedSession);
-  const [sessionVerifying, setSessionVerifying] = React.useState(() => !!storedSession?.token);
+  const [authed, setAuthed] = React.useState(() => !!storedSession?.name);
+  const [sessionVerifying, setSessionVerifying] = React.useState(true);
   const [authName, setAuthName] = React.useState("");
   const [authPin, setAuthPin] = React.useState("");
   const [authError, setAuthError] = React.useState("");
@@ -899,16 +898,10 @@ function App() {
   };
   React.useEffect(() => {
     let cancelled = false;
-    if (!storedSession?.token) {
-      setSessionVerifying(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-    verifyServerSession(storedSession.token).then(serverSession => {
+    verifyServerSession(storedSession?.token || "").then(serverSession => {
       if (cancelled) return;
       const resolvedRole = serverSession.role === "manager" ? "manager" : "driver";
-      writeSession(serverSession.name, resolvedRole, storedSession.token, serverSession.expiresAt || storedSession.expiresAt || null);
+      writeSession(serverSession.name, resolvedRole, serverSession.expiresAt || storedSession?.expiresAt || null);
       setAuthed(true);
       setCurrentRole(resolvedRole);
       setCurrentUser(serverSession.name);
@@ -931,14 +924,14 @@ function App() {
         setSelectedDriver(null);
         setAuthName("");
         setAuthPin("");
-        setAuthError(err?.message || "Session expired. Please sign in again.");
+        setAuthError(storedSession?.name ? err?.message || "Session expired. Please sign in again." : "");
         return;
       }
-      // Keep the cached session during transient API/network issues.
-      console.warn("Session verification unavailable; keeping local session.", err);
-      setAuthError("");
-      setAuthed(true);
       if (storedSession?.name) {
+        // Keep cached session metadata during transient API/network issues.
+        console.warn("Session verification unavailable; keeping local session.", err);
+        setAuthError("");
+        setAuthed(true);
         setCurrentUser(storedSession.name);
         setCurrentRole(storedSession.role === "manager" ? "manager" : "driver");
         setAuthName(storedSession.name);
@@ -949,6 +942,13 @@ function App() {
           setSelectedDriver(null);
           setScreen("home");
         }
+      } else {
+        setAuthError("");
+        setAuthed(false);
+        setCurrentUser(null);
+        setCurrentRole("driver");
+        setScreen("home");
+        setSelectedDriver(null);
       }
     }).finally(() => {
       if (!cancelled) setSessionVerifying(false);
@@ -956,7 +956,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [storedSession?.token]);
+  }, []);
 
   // Fetch live rota on mount
   React.useEffect(() => {
@@ -1075,7 +1075,7 @@ function App() {
       const resolvedName = session.name;
       const role = session.role === "manager" ? "manager" : "driver";
       const resolvedKnownDriver = DRIVERS.includes(resolvedName);
-      writeSession(resolvedName, role, session.token, session.expiresAt || null);
+      writeSession(resolvedName, role, session.expiresAt || null);
       await refreshRota("");
       setAuthed(true);
       setCurrentRole(role);
@@ -1450,7 +1450,8 @@ function App() {
     setScreen("week");
     setSearch("");
   };
-  const switchUser = () => {
+  const switchUser = async () => {
+    await logoutServerSession();
     clearSession();
     setAuthed(false);
     setCurrentUser(null);
