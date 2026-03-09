@@ -119,7 +119,6 @@ const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
 const AUTH_LOGOUT_ENDPOINT = "/api/auth-logout";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
-const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
 const SWAP_REQUESTS_ENDPOINT = "/api/swap-requests";
 const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
@@ -472,25 +471,6 @@ async function fetchLiveAllocationData() {
   } catch {
     return null;
   }
-}
-async function sendPortalRequestEmail(kind, payload) {
-  const response = await fetch(REQUEST_EMAIL_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    credentials: "same-origin",
-    cache: "no-store",
-    body: JSON.stringify({
-      kind,
-      payload
-    })
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) {
-    throw new Error(data?.error || "Unable to send request email right now.");
-  }
-  return data;
 }
 async function fetchSwapRequests() {
   const response = await fetch(SWAP_REQUESTS_ENDPOINT, {
@@ -2930,24 +2910,15 @@ function App() {
       const diffDays = Math.max(1, Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1);
       setLeaveSending(true);
       setLeaveError("");
-      const submittedAtIso = new Date().toISOString();
-      sendPortalRequestEmail("leave", {
-        driverName: actionDriver,
-        dateFrom: leaveForm.dateFrom,
-        dateTo: leaveForm.dateTo,
-        fromDateLabel: fromDate,
-        toDateLabel: toDate,
-        totalDays: diffDays,
-        reason: leaveForm.reason || "Annual leave",
-        notes: leaveForm.notes || "",
-        submittedAtIso
-      }).then(() => {
+      try {
+        const subject = `Annual Leave Request - ${actionDriver}`;
+        const body = [`ANNUAL LEAVE REQUEST`, ``, `Driver: ${actionDriver}`, `From: ${fromDate}`, `To: ${toDate}`, `Total days: ${diffDays}`, `Reason: ${leaveForm.reason || "Annual leave"}`, `Notes: ${leaveForm.notes || "None"}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        window.open(`mailto:${LEAVE_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
         setLeaveSubmitted(true);
-      }).catch(err => {
-        setLeaveError(err?.message || "Unable to send your leave request right now.");
-      }).finally(() => {
-        setLeaveSending(false);
-      });
+      } catch (err) {
+        setLeaveError(err?.message || "Unable to open your email app.");
+      }
+      setLeaveSending(false);
     };
     const inputStyle = {
       width: "100%",
@@ -2990,7 +2961,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your annual leave request has been sent to office staff."), /*#__PURE__*/React.createElement("button", {
+    }, "Your annual leave request is ready in your email app. Send it to submit your request."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setLeaveSubmitted(false);
@@ -3191,7 +3162,7 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This sends your leave request directly to office staff.")));
+    }, "This opens your email app with the leave request ready to send.")));
   })(), screen === "swap" && actionDriver && (() => {
     const myRota = ROTA[actionDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== actionDriver);

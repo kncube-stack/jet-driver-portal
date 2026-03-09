@@ -1,6 +1,10 @@
 # Server-side request email delivery
 
-The portal now sends leave and shift-swap requests through a server endpoint instead of `mailto:`.
+The portal currently uses a mixed model:
+
+- annual leave opens the user's mail app via `mailto:` for pilot testing,
+- approved shift swaps are emailed from the server side,
+- `POST /api/send-request` still exists for direct server-side request email sends where needed.
 
 ## Routes
 - `POST /api/auth-login` (server-side PIN verification, returns signed session token)
@@ -8,6 +12,7 @@ The portal now sends leave and shift-swap requests through a server endpoint ins
 - `POST /api/send-request` (requires bearer token)
 
 ## Routing rules
+- leave mail drafts target `errol@jasonedwardstravel.co.uk`
 - `kind: "leave"` -> `errol@jasonedwardstravel.co.uk`
 - `kind: "swap"` -> `operations@jasonedwardstravel.co.uk`
 
@@ -18,5 +23,5 @@ The portal now sends leave and shift-swap requests through a server endpoint ins
 
 ## Notes
 - The endpoint uses the Resend API from the server side.
-- If env vars are missing, the app shows an inline send error instead of opening the user email app.
+- The main live server-side email use today is the approved-swap workflow.
 - Drivers cannot submit leave/swap on behalf of another name; managers can.

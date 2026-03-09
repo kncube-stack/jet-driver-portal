@@ -199,9 +199,8 @@ Important:
    - header layout has been tuned so larger phones keep those controls inline with the user name.
 
 4. Leave and swap
-   - leave no longer uses `mailto:`
-   - leave is sent directly through `/api/send-request`
-   - leave routes to `errol@jasonedwardstravel.co.uk`
+   - leave currently uses the user's email app (`mailto:`) again for pilot testing
+   - leave drafts to `errol@jasonedwardstravel.co.uk`
    - swap is now a two-step in-app workflow:
      - requester creates a pending swap for another driver
      - target driver approves or declines inside the dedicated `Swap Request` screen
