@@ -33,6 +33,62 @@ function normalizeRotaByStaffName(rotaByName) {
   }, {});
 }
 
+function mergeLiveRotaIntoDirectory(sourceSections, sourceRota) {
+  const sections = getStaffDirectorySections();
+  const rota = buildEmptyRotaFromSections(sections);
+  const normalizedSourceRota = normalizeRotaByStaffName(sourceRota);
+  Object.keys(rota).forEach(name => {
+    if (Array.isArray(normalizedSourceRota[name])) rota[name] = normalizedSourceRota[name];
+  });
+  if (!STAFF_SOURCE_CONFIG.includeSheetDiscoveredStaff) {
+    return {
+      sections,
+      rota
+    };
+  }
+  const sectionIdxByKey = {};
+  sections.forEach((section, idx) => {
+    sectionIdxByKey[section.key] = idx;
+  });
+  const sourceSectionByName = {};
+  const safeSourceSections = Array.isArray(sourceSections) ? sourceSections : [];
+  safeSourceSections.forEach(section => {
+    const sectionKey = section?.key || STAFF_SOURCE_CONFIG.fallbackSectionKey || "part_time";
+    const drivers = Array.isArray(section?.drivers) ? section.drivers : [];
+    drivers.forEach(rawName => {
+      const name = normalizeStaffName(rawName);
+      if (!name) return;
+      sourceSectionByName[name] = sectionKey;
+    });
+  });
+  Object.entries(normalizedSourceRota).forEach(([name, week]) => {
+    if (Object.prototype.hasOwnProperty.call(rota, name)) return;
+    const sectionKey = sourceSectionByName[name] || STAFF_SOURCE_CONFIG.fallbackSectionKey || "part_time";
+    if (sectionIdxByKey[sectionKey] === undefined) {
+      sections.push({
+        key: sectionKey,
+        label: SECTION_LABEL_MAP[sectionKey] || sectionKey,
+        drivers: []
+      });
+      sectionIdxByKey[sectionKey] = sections.length - 1;
+    }
+    const targetSection = sections[sectionIdxByKey[sectionKey]];
+    if (!targetSection.drivers.includes(name)) {
+      targetSection.drivers.push(name);
+    }
+    rota[name] = Array.isArray(week) ? week.slice(0, 7) : blankWeek();
+  });
+  sections.forEach(section => {
+    section.drivers.sort((a, b) => a.localeCompare(b, undefined, {
+      sensitivity: "base"
+    }));
+  });
+  return {
+    sections,
+    rota
+  };
+}
+
 function getLocalDateKey(date = new Date()) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -312,18 +368,9 @@ const ROTA_DATA_ADAPTERS = {
     async fetchWeekByGid(weekCommencing) {
       const res = await fetch(`/api/rota-read?week=${weekCommencing}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch rota data (${res.status}). Check your connection.`);
-      const { ok, rota: blobRota, error } = await res.json();
+      const { ok, sections: blobSections, rota: blobRota, error } = await res.json();
       if (!ok) throw new Error(error || "Failed to load rota data.");
-      // Use in-app directory for section structure; overlay duty assignments from blob
-      const sections = getStaffDirectorySections();
-      const rota = buildEmptyRotaFromSections(sections);
-      const normalizedBlobRota = normalizeRotaByStaffName(blobRota);
-      if (normalizedBlobRota && typeof normalizedBlobRota === "object") {
-        Object.keys(rota).forEach(name => {
-          if (Array.isArray(normalizedBlobRota[name])) rota[name] = normalizedBlobRota[name];
-        });
-      }
-      return { sections, rota };
+      return mergeLiveRotaIntoDirectory(blobSections, blobRota);
     }
   }
 };

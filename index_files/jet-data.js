@@ -4953,7 +4953,7 @@ const STAFF_DIRECTORY = [{
 // - includeSheetDiscoveredStaff false: only in-app directory names are shown.
 // - includeSheetDiscoveredStaff true: new names found in sheet/sharepoint are auto-added.
 const STAFF_SOURCE_CONFIG = {
-  includeSheetDiscoveredStaff: false,
+  includeSheetDiscoveredStaff: true,
   fallbackSectionKey: "part_time"
 };
 
