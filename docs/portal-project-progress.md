@@ -204,11 +204,12 @@ Important:
    - leave routes to `errol@jasonedwardstravel.co.uk`
    - swap is now a two-step in-app workflow:
      - requester creates a pending swap for another driver
-     - target driver approves or declines inside the portal
+     - target driver approves or declines inside the dedicated `Swap Request` screen
      - requester can cancel while still pending
      - pending swaps auto-expire after 48 hours
      - management is emailed only after the target driver approves
    - swap requests are stored in Blob at `swap-requests/index.json`
+   - the weekly view does not show full swap cards; it only shows a red count badge on the `Swap Request` button when approvals are waiting
 
 5. Timesheets
    - generated from duty-card sign-on/sign-off data,
@@ -240,6 +241,7 @@ Important:
   - menu icon
 - Weekly manager header is tuned to stay inline on larger phones and web, with controlled wrap only on genuinely narrow widths.
 - `Generate Timesheet` and `Swap Request` now share the same button treatment in both light and dark mode.
+- the `Swap Request` button can now show a red top-right badge count for pending inbound approvals.
 - Admin browsing another driver's week now hides the bottom action buttons, and leave/swap/timesheet actions always stay tied to the logged-in user.
 - Standalone duty-cards app remains separate and light-themed.
 
