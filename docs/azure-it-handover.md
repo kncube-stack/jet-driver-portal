@@ -358,7 +358,44 @@ Best fit if the frontend should stay mostly unchanged:
 - API in Azure Functions,
 - JSON snapshots in Azure Blob Storage.
 
-## 10) What IT can change safely
+## 10) Environment layout to request from IT
+
+Recommended minimum Azure environment layout:
+
+1. `Production`
+   - live driver-facing portal
+   - production auth secrets
+   - production storage account/container
+   - live domain / SSL
+
+2. `Staging` or `Test`
+   - same codebase as production
+   - separate app URL
+   - separate storage container or storage path namespace
+   - separate secrets/config where appropriate
+   - safe place for Kennedy / IT to test before production rollout
+
+Recommended supporting requirements:
+
+- GitHub-connected deployment path for staging first
+- clear promotion path from staging to production
+- access to staging logs and deployment status
+- a small set of staging test accounts/PINs
+- if email sending is enabled in staging, either a test mailbox or clearly isolated email routing
+
+Preferred deployment flow:
+
+1. code change is pushed to GitHub
+2. change deploys to staging
+3. staging is tested and approved
+4. same change is promoted/deployed to production
+
+Important:
+
+- testing directly against the live production environment is not recommended,
+- the app should have at least one non-production Azure environment before the migration is considered complete.
+
+## 11) What IT can change safely
 
 These can change behind the scenes:
 
@@ -370,7 +407,7 @@ These can change behind the scenes:
 - backend implementation language/framework,
 - Power Automate ownership.
 
-## 11) What IT should not change without app rework
+## 12) What IT should not change without app rework
 
 These should stay stable unless the app is intentionally rebuilt:
 
@@ -384,7 +421,7 @@ Most important point:
 
 - do not replace the normalized JSON contract with direct raw-Excel reads unless a larger redevelopment is agreed.
 
-## 12) Environment variables / secrets currently relevant
+## 13) Environment variables / secrets currently relevant
 
 Auth:
 
@@ -393,8 +430,6 @@ Auth:
 - `AUTH_USER_PIN_HASHES`
 - `AUTH_MANAGER_NAMES`
 - `AUTH_ALLOWED_NAMES`
-- `AUTH_DEFAULT_DRIVER_PIN_HASH`
-- `AUTH_MANAGER_MASTER_PIN_HASH`
 - `AUTH_TOKEN_TTL_SECONDS`
 
 Ingest:
@@ -411,7 +446,7 @@ Storage:
 - `BLOB_READ_WRITE_TOKEN`
 - `BLOB_ACCESS_MODE`
 
-## 13) Current important implementation files
+## 14) Current important implementation files
 
 Frontend/runtime:
 
@@ -441,7 +476,7 @@ Office Scripts:
 - [`office-scripts/publish-rota.ts`](/Users/k_ncube/Documents/Projects/jet-driver-portal/office-scripts/publish-rota.ts)
 - [`office-scripts/publish-allocation.ts`](/Users/k_ncube/Documents/Projects/jet-driver-portal/office-scripts/publish-allocation.ts)
 
-## 14) Plain-English summary for IT
+## 15) Plain-English summary for IT
 
 The app already works by reading clean JSON snapshots, not raw Excel.
 
