@@ -1,6 +1,6 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 09 March 2026 (UK time) — audit refresh after auth hardening, PIN rollout, blob-read refactor, and weekly UI cleanup
+Last updated: 09 March 2026 (UK time) — audit refresh after swap workflow rollout, auth hardening, PIN rollout, blob-read refactor, and weekly UI cleanup
 
 ## 1) Project purpose
 
@@ -56,7 +56,8 @@ Residual risks still present:
 - the live Blob store is still public-access at the storage layer and has not yet been migrated to a private store,
 - login throttling is in-memory serverless throttling, so it is helpful but not a perfect distributed rate limiter,
 - timesheet submission still opens `mailto:` rather than using the backend email route,
-- Office Scripts still rely on a shared ingest secret in script configuration.
+- Office Scripts still rely on a shared ingest secret in script configuration,
+- the new swap-request workflow has syntax/runtime-checked code paths, but it still needs real multi-user production-path testing with two separate staff logins.
 
 ## 5) Current architecture
 
@@ -80,7 +81,13 @@ Auth/session:
 - `api/_auth-rate-limit.js` — login throttling helper
 
 Requests/email:
-- `api/send-request.js` — leave and swap emails via Resend
+- `api/send-request.js` — leave emails via Resend, plus legacy direct swap email support
+- `api/_request-email.js` — shared email payload builders and Resend send helper
+
+Swap workflow:
+- `api/swap-requests.js` — create/list swap requests for the signed-in driver
+- `api/swap-request-action.js` — approve, decline, cancel swap requests
+- `api/_swap-requests.js` — Blob-backed swap-request store + expiry logic
 
 Blob ingest/read:
 - `api/rota-ingest.js`
@@ -120,10 +127,11 @@ Utility/script:
 Current manager/duty-manager access list in code:
 - `Alfie Hoque`
 - `Errol Thomas`
+- `Jason Edwards`
 - `Kennedy Ncube`
-- `J. Ferreira`
-- `M. Ali`
-- `D. Howards`
+- `Joao Ferreira`
+- `Mo ali`
+- `Davina Howards`
 - `Umair Akram`
 - `Adrian Koprowski`
 
@@ -133,7 +141,12 @@ Current manager/duty-manager access list in code:
 
 - `ACTIVE_ROTA_ADAPTER_KEY = "backend"` in `index_files/jet-data-layer.js`
 - Google Sheets adapter still exists as rollback code, but the live portal now reads from the backend adapter
-- the in-app staff directory remains the authoritative roster for sign-in name validation and section labeling
+- the in-app staff directory remains the authoritative roster for sign-in name validation, access groups, and section labeling
+- published rota data can now auto-surface unknown driver names into the app roster view, but that does not automatically provision login PINs
+- legacy rota names are aliased to the newer full display names for:
+  - `J. Ferreira` -> `Joao Ferreira`
+  - `M. Ali` -> `Mo ali`
+  - `D. Howards` -> `Davina Howards`
 
 ### Blob backend status
 
@@ -186,11 +199,16 @@ Important:
    - header layout has been tuned so larger phones keep those controls inline with the user name.
 
 4. Leave and swap
-   - no longer `mailto:`
-   - now sent directly through `/api/send-request`
-   - routed by request type:
-     - leave -> `errol@jasonedwardstravel.co.uk`
-     - swap -> `operations@jasonedwardstravel.co.uk`
+   - leave no longer uses `mailto:`
+   - leave is sent directly through `/api/send-request`
+   - leave routes to `errol@jasonedwardstravel.co.uk`
+   - swap is now a two-step in-app workflow:
+     - requester creates a pending swap for another driver
+     - target driver approves or declines inside the portal
+     - requester can cancel while still pending
+     - pending swaps auto-expire after 48 hours
+     - management is emailed only after the target driver approves
+   - swap requests are stored in Blob at `swap-requests/index.json`
 
 5. Timesheets
    - generated from duty-card sign-on/sign-off data,
@@ -208,6 +226,7 @@ Important:
    - `Management`
    - `Duty Managers`
    - operational driver sections
+   - `Jason Edwards` is now included under `Management` with blank days unless rota data is later added for him
 
 ## 9) Visual/UI state
 
@@ -221,6 +240,7 @@ Important:
   - menu icon
 - Weekly manager header is tuned to stay inline on larger phones and web, with controlled wrap only on genuinely narrow widths.
 - `Generate Timesheet` and `Swap Request` now share the same button treatment in both light and dark mode.
+- Admin browsing another driver's week now hides the bottom action buttons, and leave/swap/timesheet actions always stay tied to the logged-in user.
 - Standalone duty-cards app remains separate and light-themed.
 
 ## 10) Security posture (current)
@@ -231,6 +251,7 @@ What is strong now:
 - auth/session checks are server-side,
 - real session token is now in an `HttpOnly` cookie,
 - leave/swap actions are authenticated server-side,
+- swap approval/cancel permissions are enforced against the signed-in user on the server,
 - login throttling is in place,
 - ingest endpoints require `API_INGEST_KEY`.
 
@@ -252,10 +273,12 @@ Recommended order:
 
 1. End-to-end test the rota Office Script with the real workbook and production ingest config.
 2. End-to-end test the allocation Office Script with the real workbook and production ingest config.
-3. Migrate from the current public Blob store to a private Blob store.
-4. Republish rota/allocation data into the private store.
-5. Decide whether timesheet should also move from `mailto:` to backend email send.
-6. If stronger security is required after rollout:
+3. End-to-end test the new two-step swap approval flow with two separate live staff sessions.
+4. Migrate from the current public Blob store to a private Blob store.
+5. Republish rota/allocation data into the private store.
+6. Decide whether timesheet should also move from `mailto:` to backend email send.
+7. Harden the Office Scripts so Power Automate failures throw explicitly and return useful result data.
+8. If stronger security is required after rollout:
    - add distributed rate limiting,
    - consider shorter session TTL,
    - consider stronger admin authentication requirements.
@@ -308,6 +331,7 @@ Blob + ingest:
 - Path convention:
   - `rota/{YYYY-MM-DD}.json`
   - `allocation/{YYYY-MM-DD}.json`
+  - `swap-requests/index.json`
 - Repeated publishes overwrite the same logical path
 - `api/rota-weeks.js` lists available rota weeks
 - Current store mode is public
@@ -315,7 +339,17 @@ Blob + ingest:
 - Private-store migration still requires:
   - creating/linking a new private Blob store,
   - setting `BLOB_ACCESS_MODE=private`,
-  - republishing data
+  - republishing rota/allocation data
+
+Swap-request store notes:
+- all swap requests currently live in a single Blob JSON file
+- expiry is handled on read/write, not by a background scheduler
+- statuses used by the app:
+  - `pending`
+  - `approved`
+  - `declined`
+  - `cancelled`
+  - `expired`
 
 ## 15) Practical notes for future contributors/models
 
@@ -329,3 +363,5 @@ Blob + ingest:
 8. The theme system is centralized in `jet-ui-helpers.js`; do not hardcode ad-hoc colors in new UI work unless necessary.
 9. The in-app staff directory remains the source of truth for names/sections, including access-group labeling.
 10. Timesheet email flow is the main remaining user-facing request flow that has not yet been moved fully server-side.
+11. The swap workflow is now stateful; do not revert it back to immediate management email without an explicit process decision.
+12. If changing staff display names, keep alias handling in sync with the rota source naming until the source workbook is updated too.
