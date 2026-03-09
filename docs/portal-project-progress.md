@@ -1,248 +1,286 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 08 March 2026 (UK time) — updated same day after fourth session
+Last updated: 09 March 2026 (UK time) — audit refresh after auth hardening, PIN rollout, blob-read refactor, and weekly UI cleanup
 
-## 1) Project purpose (problem we are solving)
+## 1) Project purpose
 
-JET currently shares weekly duty information in a broad WhatsApp-style way where everyone can see everything.
-This project aims to provide a cleaner driver portal with:
+JET currently distributes weekly duty information too broadly and too manually.
+This portal provides:
 
-- personalized weekly rota visibility for each driver,
-- manager-level oversight for all staff,
-- fast duty card lookup with stop-level map guidance,
-- practical tools (leave request, shift swap, timesheet),
-- a path to move live rota source from Google Sheets to a backend-owned data pipeline.
+- personal weekly rota visibility for each driver,
+- manager/duty-manager access to all staff,
+- fast duty-card lookup with stop-level map guidance,
+- practical staff tools (leave, swap, timesheet),
+- a backend-owned rota/allocation pipeline that no longer depends on Google Sheets at runtime.
 
-Core constraint: keep onboarding simple for drivers (no Microsoft 365 account requirement for every driver).
+Core constraint: onboarding must stay simple for drivers. No Microsoft 365 account is required for drivers to use the portal.
 
 ## 2) Design philosophy
 
 This codebase has been steered by these principles:
 
-1. Keep UI familiar and stable while adding capability.
-2. Make changes incrementally, with rollback-safe commits.
-3. Decouple data source from UI so Google Sheets can later be swapped for backend data.
-4. Keep driver flow simple:
-   - one sign-in step,
-   - persistent session until logout/clear,
-   - minimal typing and mobile-first use.
-5. Protect sensitive operational data:
-   - server-side auth/session checks,
-   - manager-only access to all-staff controls,
-   - suppress office-only notes in driver views.
+1. Keep the driver workflow simple and mobile-first.
+2. Avoid broad rewrites; prefer additive, rollback-safe changes.
+3. Keep data-source logic separate from UI logic.
+4. Preserve manager-only visibility controls.
+5. Raise security incrementally without breaking the existing operational flow.
 
-## 3) What exists today (high-level)
+## 3) What exists today
 
-There are two web experiences in the same repo:
+There are two web experiences in this repo:
 
 1. Main portal (`/`)
-   - login + PIN,
+   - server-side login + PIN,
    - personal weekly rota view,
-   - manager controls (all staff),
-   - duty card details,
-   - leave/swap/timesheet flows.
+   - manager/duty-manager all-staff access,
+   - duty-card details,
+   - leave, swap, and timesheet flows.
 
-2. Standalone Duty Cards app (`/duty-cards/`)
+2. Standalone duty cards app (`/duty-cards/`)
    - public, no login,
-   - light theme,
+   - light-themed duty lookup,
    - search by duty number, route code, destination, and stop,
-   - map deep-linking for stops.
+   - mobile map deep-linking.
 
 Routing note:
-- On duty-card hostnames, root path redirects to `/duty-cards/`.
+- on duty-card hostnames, root redirects to `/duty-cards/`.
 
-## 4) Current architecture
+## 4) Audit summary (09 March 2026)
 
-This project is static-first (no bundler required in runtime) with modular JS files:
+Static audit result:
+- no critical regressions found in the current app/API source during this pass,
+- syntax checks passed for the main app, data-layer files, auth endpoints, blob endpoints, and the PIN generator,
+- the current handover doc was stale in several areas and has now been refreshed.
 
-- `index.html` -> main portal shell and script loading
-- `index_files/jet-data.js` -> core data constants (duty cards, staff directory, config)
-- `index_files/jet-data-layer.js` -> live rota adapter/parsing/fetch logic
-- `index_files/jet-ui-helpers.js` -> colors/status/note filtering helpers
-- `index_files/app.js` -> main React app logic/UI flows
-- `index_files/jet-stop-directory.js` -> stop coordinate directory used for map matching
-- `index_files/duty-cards-app.js` -> standalone duty cards app
+Residual risks still present:
+- the live Blob store is still public-access at the storage layer and has not yet been migrated to a private store,
+- login throttling is in-memory serverless throttling, so it is helpful but not a perfect distributed rate limiter,
+- timesheet submission still opens `mailto:` rather than using the backend email route,
+- Office Scripts still rely on a shared ingest secret in script configuration.
 
-Serverless API endpoints (`/api`):
+## 5) Current architecture
 
-Existing (unchanged):
-- `api/auth-login.js` — name + PIN login, returns JWT
-- `api/auth-session.js` — validate existing session token
-- `api/send-request.js` — leave/swap request emails via Resend API
-- `api/_auth.js` — shared auth/session helpers (JWT, PIN hashing)
+Runtime structure:
 
-New (added 08 March 2026):
-- `api/rota-ingest.js` — receives weekly rota JSON, stores in Vercel Blob
-- `api/rota-read.js` — serves stored rota for a given week
-- `api/rota-weeks.js` — lists all available published weeks
-- `api/allocation-ingest.js` — receives daily allocation JSON, stores in Vercel Blob
-- `api/allocation-read.js` — serves today's allocation (defaults to UK date)
-- `api/_ingest-auth.js` — shared API key validation for ingest endpoints
+- `index.html` -> main portal shell
+- `index_files/jet-data.js` -> duty cards, staff directory, access config
+- `index_files/jet-data-layer.js` -> live rota adapter and fetch logic
+- `index_files/jet-ui-helpers.js` -> shared theme/status helpers
+- `index_files/app.js` -> main React app logic/UI
+- `index_files/duty-cards-app.js` -> standalone duty-cards app
+- `index_files/jet-stop-directory.js` -> stop coordinate directory
 
-## 5) Authentication and access model (current)
+Serverless API endpoints:
 
-- Name + PIN sign-in validated server-side.
-- Session token stored client-side and verified via `/api/auth-session`.
-- Default token TTL: 30 days (configurable with env var).
-- Manager names defined in data/config and resolved to role `manager`.
+Auth/session:
+- `api/auth-login.js` — validates name + PIN, applies login throttling, sets `HttpOnly` session cookie
+- `api/auth-session.js` — verifies existing session and promotes legacy bearer sessions into cookie sessions
+- `api/auth-logout.js` — clears the server session cookie
+- `api/_auth.js` — shared auth helpers (PIN hashing, JWT signing/verification, cookie helpers)
+- `api/_auth-rate-limit.js` — login throttling helper
+
+Requests/email:
+- `api/send-request.js` — leave and swap emails via Resend
+
+Blob ingest/read:
+- `api/rota-ingest.js`
+- `api/rota-read.js`
+- `api/rota-weeks.js`
+- `api/allocation-ingest.js`
+- `api/allocation-read.js`
+- `api/_ingest-auth.js`
+- `api/_blob-json.js` — shared blob read/write helper with access-mode support
+
+Office Scripts:
+- `office-scripts/publish-rota.ts`
+- `office-scripts/publish-allocation.ts`
+
+Utility/script:
+- `scripts/gen-pins.js` — generates unique 6-digit driver/admin PIN packs and the `AUTH_USER_PIN_HASHES` payload
+
+## 6) Authentication and access model (current)
+
+- Name + PIN sign-in is server-side only.
+- The live auth mode is now expected to be `strict`.
+- Per-user 6-digit PIN hashes are supplied via `AUTH_USER_PIN_HASHES`.
+- Manager/duty-manager names are resolved from `ACCESS_CONTROL.managerNames`.
+- Successful login sets an `HttpOnly`, `SameSite=Lax` session cookie (`jet_portal_session`).
+- The browser still caches lightweight session metadata locally for UX continuity, but the actual auth token is no longer stored client-side for normal operation.
+- Session TTL defaults to 30 days unless overridden by `AUTH_TOKEN_TTL_SECONDS`.
+- Login throttling is active:
+  - 6 failed attempts per name+IP within the rolling window,
+  - 12 failed attempts per IP within the rolling window,
+  - 15-minute temporary block when the threshold is hit.
 - Manager-only controls:
-  - all staff browsing / staff-hub behavior.
-- Non-managers are forced back to their own driver view if they try to browse staff.
-- Ingest endpoints (rota/allocation publish) are protected by a separate API key (`API_INGEST_KEY`), validated via timing-safe comparison in `_ingest-auth.js`.
+  - all-staff browsing,
+  - browsing other drivers,
+  - management/duty-manager oversight flows.
+- Ingest endpoints use a separate `API_INGEST_KEY` checked by timing-safe comparison.
 
-## 6) Data source status
+Current manager/duty-manager access list in code:
+- `Alfie Hoque`
+- `Errol Thomas`
+- `Kennedy Ncube`
+- `J. Ferreira`
+- `M. Ali`
+- `D. Howards`
+- `Umair Akram`
+- `Adrian Koprowski`
+
+## 7) Data source and publish status
 
 ### Live source today
-- **Vercel Blob backend is now the active rota source** — `ACTIVE_ROTA_ADAPTER_KEY = "backend"` in `jet-data-layer.js`.
-- Google Sheets adapter remains in code at `ROTA_DATA_ADAPTERS.googleSheets` as a one-line rollback.
-- In-app staff directory remains authoritative for name validation after login.
 
-### Backend data pipeline (live — 08 March 2026)
-- **Vercel Blob storage** is connected and tested.
-- Five API endpoints are live:
-  - `POST /api/rota-ingest` — writes `rota/{weekCommencing}.json` to blob
-  - `GET /api/rota-read?week=YYYY-MM-DD` — reads a week's rota from blob
-  - `GET /api/rota-weeks` — discovers available weeks from blob prefix listing
-  - `POST /api/allocation-ingest` — writes `allocation/{date}.json` to blob
-  - `GET /api/allocation-read?date=YYYY-MM-DD` — reads a day's allocation from blob
-- The `backend` adapter in `jet-data-layer.js` calls `/api/rota-weeks` to discover tabs and `/api/rota-read` to fetch each week. The `YYYY-MM-DD` dates are converted to/from `WC DD.MM.YYYY` tab-name format so the rest of the UI is unchanged.
-- To roll back to Google Sheets: change one line — `const ACTIVE_ROTA_ADAPTER_KEY = "googleSheets";`
+- `ACTIVE_ROTA_ADAPTER_KEY = "backend"` in `index_files/jet-data-layer.js`
+- Google Sheets adapter still exists as rollback code, but the live portal now reads from the backend adapter
+- the in-app staff directory remains the authoritative roster for sign-in name validation and section labeling
 
-### SharePoint / Power Automate status
-- Power Automate flow approach has been **deprioritized**.
-- The premium HTTP connector is not available on the company's current Microsoft 365 plan.
-- Azure App Registration was refused by IT on security grounds.
-- The new strategy is to use **Office Scripts** (available in Excel for the web) to publish data directly from SharePoint-hosted Excel files to the portal backend — no Power Automate or Azure registration required.
+### Blob backend status
 
-### Office Scripts publish strategy
-- Two separate Excel files, two separate Office Scripts:
-  1. **Rota script** — reads weekly rota sheet from `Rota.xlsx`, posts to `/api/rota-ingest`
-  2. **Allocation script** — reads daily allocation chart, posts to `/api/allocation-ingest`
-- Scripts authenticate using `API_INGEST_KEY` in the `x-api-key` header.
-- Office Scripts confirmed available on the company's Microsoft 365 plan (Automate tab visible in Excel for the web).
-- **Rota script (Script 1) is built** — file: `office-scripts/publish-rota.ts`.
-  - User selects the target week's sheet tab, runs the script once per week.
-  - Script is saved to the user's Microsoft 365 account — does not need to be re-pasted each week.
-  - Requires `INGEST_URL` and `API_KEY` constants to be filled in before first use.
-- **Allocation script (Script 2) is built** — file: `office-scripts/publish-allocation.ts`.
-  - Script auto-detects the allocation sheet by looking for `DUTIES`, `VEHICLE`, `DRIVER`, and `SIGN ON` headers.
-  - It posts today's UK-date allocation to `/api/allocation-ingest`.
-  - It also derives handover/takeover relationships when the same vehicle appears on two duties in a day.
+- Provider: Vercel Blob
+- Current live store mode: still public-access
+- Current code status: read/write layer is now compatible with both public and private modes via `BLOB_ACCESS_MODE`
+- Current pinned env value in Vercel: `BLOB_ACCESS_MODE=public`
 
-## 7) Key functional features already implemented
+Important:
+- the app no longer depends on public blob `downloadUrl` reads,
+- but the underlying store itself has not yet been migrated to a private Blob store.
 
-1. Login UX:
-   - plain text name input (no picker/autocomplete — drivers type their name),
-   - PIN entry,
-   - persistent login behavior.
+### Office Scripts status
 
-2. Weekly rota view:
-   - today banner for duty and REST states,
+- Office Scripts remain the intended operational publish path from SharePoint-hosted Excel files.
+- Two scripts exist:
+  1. `publish-rota.ts`
+  2. `publish-allocation.ts`
+- They post to:
+  - `/api/rota-ingest`
+  - `/api/allocation-ingest`
+- They authenticate with `API_INGEST_KEY`.
+- If the project later moves to a private Blob store, the Office Scripts do not need changing as long as the ingest URLs and API key remain the same.
+
+## 8) Key functional features implemented
+
+1. Login
+   - plain-text name entry,
+   - 6-digit PIN entry,
+   - persistent sign-in via server cookie session.
+
+2. Weekly rota view
+   - manual refresh inside the app,
+   - refresh on successful login,
+   - current-week banner,
    - week navigation,
-   - visible manual refresh control on the weekly driver screen,
-   - optional in-app auto refresh toggle (30-second interval),
-   - status coloring by duty type.
+   - runout/allocation overlay where available.
 
-3. Duty card details:
-   - reminders/warnings,
-   - runout/takeover details where available,
-   - 45-minute break prompt inserted near operational ARR/DEP points (especially around stand/pull-on-stand behavior for A6 flow).
+3. Weekly action layout
+   - primary actions below rota:
+     - `Swap Request`
+     - `Generate Timesheet`
+   - secondary actions moved into the top-right menu:
+     - duty cards
+     - leave request
+   - managers/duty managers also see:
+     - `All Staff`
+     - refresh icon
+     - menu button
+   - header layout has been tuned so larger phones keep those controls inline with the user name.
 
-4. Duty cards map links:
-   - stop-to-directory fuzzy matching,
-   - coordinates prioritized where available,
-   - mobile deep-link preference (`geo:` Android, `comgooglemaps://` iOS) with web fallback.
+4. Leave and swap
+   - no longer `mailto:`
+   - now sent directly through `/api/send-request`
+   - routed by request type:
+     - leave -> `errol@jasonedwardstravel.co.uk`
+     - swap -> `operations@jasonedwardstravel.co.uk`
 
-5. Standalone duty cards app:
-   - light soft style,
-   - smart ranking search,
-   - stop-choice behavior for stop-based queries.
+5. Timesheets
+   - generated from duty-card sign-on/sign-off data,
+   - stale draft rows are ignored if the underlying duty changed,
+   - Paddington travel default -> `£6`,
+   - Victoria travel default -> `£9`,
+   - still submitted via `mailto:` today.
 
-6. Requests and timesheet:
-   - Leave request and shift swap currently open user email app (`mailto`) with prefilled text.
-   - Timesheet generator with editable start/finish/travel fields.
-   - Timesheet defaults now follow duty-card `signOn` / `signOff` times.
-   - Timesheet draft restore ignores stale saved rows if the underlying duty code has changed.
-   - Draft timesheet autosave in local storage.
-   - AVR/PH logic uses blank defaults for manual fill.
-   - Travel defaults are now policy-based:
-     - Paddington duties -> `£6`
-     - Victoria duties -> `£9`
+6. Duty cards
+   - route/destination/stop search,
+   - stop matching and map deep-linking,
+   - driver-facing filtering of office/internal note lines.
 
-7. Notes visibility:
-   - management/internal note lines are filtered for driver-facing views.
+7. Staff directory structure
+   - `Management`
+   - `Duty Managers`
+   - operational driver sections
 
-## 8) Visual/UI state
+## 9) Visual/UI state
 
-- Main portal has a **user-selectable light/dark theme toggle**.
-  - Light theme: soft white/slate (current default).
-  - Dark theme: dark navy baseline (original style).
-  - Preference persisted in `localStorage("jet_theme")`.
-  - Header controls now include:
-    - manual refresh,
-    - auto-refresh toggle (`Auto 30s`),
-    - theme toggle,
-    - log out.
-  - Drivers also have a dedicated refresh button on the weekly rota screen next to week navigation.
-  - Toggle button: ☽/☀ icon in the main app header and text link on the login page.
-  - Theme tokens defined in `jet-ui-helpers.js` as `LIGHT_THEME` and `DARK_THEME`, exported via `THEMES`. Active theme is resolved inside `App()` — all `C.xxx` references respond automatically.
-- Standalone duty cards app remains light-themed (no toggle — separate app).
-- UI rule has been to preserve layout/interaction patterns and avoid disruptive redesigns.
+- Main portal has light/dark theme toggle.
+- Top header now keeps only:
+  - theme toggle
+  - log out
+- Weekly manager header carries:
+  - `All Staff`
+  - refresh icon
+  - menu icon
+- Weekly manager header is tuned to stay inline on larger phones and web, with controlled wrap only on genuinely narrow widths.
+- `Generate Timesheet` and `Swap Request` now share the same button treatment in both light and dark mode.
+- Standalone duty-cards app remains separate and light-themed.
 
-## 9) Security and compliance posture (current)
+## 10) Security posture (current)
 
-- Auth and session checks are server-side, not purely client trust.
-- Sensitive request actions validate the logged-in identity.
-- Email request routing is fixed by request type:
-  - leave -> `errol@jasonedwardstravel.co.uk`
-  - shift swap -> `operations@jasonedwardstravel.co.uk`
-- Ingest endpoints protected by API key (timing-safe comparison).
-- Blob storage is public-access (URLs are long random strings, not discoverable; write access requires the API key).
-- Portal messaging and handling acknowledge staff data sensitivity (UK GDPR context).
+What is strong now:
+- transport is HTTPS in normal production use,
+- per-user 6-digit PINs are hashed server-side,
+- auth/session checks are server-side,
+- real session token is now in an `HttpOnly` cookie,
+- leave/swap actions are authenticated server-side,
+- login throttling is in place,
+- ingest endpoints require `API_INGEST_KEY`.
 
-## 10) Current blockers / open decisions
+What is still weaker than ideal:
+- current Blob store is still public-access at the storage layer,
+- rate limiting is not yet distributed/persistent across all serverless instances,
+- Office Script ingest credentials are still shared operational secrets,
+- timesheet still relies on the user's mail app,
+- no MFA.
 
-1. ~~SharePoint integration completion path~~ — resolved: using Office Scripts instead of Power Automate.
-2. ~~Where JSON feed should be published~~ — resolved: Vercel Blob via backend ingest endpoints.
-3. ~~Portal frontend wired to backend adapter~~ — resolved: `ACTIVE_ROTA_ADAPTER_KEY = "backend"` live.
-4. ~~Remove name auto-population on login screen~~ — resolved: plain text input, no pre-fill.
-5. Office Script 1 and Script 2 both need end-to-end testing with real operational files and production credentials.
-6. Planned security upgrade (not yet implemented):
-   - Upgrade from 4-digit to 6-digit PIN.
+Presentation-safe summary:
+- secure enough for internal operational rollout,
+- not yet at full enterprise-hardening level,
+- clear next upgrades are already identified.
 
-## 11) Immediate next steps (recommended order)
+## 11) Open items / next steps
 
-1. ~~Build Office Script 1 (rota publish)~~ — done: `office-scripts/publish-rota.ts`.
-2. ~~Wire up portal frontend to backend adapter~~ — done: `ACTIVE_ROTA_ADAPTER_KEY = "backend"`.
-3. ~~Remove login name auto-population~~ — done: plain text input.
-4. Test Office Script 1 end-to-end with real rota data (WC 09.03.2026).
-5. Test Office Script 2 end-to-end with a real allocation sheet publish.
-6. Monitor the new driver-facing refresh flow in real use:
-   - weekly-view manual refresh,
-   - header auto-refresh toggle (`30s`).
-7. Decide whether leave / swap should stay `mailto:` or be switched over to `/api/send-request`.
-8. Implement 6-digit PIN upgrade.
+Recommended order:
 
-## 12) Known project docs and where to look first
+1. End-to-end test the rota Office Script with the real workbook and production ingest config.
+2. End-to-end test the allocation Office Script with the real workbook and production ingest config.
+3. Migrate from the current public Blob store to a private Blob store.
+4. Republish rota/allocation data into the private store.
+5. Decide whether timesheet should also move from `mailto:` to backend email send.
+6. If stronger security is required after rollout:
+   - add distributed rate limiting,
+   - consider shorter session TTL,
+   - consider stronger admin authentication requirements.
+
+## 12) Known docs and recommended reading order
 
 Read in this order:
 
 1. `docs/portal-project-progress.md` (this file)
-2. `docs/architecture-v2.md` (adapter/modularization decisions)
-3. `docs/server-email.md` (email/auth env requirements)
-4. `docs/power-automate-progress.md` (historical — approach deprioritized)
+2. `docs/architecture-v2.md`
+3. `docs/server-email.md`
+4. `docs/power-automate-progress.md` (historical notes / incomplete external setup progress)
 
 Then inspect implementation files:
 
 1. `index_files/jet-data.js`
-2. `index_files/jet-data-layer.js` — note `ACTIVE_ROTA_ADAPTER_KEY = "backend"`
-3. `index_files/jet-ui-helpers.js` — note `THEMES` export with `LIGHT_THEME` / `DARK_THEME`
+2. `index_files/jet-data-layer.js`
+3. `index_files/jet-ui-helpers.js`
 4. `index_files/app.js`
 5. `index_files/duty-cards-app.js`
 6. `api/_auth.js`
-7. `api/_ingest-auth.js`
-8. `office-scripts/publish-rota.ts` — Office Script for rota publish
-9. `office-scripts/publish-allocation.ts` — Office Script for allocation publish
+7. `api/_blob-json.js`
+8. `api/_ingest-auth.js`
+9. `office-scripts/publish-rota.ts`
+10. `office-scripts/publish-allocation.ts`
 
 ## 13) Environment variables currently relevant
 
@@ -260,28 +298,34 @@ Email:
 - `RESEND_API_KEY`
 - `PORTAL_EMAIL_FROM`
 
-Blob storage + ingest:
-- `BLOB_READ_WRITE_TOKEN` (auto-set by Vercel when Blob store is linked)
-- `API_INGEST_KEY` (shared secret for Office Scripts to authenticate ingest requests)
+Blob + ingest:
+- `BLOB_READ_WRITE_TOKEN`
+- `BLOB_ACCESS_MODE`
+- `API_INGEST_KEY`
 
 ## 14) Blob storage details
 
-- Provider: Vercel Blob (public access store)
 - Path convention:
-  - `rota/{YYYY-MM-DD}.json` — weekly rota keyed by week-commencing date
-  - `allocation/{YYYY-MM-DD}.json` — daily allocation keyed by date
-- Overwrites: `addRandomSuffix: false` allows repeated publishes to the same path (last write wins)
-- Max weeks retained: no hard limit in code, but `rota-weeks.js` lists all available
+  - `rota/{YYYY-MM-DD}.json`
+  - `allocation/{YYYY-MM-DD}.json`
+- Repeated publishes overwrite the same logical path
+- `api/rota-weeks.js` lists available rota weeks
+- Current store mode is public
+- Current code is prepared for a future private-store cutover
+- Private-store migration still requires:
+  - creating/linking a new private Blob store,
+  - setting `BLOB_ACCESS_MODE=private`,
+  - republishing data
 
 ## 15) Practical notes for future contributors/models
 
-1. Avoid broad rewrites; this project has many UX-sensitive workflows already validated by the user.
-2. Keep manager-only guard behavior intact.
-3. Keep mobile behavior front-of-mind for all UI changes.
-4. Preserve the stop-directory map accuracy work and route-direction matching behavior.
-5. Before changing data ingestion, maintain a rollback path to known-good Google Sheets feed.
-6. If uncertain, prefer additive changes behind toggles/adapters rather than replacing existing flow.
-7. ~~The ingest endpoints are additive — they do not affect the existing portal until the adapter is switched.~~ The adapter has now been switched. Google Sheets adapter remains as rollback (one-line change).
-8. Office Scripts run in Excel for the web only (not desktop Excel).
-9. The theme toggle (`THEMES` in `jet-ui-helpers.js`, `const C = THEMES[theme]` in `App()`) means all color references throughout the portal respond to the toggle automatically. Do not hardcode color values outside the theme objects.
-10. Login name is now a plain free-text input — the server validates the name against known staff on `/api/auth-login`. Do not re-add client-side name autocomplete without confirming with the project owner.
+1. Avoid broad rewrites; this project is operationally sensitive.
+2. Keep mobile behavior front-of-mind for all UI changes.
+3. Keep manager-only behavior intact.
+4. Do not reintroduce client-stored bearer-token auth as the main session mechanism.
+5. Do not assume the current Blob store is private just because the read layer now supports it.
+6. If changing Office Script publish logic, keep backward compatibility with the current ingest endpoints unless there is a clear migration plan.
+7. The rate limiter is intentionally simple; treat it as a first hardening step, not a finished anti-abuse system.
+8. The theme system is centralized in `jet-ui-helpers.js`; do not hardcode ad-hoc colors in new UI work unless necessary.
+9. The in-app staff directory remains the source of truth for names/sections, including access-group labeling.
+10. Timesheet email flow is the main remaining user-facing request flow that has not yet been moved fully server-side.
