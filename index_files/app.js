@@ -120,6 +120,8 @@ const AUTH_SESSION_ENDPOINT = "/api/auth-session";
 const AUTH_LOGOUT_ENDPOINT = "/api/auth-logout";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
 const REQUEST_EMAIL_ENDPOINT = "/api/send-request";
+const SWAP_REQUESTS_ENDPOINT = "/api/swap-requests";
+const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
@@ -490,6 +492,86 @@ async function sendPortalRequestEmail(kind, payload) {
   }
   return data;
 }
+async function fetchSwapRequests() {
+  const response = await fetch(SWAP_REQUESTS_ENDPOINT, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !Array.isArray(data.requests)) {
+    throw new Error(data?.error || "Unable to load swap requests right now.");
+  }
+  return data.requests;
+}
+async function createSwapRequest(payload) {
+  const response = await fetch(SWAP_REQUESTS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    credentials: "same-origin",
+    cache: "no-store",
+    body: JSON.stringify({ payload })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !data?.request) {
+    throw new Error(data?.error || "Unable to create swap request right now.");
+  }
+  return data.request;
+}
+async function updateSwapRequestAction(id, action) {
+  const response = await fetch(SWAP_REQUEST_ACTION_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    credentials: "same-origin",
+    cache: "no-store",
+    body: JSON.stringify({
+      id,
+      action
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !data?.request) {
+    throw new Error(data?.error || "Unable to update swap request right now.");
+  }
+  return data.request;
+}
+function formatSwapWeekLabel(weekCommencing) {
+  const match = String(weekCommencing || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return String(weekCommencing || "");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  return `w/c ${Number.parseInt(match[3], 10)} ${months[monthIndex] || match[2]} ${match[1]}`;
+}
+function parseWeekTabNameToIso(tabName) {
+  const match = String(tabName || "").match(/^WC (\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return "";
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+function formatSwapDateTime(isoValue) {
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+function formatSwapExpiryLabel(isoValue) {
+  const date = new Date(isoValue);
+  const millis = date.getTime() - Date.now();
+  if (!Number.isFinite(millis)) return "";
+  if (millis <= 0) return "Expired";
+  const totalMinutes = Math.ceil(millis / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor(totalMinutes % (60 * 24) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `Expires in ${days}d ${hours}h`;
+  if (hours > 0) return `Expires in ${hours}h ${minutes}m`;
+  return `Expires in ${minutes}m`;
+}
 const STOP_DIRECTORY = Array.isArray(window.JET_STOP_DIRECTORY) ? window.JET_STOP_DIRECTORY : [];
 const STOP_OPERATION_PATTERNS = [/^sign on/i, /^sign off/i, /^empty to/i, /^take over/i, /^hand over/i, /^pull on stand/i, /^travel on tube/i, /^arrive for loading/i];
 const STOP_TOKEN_IGNORE = new Set(["the", "and", "to", "for", "of", "at", "in", "on", "bus", "station", "stn", "road", "rd", "stop", "coach", "stops", "nr", "near", "opp", "opposite", "o", "s", "bay", "bays", "lower", "upper", "airport"]);
@@ -833,6 +915,10 @@ function App() {
   const [swapSubmitted, setSwapSubmitted] = React.useState(false);
   const [swapSending, setSwapSending] = React.useState(false);
   const [swapError, setSwapError] = React.useState("");
+  const [swapRequests, setSwapRequests] = React.useState([]);
+  const [swapRequestsLoading, setSwapRequestsLoading] = React.useState(false);
+  const [swapRequestsError, setSwapRequestsError] = React.useState("");
+  const [swapActionPending, setSwapActionPending] = React.useState("");
   const [timesheetRows, setTimesheetRows] = React.useState([]);
   const [timesheetSubmitted, setTimesheetSubmitted] = React.useState(false);
   const [timesheetSending, setTimesheetSending] = React.useState(false);
@@ -896,6 +982,23 @@ function App() {
     if (selectedDriver && DRIVERS.includes(selectedDriver)) return selectedDriver;
     return null;
   }, [currentUser, selectedDriver, DRIVERS]);
+  const loadSwapRequestsForActionDriver = React.useCallback(async () => {
+    if (!actionDriver) {
+      setSwapRequests([]);
+      setSwapRequestsError("");
+      return;
+    }
+    setSwapRequestsLoading(true);
+    setSwapRequestsError("");
+    try {
+      const requests = await fetchSwapRequests();
+      setSwapRequests(Array.isArray(requests) ? requests : []);
+    } catch (error) {
+      setSwapRequestsError(error?.message || "Unable to load swap requests right now.");
+    } finally {
+      setSwapRequestsLoading(false);
+    }
+  }, [actionDriver]);
   const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
     const dutyValue = dutyCode === null || dutyCode === undefined || dutyCode === "" ? "—" : String(dutyCode).trim();
     const forceBlankTimesheetFields = isAvrOrPrivateHireDutyCode(dutyValue);
@@ -1219,6 +1322,10 @@ function App() {
     if (!Array.isArray(timesheetRows) || timesheetRows.length !== DAYS.length) return;
     saveTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, timesheetRows);
   }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows]);
+  React.useEffect(() => {
+    if (!authed || screen !== "swap") return;
+    loadSwapRequestsForActionDriver();
+  }, [authed, screen, loadSwapRequestsForActionDriver]);
   React.useEffect(() => {
     setShowWeekMenu(false);
   }, [screen, selectedDriver, currentUser]);
@@ -3040,31 +3147,11 @@ function App() {
   })(), screen === "swap" && actionDriver && (() => {
     const myRota = ROTA[actionDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== actionDriver);
-    const selectedDayDuty = swapForm.dayIndex !== "" ? myRota[parseInt(swapForm.dayIndex)] || "—" : null;
+    const selectedDayIndex = swapForm.dayIndex === "" ? null : parseInt(swapForm.dayIndex, 10);
+    const selectedDayDuty = selectedDayIndex !== null ? myRota[selectedDayIndex] || "—" : null;
     const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
-    const targetDayDuty = swapForm.dayIndex !== "" && swapForm.targetDriver ? targetRota[parseInt(swapForm.dayIndex)] || "—" : null;
-    const handleSwapSubmit = () => {
-      if (swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending) return;
-      const dayName = DAYS[parseInt(swapForm.dayIndex)];
-      setSwapSending(true);
-      setSwapError("");
-      const submittedAtIso = new Date().toISOString();
-      sendPortalRequestEmail("swap", {
-        requestingDriver: actionDriver,
-        targetDriver: swapForm.targetDriver,
-        dayName,
-        requestingDuty: selectedDayDuty || "—",
-        targetDuty: targetDayDuty || "—",
-        notes: swapForm.notes || "",
-        submittedAtIso
-      }).then(() => {
-        setSwapSubmitted(true);
-      }).catch(err => {
-        setSwapError(err?.message || "Unable to send your swap request right now.");
-      }).finally(() => {
-        setSwapSending(false);
-      });
-    };
+    const targetDayDuty = selectedDayIndex !== null && swapForm.targetDriver ? targetRota[selectedDayIndex] || "—" : null;
+    const weekCommencing = parseWeekTabNameToIso(currentTabName);
     const inputStyle = {
       width: "100%",
       padding: "12px 14px",
@@ -3076,6 +3163,231 @@ function App() {
       fontFamily: "inherit",
       outline: "none",
       boxSizing: "border-box"
+    };
+    const statusStyles = {
+      pending: {
+        background: "#f59e0b22",
+        color: "#fbbf24"
+      },
+      approved: {
+        background: "#22c55e22",
+        color: "#4ade80"
+      },
+      declined: {
+        background: "#ef444422",
+        color: "#f87171"
+      },
+      cancelled: {
+        background: C.textDim + "22",
+        color: C.textDim
+      },
+      expired: {
+        background: "#64748b22",
+        color: "#94a3b8"
+      }
+    };
+    const outboundPending = swapRequests.filter(request => request.status === "pending" && request.requestingDriver === actionDriver);
+    const inboundPending = swapRequests.filter(request => request.status === "pending" && request.targetDriver === actionDriver);
+    const resolvedRequests = swapRequests.filter(request => request.status !== "pending");
+    const handleSwapSubmit = () => {
+      if (selectedDayIndex === null || !swapForm.targetDriver || swapSending) return;
+      setSwapSending(true);
+      setSwapError("");
+      createSwapRequest({
+        requestingDriver: actionDriver,
+        targetDriver: swapForm.targetDriver,
+        dayIndex: selectedDayIndex,
+        dayName: DAYS[selectedDayIndex],
+        weekCommencing,
+        requestingDuty: selectedDayDuty || "—",
+        targetDuty: targetDayDuty || "—",
+        notes: swapForm.notes || ""
+      }).then(request => {
+        setSwapRequests(prev => [request, ...prev]);
+        setSwapSubmitted(true);
+      }).catch(err => {
+        setSwapError(err?.message || "Unable to send your swap request right now.");
+      }).finally(() => {
+        setSwapSending(false);
+      });
+    };
+    const handleSwapAction = (id, action) => {
+      if (!id || swapActionPending) return;
+      setSwapActionPending(`${action}:${id}`);
+      setSwapError("");
+      updateSwapRequestAction(id, action).then(updatedRequest => {
+        setSwapRequests(prev => prev.map(request => request.id === updatedRequest.id ? updatedRequest : request));
+      }).catch(err => {
+        setSwapError(err?.message || "Unable to update this swap request right now.");
+      }).finally(() => {
+        setSwapActionPending("");
+      });
+    };
+    const renderSwapRequestCard = (request, context) => {
+      const badgeStyle = statusStyles[request.status] || statusStyles.cancelled;
+      const isInbound = context === "inbound";
+      const isOutbound = context === "outbound";
+      const actionDisabled = swapActionPending !== "";
+      const summaryLabel = isInbound ? `${request.requestingDriver} wants your ${request.dayName} duty` : isOutbound ? `Awaiting ${request.targetDriver}` : `${request.requestingDriver} ↔ ${request.targetDriver}`;
+      return /*#__PURE__*/React.createElement("div", {
+        key: request.id,
+        style: {
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: "10px",
+          padding: "12px 14px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "10px"
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "12px",
+          fontWeight: 700,
+          color: C.white
+        }
+      }, summaryLabel), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, request.dayName, " · ", formatSwapWeekLabel(request.weekCommencing))), /*#__PURE__*/React.createElement("span", {
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: "999px",
+          padding: "4px 8px",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.4px",
+          background: badgeStyle.background,
+          color: badgeStyle.color,
+          textTransform: "uppercase"
+        }
+      }, request.status)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "8px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: "#06b6d411",
+          border: "1px solid #06b6d422",
+          borderRadius: "8px",
+          padding: "10px 12px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "9px",
+          color: C.textDim,
+          letterSpacing: "0.5px",
+          fontWeight: 700,
+          marginBottom: "4px"
+        }
+      }, request.requestingDriver === actionDriver ? "YOUR DUTY" : `${request.requestingDriver.toUpperCase()}'S DUTY`), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "14px",
+          fontWeight: 700,
+          color: "#06b6d4"
+        }
+      }, request.requestingDuty)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: "#f9731611",
+          border: "1px solid #f9731622",
+          borderRadius: "8px",
+          padding: "10px 12px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "9px",
+          color: C.textDim,
+          letterSpacing: "0.5px",
+          fontWeight: 700,
+          marginBottom: "4px"
+        }
+      }, request.targetDriver === actionDriver ? "YOUR DUTY" : `${request.targetDriver.toUpperCase()}'S DUTY`), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "14px",
+          fontWeight: 700,
+          color: "#f97316"
+        }
+      }, request.targetDuty))), request.notes && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          lineHeight: 1.5
+        }
+      }, "Notes: ", request.notes), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "10px",
+          fontSize: "10px",
+          color: C.textDim
+        }
+      }, /*#__PURE__*/React.createElement("span", null, "Created: ", formatSwapDateTime(request.createdAt)), request.status === "pending" ? /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.accent
+        }
+      }, formatSwapExpiryLabel(request.expiresAt)) : request.respondedAt ? /*#__PURE__*/React.createElement("span", null, "Updated: ", formatSwapDateTime(request.respondedAt)) : null), request.status === "pending" && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: "8px",
+          flexWrap: "wrap"
+        }
+      }, isInbound && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleSwapAction(request.id, "approve"),
+        disabled: actionDisabled,
+        style: {
+          background: "#22c55e",
+          color: C.bg,
+          border: "none",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          fontSize: "11px",
+          fontWeight: 700,
+          cursor: actionDisabled ? "not-allowed" : "pointer",
+          fontFamily: "inherit"
+        }
+      }, swapActionPending === `approve:${request.id}` ? "Approving..." : "Approve"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleSwapAction(request.id, "decline"),
+        disabled: actionDisabled,
+        style: {
+          background: "#ef4444",
+          color: C.white,
+          border: "none",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          fontSize: "11px",
+          fontWeight: 700,
+          cursor: actionDisabled ? "not-allowed" : "pointer",
+          fontFamily: "inherit"
+        }
+      }, swapActionPending === `decline:${request.id}` ? "Declining..." : "Decline")), isOutbound && /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleSwapAction(request.id, "cancel"),
+        disabled: actionDisabled,
+        style: {
+          background: C.textDim + "22",
+          color: C.text,
+          border: `1px solid ${C.border}`,
+          borderRadius: "8px",
+          padding: "10px 14px",
+          fontSize: "11px",
+          fontWeight: 700,
+          cursor: actionDisabled ? "not-allowed" : "pointer",
+          fontFamily: "inherit"
+        }
+      }, swapActionPending === `cancel:${request.id}` ? "Cancelling..." : "Cancel")));
     };
     if (swapSubmitted) return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3101,9 +3413,8 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your shift swap request has been sent to office staff."), /*#__PURE__*/React.createElement("button", {
+    }, "Your shift swap request is now waiting for the other driver to approve it."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
-        setScreen("week");
         setSwapSubmitted(false);
         setSwapError("");
         setSwapSending(false);
@@ -3124,7 +3435,7 @@ function App() {
         cursor: "pointer",
         fontFamily: "inherit"
       }
-    }, "Back to Rota"));
+    }, "Back to Swaps"));
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: "20px"
@@ -3191,31 +3502,13 @@ function App() {
         letterSpacing: "0.5px",
         marginBottom: "4px"
       }
-    }, "YOUR DUTY (", DAYS[parseInt(swapForm.dayIndex)], ")"), /*#__PURE__*/React.createElement("div", {
+    }, "YOUR DUTY (", DAYS[selectedDayIndex], ")"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "16px",
         fontWeight: 700,
         color: "#06b6d4"
       }
-    }, selectedDayDuty), (() => {
-      const sp = getSpecialDuty(selectedDayDuty);
-      const dc = isDutyNumber(selectedDayDuty) ? DUTY_CARDS[parseInt(selectedDayDuty)] : null;
-      if (dc) return /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: "10px",
-          color: C.textMuted,
-          marginTop: "2px"
-        }
-      }, dc.route, " \xB7 ", dc.signOn, "\u2013", dc.signOff);
-      if (sp && sp.signOn !== "—") return /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: "10px",
-          color: C.textMuted,
-          marginTop: "2px"
-        }
-      }, sp.label, " \xB7 ", sp.signOn, "\u2013", sp.signOff);
-      return null;
-    })()), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    }, selectedDayDuty)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
       style: {
         display: "block",
         fontSize: "11px",
@@ -3238,7 +3531,7 @@ function App() {
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
     }, "Select a driver..."), otherDrivers.map(d => {
-      const theirDuty = swapForm.dayIndex !== "" ? ROTA[d]?.[parseInt(swapForm.dayIndex)] || "—" : "";
+      const theirDuty = selectedDayIndex !== null ? ROTA[d]?.[selectedDayIndex] || "—" : "";
       return /*#__PURE__*/React.createElement("option", {
         key: d,
         value: d
@@ -3258,31 +3551,13 @@ function App() {
         letterSpacing: "0.5px",
         marginBottom: "4px"
       }
-    }, swapForm.targetDriver.toUpperCase(), "'S DUTY (", DAYS[parseInt(swapForm.dayIndex)], ")"), /*#__PURE__*/React.createElement("div", {
+    }, swapForm.targetDriver.toUpperCase(), "'S DUTY (", DAYS[selectedDayIndex], ")"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "16px",
         fontWeight: 700,
         color: "#f97316"
       }
-    }, targetDayDuty), (() => {
-      const sp = getSpecialDuty(targetDayDuty);
-      const dc = isDutyNumber(targetDayDuty) ? DUTY_CARDS[parseInt(targetDayDuty)] : null;
-      if (dc) return /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: "10px",
-          color: C.textMuted,
-          marginTop: "2px"
-        }
-      }, dc.route, " \xB7 ", dc.signOn, "\u2013", dc.signOff);
-      if (sp && sp.signOn !== "—") return /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: "10px",
-          color: C.textMuted,
-          marginTop: "2px"
-        }
-      }, sp.label, " \xB7 ", sp.signOn, "\u2013", sp.signOff);
-      return null;
-    })()), selectedDayDuty && targetDayDuty && swapForm.targetDriver && /*#__PURE__*/React.createElement("div", {
+    }, targetDayDuty)), selectedDayDuty && targetDayDuty && swapForm.targetDriver && /*#__PURE__*/React.createElement("div", {
       style: {
         background: C.surface,
         border: `1px solid ${C.border}`,
@@ -3298,7 +3573,7 @@ function App() {
         letterSpacing: "0.5px",
         marginBottom: "10px"
       }
-    }, "SWAP PREVIEW \u2014 ", DAYS[parseInt(swapForm.dayIndex)]), /*#__PURE__*/React.createElement("div", {
+    }, "SWAP PREVIEW \u2014 ", DAYS[selectedDayIndex]), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -3355,22 +3630,22 @@ function App() {
       }
     })), /*#__PURE__*/React.createElement("button", {
       onClick: handleSwapSubmit,
-      disabled: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending,
+      disabled: selectedDayIndex === null || !swapForm.targetDriver || swapSending,
       style: {
         width: "100%",
         padding: "14px",
-        background: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending ? C.textDim + "44" : "#06b6d4",
-        color: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending ? C.textDim : C.bg,
+        background: selectedDayIndex === null || !swapForm.targetDriver || swapSending ? C.textDim + "44" : "#06b6d4",
+        color: selectedDayIndex === null || !swapForm.targetDriver || swapSending ? C.textDim : C.bg,
         border: "none",
         borderRadius: "8px",
         fontSize: "14px",
         fontWeight: 700,
-        cursor: swapForm.dayIndex === "" || !swapForm.targetDriver || swapSending ? "not-allowed" : "pointer",
+        cursor: selectedDayIndex === null || !swapForm.targetDriver || swapSending ? "not-allowed" : "pointer",
         fontFamily: "inherit",
         letterSpacing: "0.5px",
         marginTop: "6px"
       }
-    }, swapSending ? "Sending..." : "Submit Swap Request"), swapError && /*#__PURE__*/React.createElement("p", {
+    }, swapSending ? "Sending..." : "Send Swap Request"), swapError && /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "10px",
         color: "#be123c",
@@ -3386,7 +3661,65 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "This sends your swap request directly to office staff.")));
+    }, "This sends your request to the other driver for approval. Management is emailed only after approval.")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 700,
+        color: C.white,
+        marginBottom: "8px"
+      }
+    }, "Waiting For Your Approval"), swapRequestsLoading ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim
+      }
+    }, "Loading swap requests...") : inboundPending.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        padding: "12px 0"
+      }
+    }, "No incoming swap approvals.") : inboundPending.map(request => renderSwapRequestCard(request, "inbound"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 700,
+        color: C.white,
+        marginBottom: "8px"
+      }
+    }, "Waiting For Other Drivers"), !swapRequestsLoading && outboundPending.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        padding: "12px 0"
+      }
+    }, "No outbound pending swaps.") : outboundPending.map(request => renderSwapRequestCard(request, "outbound"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 700,
+        color: C.white,
+        marginBottom: "8px"
+      }
+    }, "Recent Swap History"), !swapRequestsLoading && resolvedRequests.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: C.textDim,
+        padding: "12px 0"
+      }
+    }, "No resolved swaps yet.") : resolvedRequests.map(request => renderSwapRequestCard(request, "history"))), swapRequestsError && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: "10px",
+        color: "#be123c",
+        lineHeight: 1.5,
+        margin: "2px 0 0"
+      }
+    }, swapRequestsError)));
   })(), screen === "timesheet" && actionDriver && (() => {
     const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(actionDriver);
     const updateTimesheetRow = (dayIndex, patch) => {
