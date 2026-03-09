@@ -217,7 +217,7 @@ Important:
    - stale draft rows are ignored if the underlying duty changed,
    - Paddington travel default -> `£6`,
    - Victoria travel default -> `£9`,
-   - still submitted via `mailto:` today.
+   - still submitted via `mailto:` today, drafting to `errol@jasonedwardstravel.co.uk`.
 
 6. Duty cards
    - route/destination/stop search,

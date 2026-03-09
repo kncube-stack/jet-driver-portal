@@ -13,6 +13,7 @@ The portal currently uses a mixed model:
 
 ## Routing rules
 - leave mail drafts target `errol@jasonedwardstravel.co.uk`
+- timesheet mail drafts target `errol@jasonedwardstravel.co.uk`
 - `kind: "leave"` -> `errol@jasonedwardstravel.co.uk`
 - `kind: "swap"` -> `operations@jasonedwardstravel.co.uk`
 
