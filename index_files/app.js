@@ -539,6 +539,10 @@ async function updateSwapRequestAction(id, action) {
   }
   return data.request;
 }
+function countPendingSwapApprovals(requests, driverName) {
+  if (!driverName || !Array.isArray(requests)) return 0;
+  return requests.filter(request => request.status === "pending" && request.targetDriver === driverName).length;
+}
 function formatSwapWeekLabel(weekCommencing) {
   const match = String(weekCommencing || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return String(weekCommencing || "");
@@ -915,6 +919,7 @@ function App() {
   const [swapSubmitted, setSwapSubmitted] = React.useState(false);
   const [swapSending, setSwapSending] = React.useState(false);
   const [swapError, setSwapError] = React.useState("");
+  const [swapBadgeCount, setSwapBadgeCount] = React.useState(0);
   const [swapRequests, setSwapRequests] = React.useState([]);
   const [swapRequestsLoading, setSwapRequestsLoading] = React.useState(false);
   const [swapRequestsError, setSwapRequestsError] = React.useState("");
@@ -999,10 +1004,18 @@ function App() {
       setSwapRequestsLoading(false);
     }
   }, [actionDriver]);
-  const inboundSwapRequestCount = React.useMemo(() => {
-    if (!actionDriver || !Array.isArray(swapRequests)) return 0;
-    return swapRequests.filter(request => request.status === "pending" && request.targetDriver === actionDriver).length;
-  }, [swapRequests, actionDriver]);
+  const loadSwapBadgeCountForCurrentUser = React.useCallback(async () => {
+    if (!currentUser) {
+      setSwapBadgeCount(0);
+      return;
+    }
+    try {
+      const requests = await fetchSwapRequests();
+      setSwapBadgeCount(countPendingSwapApprovals(requests, currentUser));
+    } catch {
+      setSwapBadgeCount(0);
+    }
+  }, [currentUser]);
   const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
     const dutyValue = dutyCode === null || dutyCode === undefined || dutyCode === "" ? "—" : String(dutyCode).trim();
     const forceBlankTimesheetFields = isAvrOrPrivateHireDutyCode(dutyValue);
@@ -1327,9 +1340,17 @@ function App() {
     saveTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, timesheetRows);
   }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows]);
   React.useEffect(() => {
-    if (!authed || !actionDriver) return;
+    if (!authed || !currentUser) return;
+    loadSwapBadgeCountForCurrentUser();
+  }, [authed, currentUser, loadSwapBadgeCountForCurrentUser]);
+  React.useEffect(() => {
+    if (!authed || screen !== "swap" || !actionDriver) return;
     loadSwapRequestsForActionDriver();
-  }, [authed, actionDriver, loadSwapRequestsForActionDriver]);
+  }, [authed, screen, actionDriver, loadSwapRequestsForActionDriver]);
+  React.useEffect(() => {
+    if (screen !== "swap") return;
+    setSwapBadgeCount(countPendingSwapApprovals(swapRequests, currentUser));
+  }, [screen, swapRequests, currentUser]);
   React.useEffect(() => {
     setShowWeekMenu(false);
   }, [screen, selectedDriver, currentUser]);
@@ -1884,23 +1905,19 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: openSwapRequestScreen,
-    style: weekPrimaryActionStyle,
+    style: {
+      ...weekPrimaryActionStyle,
+      position: "relative",
+      overflow: "visible"
+    },
     onMouseEnter: handleWeekPrimaryActionMouseEnter,
     onMouseLeave: handleWeekPrimaryActionMouseLeave
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      position: "relative",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "8px"
-    }
-  }, "\uD83D\uDD04 Swap Request", inboundSwapRequestCount > 0 && /*#__PURE__*/React.createElement("span", {
-    title: `${inboundSwapRequestCount} pending swap ${inboundSwapRequestCount === 1 ? "request" : "requests"} awaiting your approval`,
+  }, "\uD83D\uDD04 Swap Request", swapBadgeCount > 0 && /*#__PURE__*/React.createElement("span", {
+    title: `${swapBadgeCount} pending swap ${swapBadgeCount === 1 ? "request" : "requests"} awaiting your approval`,
     style: {
       position: "absolute",
-      top: "-11px",
-      right: "-18px",
+      top: "-8px",
+      right: "-8px",
       minWidth: "18px",
       height: "18px",
       padding: "0 5px",
@@ -1913,7 +1930,7 @@ function App() {
       textAlign: "center",
       boxShadow: `0 0 0 2px ${theme === "dark" ? "#1e293b" : "#f8fafc"}`
     }
-  }, inboundSwapRequestCount > 9 ? "9+" : String(inboundSwapRequestCount)))), /*#__PURE__*/React.createElement("button", {
+  }, swapBadgeCount > 9 ? "9+" : String(swapBadgeCount))), /*#__PURE__*/React.createElement("button", {
     onClick: openTimesheetScreen,
     style: weekPrimaryActionStyle,
     onMouseEnter: handleWeekPrimaryActionMouseEnter,
