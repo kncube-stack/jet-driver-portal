@@ -4968,7 +4968,7 @@ const MANUAL_STAFF_OVERRIDES = [{
 // - mode is informational for UI messaging.
 // - PIN verification is performed server-side via /api/auth-login.
 const ACCESS_CONTROL = {
-  mode: "soft",
+  mode: "strict",
   managerNames: ["Alfie Hoque", "Errol Thomas", "Jason Edwards", "Kennedy Ncube", "Joao Ferreira", "Mo ali", "Davina Howards", "Umair Akram", "Adrian Koprowski"],
   authProvider: "server"
 };
