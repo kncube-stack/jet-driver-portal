@@ -108,8 +108,10 @@ Utility/script:
 ## 6) Authentication and access model (current)
 
 - Name + PIN sign-in is server-side only.
-- The live auth mode is now expected to be `strict`.
+- The live auth mode is `strict`.
 - Per-user 6-digit PIN hashes are supplied via `AUTH_USER_PIN_HASHES`.
+- Shared driver PIN fallback is disabled.
+- Manager master/shared PIN fallback is disabled.
 - Manager/duty-manager names are resolved from `ACCESS_CONTROL.managerNames`.
 - Successful login sets an `HttpOnly`, `SameSite=Lax` session cookie (`jet_portal_session`).
 - The browser still caches lightweight session metadata locally for UX continuity, but the actual auth token is no longer stored client-side for normal operation.
@@ -314,8 +316,6 @@ Auth:
 - `AUTH_USER_PIN_HASHES`
 - `AUTH_MANAGER_NAMES`
 - `AUTH_ALLOWED_NAMES`
-- `AUTH_DEFAULT_DRIVER_PIN_HASH`
-- `AUTH_MANAGER_MASTER_PIN_HASH`
 - `AUTH_TOKEN_TTL_SECONDS`
 
 Email:
