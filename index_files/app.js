@@ -984,6 +984,31 @@ function App() {
       cancelled = true;
     };
   }, []);
+  React.useEffect(() => {
+    if (!authed) return undefined;
+    const syncCurrentWeekOnResume = () => {
+      if (document.hidden) return;
+      if (!currentTabNameRef.current) return;
+      if (refreshInFlightRef.current) return;
+      const now = new Date();
+      const dow = now.getDay();
+      const diffToMon = dow === 0 ? 6 : dow - 1;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - diffToMon);
+      const dd = String(monday.getDate()).padStart(2, "0");
+      const mm = String(monday.getMonth() + 1).padStart(2, "0");
+      const liveWeekTabName = `WC ${dd}.${mm}.${monday.getFullYear()}`;
+      if (currentTabNameRef.current !== liveWeekTabName) {
+        refreshRota("");
+      }
+    };
+    document.addEventListener("visibilitychange", syncCurrentWeekOnResume);
+    window.addEventListener("focus", syncCurrentWeekOnResume);
+    return () => {
+      document.removeEventListener("visibilitychange", syncCurrentWeekOnResume);
+      window.removeEventListener("focus", syncCurrentWeekOnResume);
+    };
+  }, [authed]);
 
   const getTodayRunoutLive = dutyNum => {
     if (liveAllocation) return liveAllocation[String(dutyNum)] || null;
