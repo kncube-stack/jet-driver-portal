@@ -2238,6 +2238,7 @@ function App() {
       const cellNote = null;
       const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
       const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
+      const hideRowViewCardButton = isToday && hasDutyCard && !!todayDutyCard;
       return /*#__PURE__*/React.createElement("div", {
         key: day,
         style: {
@@ -2320,7 +2321,7 @@ function App() {
           lineHeight: 1.3,
           whiteSpace: "pre-line"
         }
-      }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && /*#__PURE__*/React.createElement("button", {
+      }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && !hideRowViewCardButton && /*#__PURE__*/React.createElement("button", {
         onClick: () => {
           setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
           setScreen("duty");
