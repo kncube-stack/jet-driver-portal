@@ -1711,6 +1711,7 @@ function App() {
   }, "\uD83E\uDDFE Generate Timesheet"));
   const renderWeekScreen = () => {
     if (!selectedDriver) return null;
+    const canShowWeekPrimaryActions = !!actionDriver && selectedDriver === actionDriver;
     const todayVal = ROTA[selectedDriver]?.[today] || "—";
     const runout = getDriverRunoutLive(selectedDriver);
     const todayNote = null;
@@ -2126,7 +2127,7 @@ function App() {
           background: `linear-gradient(90deg, ${C.accent}, transparent)`
         }
       }));
-    })), renderWeekPrimaryActions());
+    })), canShowWeekPrimaryActions ? renderWeekPrimaryActions() : null);
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
