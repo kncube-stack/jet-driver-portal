@@ -338,6 +338,11 @@ Blob + ingest:
 - `api/rota-weeks.js` lists available rota weeks
 - Current store mode is public
 - Current code is prepared for a future private-store cutover
+- Current observed Blob usage is very small for this app:
+  - storage footprint is tiny,
+  - transfer is tiny,
+  - simple operations are tiny,
+  - advanced operations are the closest relative metric to watch, but still comfortably below limits at the last check
 - Private-store migration still requires:
   - creating/linking a new private Blob store,
   - setting `BLOB_ACCESS_MODE=private`,
