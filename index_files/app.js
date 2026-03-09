@@ -64,6 +64,57 @@ function clearSession() {
     sessionStorage.removeItem("jet_auth");
   } catch {}
 }
+function normalizeNameSearchText(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function getNameSearchTokens(value) {
+  const normalized = normalizeNameSearchText(value);
+  return normalized ? normalized.split(" ") : [];
+}
+function getNameInitials(tokens) {
+  return tokens.map(token => token[0]).join("");
+}
+function scoreDriverNameSearch(driverName, query) {
+  const normalizedName = normalizeNameSearchText(driverName);
+  const normalizedQuery = normalizeNameSearchText(query);
+  if (!normalizedName || !normalizedQuery) return -1;
+  const compactName = normalizedName.replace(/\s+/g, "");
+  const compactQuery = normalizedQuery.replace(/\s+/g, "");
+  const nameTokens = getNameSearchTokens(driverName);
+  const queryTokens = getNameSearchTokens(query);
+  if (normalizedName === normalizedQuery) return 1000;
+  if (compactName === compactQuery) return 950;
+  if (normalizedName.startsWith(normalizedQuery)) return 900;
+  if (compactName.startsWith(compactQuery)) return 875;
+  if (normalizedName.includes(normalizedQuery)) return 820;
+  if (compactName.includes(compactQuery)) return 780;
+  const initials = getNameInitials(nameTokens);
+  if (initials && (initials === compactQuery || initials.startsWith(compactQuery))) return 760;
+  let sequentialMatchCount = 0;
+  let nameIndex = 0;
+  for (const queryToken of queryTokens) {
+    let matched = false;
+    while (nameIndex < nameTokens.length) {
+      const nameToken = nameTokens[nameIndex];
+      nameIndex += 1;
+      if (nameToken.startsWith(queryToken) || queryToken.length === 1 && nameToken[0] === queryToken || nameToken.includes(queryToken)) {
+        sequentialMatchCount += 1;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      sequentialMatchCount = 0;
+      break;
+    }
+  }
+  if (sequentialMatchCount === queryTokens.length && sequentialMatchCount > 0) {
+    return 700 + sequentialMatchCount * 10;
+  }
+  const overlapCount = queryTokens.filter(queryToken => nameTokens.some(nameToken => nameToken.startsWith(queryToken) || nameToken.includes(queryToken))).length;
+  if (overlapCount > 0) return 600 + overlapCount * 10;
+  return -1;
+}
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
 const AUTH_LOGOUT_ENDPOINT = "/api/auth-logout";
@@ -1096,9 +1147,14 @@ function App() {
   const getWeekCommencing = () => weekLabel || "Loading...";
   const activeTimesheetWeekKey = currentTabName || weekLabel || "";
   const filtered = React.useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q = search.trim();
     if (!q) return null;
-    return DRIVERS.filter(d => d.toLowerCase().includes(q));
+    return DRIVERS.map(driver => ({
+      driver,
+      score: scoreDriverNameSearch(driver, q)
+    })).filter(entry => entry.score >= 0).sort((a, b) => b.score - a.score || a.driver.localeCompare(b.driver, undefined, {
+      sensitivity: "base"
+    })).map(entry => entry.driver);
   }, [search, DRIVERS]);
   const handleLogin = async () => {
     const rawName = authName.trim();
@@ -2400,7 +2456,7 @@ function App() {
     type: "text",
     value: search,
     onChange: e => setSearch(e.target.value),
-    placeholder: "Search by name...",
+    placeholder: "Search",
     autoFocus: true,
     style: {
       width: "100%",
