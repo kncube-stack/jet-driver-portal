@@ -3459,7 +3459,15 @@ function App() {
       style: {
         marginBottom: "20px"
       }
-    }, /*#__PURE__*/React.createElement("h2", {
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: "12px",
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
       style: {
         fontSize: "17px",
         fontWeight: 600,
@@ -3472,7 +3480,35 @@ function App() {
         color: C.textMuted,
         margin: 0
       }
-    }, actionDriver)), /*#__PURE__*/React.createElement("div", {
+    }, actionDriver)), inboundPending.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#f59e0b18",
+        border: "1px solid #f59e0b33",
+        borderRadius: "999px",
+        padding: "8px 12px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
+        color: "#fbbf24",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.4px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        minWidth: "18px",
+        height: "18px",
+        borderRadius: "999px",
+        background: "#dc2626",
+        color: "#ffffff",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "10px",
+        fontWeight: 700,
+        lineHeight: 1
+      }
+    }, inboundPending.length > 9 ? "9+" : String(inboundPending.length)), inboundPending.length === 1 ? "1 approval waiting below" : `${inboundPending.length} approvals waiting below`))), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
