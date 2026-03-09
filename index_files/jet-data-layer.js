@@ -1,13 +1,37 @@
 (function (window) {
   const {
     DAILY_RUNOUT,
-    GSHEET_PUB_BASE,
+  GSHEET_PUB_BASE,
     SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
+    STAFF_NAME_ALIASES,
     STAFF_DIRECTORY,
     STAFF_SOURCE_CONFIG,
     MANUAL_STAFF_OVERRIDES
   } = window.JET_DATA;
+
+const NORMALIZED_STAFF_NAME_ALIASES = Object.entries(STAFF_NAME_ALIASES || {}).reduce((acc, [fromName, toName]) => {
+  const source = String(fromName || "").trim().toLowerCase();
+  const target = String(toName || "").trim();
+  if (source && target) acc[source] = target;
+  return acc;
+}, {});
+
+function normalizeStaffName(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return "";
+  return NORMALIZED_STAFF_NAME_ALIASES[raw.toLowerCase()] || raw;
+}
+
+function normalizeRotaByStaffName(rotaByName) {
+  if (!rotaByName || typeof rotaByName !== "object") return {};
+  return Object.entries(rotaByName).reduce((acc, [rawName, week]) => {
+    const name = normalizeStaffName(rawName);
+    if (!name || !Array.isArray(week)) return acc;
+    acc[name] = week;
+    return acc;
+  }, {});
+}
 
 function getLocalDateKey(date = new Date()) {
   const yyyy = date.getFullYear();
@@ -30,9 +54,10 @@ function getDriverRunout(driverName) {
   const todayData = DAILY_RUNOUT[dateKey];
   if (!todayData) return null;
   for (const [dutyNum, info] of Object.entries(todayData)) {
-    if (info.driver === driverName) return {
+    if (normalizeStaffName(info.driver) === normalizeStaffName(driverName)) return {
       duty: parseInt(dutyNum),
-      ...info
+      ...info,
+      driver: normalizeStaffName(info.driver)
     };
   }
   return null;
@@ -155,10 +180,11 @@ function parseRotaCSV(csvText) {
       const v = (row[dayIdx + 2] || "").trim();
       return v === "" ? null : v;
     });
-    sheetWeekByName[colA] = week;
+    const resolvedName = normalizeStaffName(colA);
+    sheetWeekByName[resolvedName] = week;
     const resolvedSection = currentSectionKey || previousSectionKey || STAFF_SOURCE_CONFIG.fallbackSectionKey || null;
     if (resolvedSection) {
-      sheetSectionByName[colA] = resolvedSection;
+      sheetSectionByName[resolvedName] = resolvedSection;
     }
   }
   Object.keys(rota).forEach(name => {
@@ -291,9 +317,10 @@ const ROTA_DATA_ADAPTERS = {
       // Use in-app directory for section structure; overlay duty assignments from blob
       const sections = getStaffDirectorySections();
       const rota = buildEmptyRotaFromSections(sections);
-      if (blobRota && typeof blobRota === "object") {
+      const normalizedBlobRota = normalizeRotaByStaffName(blobRota);
+      if (normalizedBlobRota && typeof normalizedBlobRota === "object") {
         Object.keys(rota).forEach(name => {
-          if (Array.isArray(blobRota[name])) rota[name] = blobRota[name];
+          if (Array.isArray(normalizedBlobRota[name])) rota[name] = normalizedBlobRota[name];
         });
       }
       return { sections, rota };
@@ -361,6 +388,7 @@ const SHORT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     findCurrentWeekTab,
     fetchTabCSV,
     parseCSVRow,
+    normalizeStaffName,
     getStaffDirectorySections,
     buildEmptyRotaFromSections,
     parseRotaCSV,

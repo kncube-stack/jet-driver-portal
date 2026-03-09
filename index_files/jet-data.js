@@ -4899,6 +4899,11 @@ const SECTION_LABEL_MAP = {
   cleaners: "Cleaners",
   shunters: "Shunters"
 };
+const STAFF_NAME_ALIASES = {
+  "J. Ferreira": "Joao Ferreira",
+  "M. Ali": "Mo ali",
+  "D. Howards": "Davina Howards"
+};
 
 // Authoritative in-app staff directory.
 // External rota sources (Google Sheets / SharePoint) should only supply duty cells.
@@ -4976,6 +4981,7 @@ const ACCESS_CONTROL = {
     GSHEET_PUB_BASE,
     SECTION_KEY_MAP,
     SECTION_LABEL_MAP,
+    STAFF_NAME_ALIASES,
     STAFF_DIRECTORY,
     STAFF_SOURCE_CONFIG,
     MANUAL_STAFF_OVERRIDES,

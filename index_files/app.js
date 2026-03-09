@@ -10,6 +10,7 @@
     buildEmptyRotaFromSections,
     buildDriverList,
     buildSectionLookup,
+    normalizeStaffName,
     DAYS,
     SHORT_DAYS
   } = window.JET_DATA_LAYER;
@@ -398,7 +399,23 @@ async function fetchLiveAllocationData() {
     const response = await fetch(ALLOCATION_READ_ENDPOINT, { cache: "no-store" });
     if (!response.ok) return null;
     const data = await response.json().catch(() => null);
-    return data && data.ok && data.allocation ? data.allocation : null;
+    if (!data || !data.ok || !data.allocation || typeof data.allocation !== "object") return null;
+    return Object.entries(data.allocation).reduce((acc, [dutyNum, info]) => {
+      if (!info || typeof info !== "object") return acc;
+      acc[dutyNum] = {
+        ...info,
+        driver: normalizeStaffName(info.driver),
+        handoverTo: info.handoverTo ? {
+          ...info.handoverTo,
+          driver: normalizeStaffName(info.handoverTo.driver)
+        } : null,
+        takeoverFrom: info.takeoverFrom ? {
+          ...info.takeoverFrom,
+          driver: normalizeStaffName(info.takeoverFrom.driver)
+        } : null
+      };
+      return acc;
+    }, {});
   } catch {
     return null;
   }
@@ -1022,7 +1039,7 @@ function App() {
   const getDriverRunoutLive = driverName => {
     if (liveAllocation) {
       for (const [dutyNum, info] of Object.entries(liveAllocation)) {
-        if (info.driver === driverName) return { duty: parseInt(dutyNum, 10), ...info };
+        if (normalizeStaffName(info.driver) === normalizeStaffName(driverName)) return { duty: parseInt(dutyNum, 10), ...info };
       }
       return null;
     }
