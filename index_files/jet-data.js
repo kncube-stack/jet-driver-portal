@@ -4929,11 +4929,11 @@ const STAFF_DIRECTORY = [{
 }, {
   key: "management",
   label: "Management",
-  drivers: ["Alfie Hoque", "Errol Thomas"]
+  drivers: ["Alfie Hoque", "Errol Thomas", "Jason Edwards"]
 }, {
   key: "controllers",
   label: "Duty Managers",
-  drivers: ["Kennedy Ncube", "J. Ferreira", "M. Ali", "D. Howards", "Umair Akram", "Adrian Koprowski"]
+  drivers: ["Kennedy Ncube", "Joao Ferreira", "Mo ali", "Davina Howards", "Umair Akram", "Adrian Koprowski"]
 }, {
   key: "cleaners",
   label: "Cleaners",
@@ -4964,7 +4964,7 @@ const MANUAL_STAFF_OVERRIDES = [{
 // - PIN verification is performed server-side via /api/auth-login.
 const ACCESS_CONTROL = {
   mode: "soft",
-  managerNames: ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube", "J. Ferreira", "M. Ali", "D. Howards", "Umair Akram", "Adrian Koprowski"],
+  managerNames: ["Alfie Hoque", "Errol Thomas", "Jason Edwards", "Kennedy Ncube", "Joao Ferreira", "Mo ali", "Davina Howards", "Umair Akram", "Adrian Koprowski"],
   authProvider: "server"
 };
 
