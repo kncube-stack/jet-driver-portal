@@ -130,12 +130,6 @@ const PADDINGTON_TRAVEL_COST = 6;
 const VICTORIA_TRAVEL_COST = 9;
 const WORKSHOP_DEFAULT_START_TIME = "08:00";
 const WORKSHOP_DEFAULT_FINISH_TIME = "18:00";
-const TIMESHEET_EXPENSES_EMPTY_STATE = [{
-  id: 1,
-  date: "",
-  description: "",
-  amount: ""
-}];
 const BREAK_STOP_IGNORE_TOKENS = new Set(["coach", "station", "bus", "stop", "stn", "arrivals", "arrival", "departures", "departure", "airport"]);
 function isTimeValue(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
@@ -318,10 +312,10 @@ function normalizeTimesheetExpenseAmount(value, fallback) {
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return Number(parsed.toFixed(2));
 }
-function createEmptyTimesheetExpense(id) {
+function createEmptyTimesheetExpense(id, date = "") {
   return {
     id,
-    date: "",
+    date: normalizeTimesheetExpenseDate(date),
     description: "",
     amount: ""
   };
@@ -330,27 +324,70 @@ function normalizeTimesheetExpenseDate(value) {
   const raw = String(value || "").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
 }
-function normalizeTimesheetExpenseList(expenses) {
-  if (!Array.isArray(expenses) || expenses.length === 0) return TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-    ...item
-  }));
-  const normalized = expenses.map((expense, index) => {
+function normalizeTimesheetExpenseList(expenses, fallbackDate = "") {
+  if (!Array.isArray(expenses) || expenses.length === 0) return [];
+  const normalizedFallbackDate = normalizeTimesheetExpenseDate(fallbackDate);
+  return expenses.map((expense, index) => {
     const fallbackId = index + 1;
     const rawId = Number(expense?.id);
     return {
       id: Number.isInteger(rawId) && rawId > 0 ? rawId : fallbackId,
-      date: normalizeTimesheetExpenseDate(expense?.date),
+      date: normalizeTimesheetExpenseDate(expense?.date) || normalizedFallbackDate,
       description: String(expense?.description || "").trim(),
       amount: normalizeTimesheetExpenseAmount(expense?.amount, "")
     };
   });
-  return normalized.length > 0 ? normalized : TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-    ...item
-  }));
 }
-function hydrateTimesheetRowsFromDraft(baseRows, draftRows) {
+function getIsoDateWithDayOffset(isoValue, dayOffset) {
+  const match = String(isoValue || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  const date = new Date(Number.parseInt(match[1], 10), Number.parseInt(match[2], 10) - 1, Number.parseInt(match[3], 10));
+  if (Number.isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + Number(dayOffset || 0));
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+function getTimesheetRowIsoDate(weekTabName, dayIndex) {
+  const mondayIso = parseWeekTabNameToIso(weekTabName);
+  if (!mondayIso || !Number.isInteger(dayIndex) || dayIndex < 0) return "";
+  return getIsoDateWithDayOffset(mondayIso, dayIndex);
+}
+function formatTimesheetRowDateLabel(isoValue) {
+  const match = String(isoValue || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  const date = new Date(Number.parseInt(match[1], 10), Number.parseInt(match[2], 10) - 1, Number.parseInt(match[3], 10));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+function buildLegacyTimesheetExpenseDayMap(expenses, baseRows) {
+  const normalizedExpenses = normalizeTimesheetExpenseList(expenses);
+  if (normalizedExpenses.length === 0 || !Array.isArray(baseRows) || baseRows.length === 0) return new Map();
+  const dayIndexByDate = new Map(baseRows.map(row => [normalizeTimesheetExpenseDate(row?.rowDate), row.dayIndex]));
+  const fallbackDayIndex = Number.isInteger(baseRows[0]?.dayIndex) ? baseRows[0].dayIndex : 0;
+  const buckets = new Map();
+  normalizedExpenses.forEach((expense, index) => {
+    const mappedDayIndex = dayIndexByDate.get(expense.date) ?? fallbackDayIndex;
+    const nextExpense = {
+      id: index + 1,
+      date: expense.date || normalizeTimesheetExpenseDate(baseRows.find(row => row.dayIndex === mappedDayIndex)?.rowDate),
+      description: expense.description,
+      amount: expense.amount
+    };
+    if (!buckets.has(mappedDayIndex)) buckets.set(mappedDayIndex, []);
+    buckets.get(mappedDayIndex).push(nextExpense);
+  });
+  return buckets;
+}
+function hydrateTimesheetRowsFromDraft(baseRows, draftRows, legacyExpenses) {
   if (!Array.isArray(baseRows) || baseRows.length === 0 || !Array.isArray(draftRows)) return baseRows;
   const byDay = new Map();
+  const legacyExpenseDayMap = buildLegacyTimesheetExpenseDayMap(legacyExpenses, baseRows);
   for (const row of draftRows) {
     const dayIndex = Number(row?.dayIndex);
     if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= baseRows.length) continue;
@@ -364,36 +401,31 @@ function hydrateTimesheetRowsFromDraft(baseRows, draftRows) {
     if (draftDutyCode && baseDutyCode && draftDutyCode !== baseDutyCode) return baseRow;
     const startTime = isTimeValue(draft.startTime) ? draft.startTime : "";
     const finishTime = isTimeValue(draft.finishTime) ? draft.finishTime : "";
+    const normalizedExpenses = normalizeTimesheetExpenseList(draft.expenses, baseRow.rowDate);
     return {
       ...baseRow,
       startTime,
       finishTime,
-      travelCost: normalizeTimesheetTravelCost(draft.travelCost, baseRow.travelCost)
+      travelCost: normalizeTimesheetTravelCost(draft.travelCost, baseRow.travelCost),
+      expenses: normalizedExpenses.length > 0 ? normalizedExpenses : normalizeTimesheetExpenseList(legacyExpenseDayMap.get(baseRow.dayIndex), baseRow.rowDate)
     };
   });
 }
 function readTimesheetDraftData(driverName, weekTabName, baseRows) {
   const key = getTimesheetDraftEntryKey(driverName, weekTabName);
   if (!key) return {
-    rows: baseRows,
-    expenses: TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-      ...item
-    }))
+    rows: baseRows
   };
   const store = readTimesheetDraftStore();
   const entry = store[key];
   if (!entry || typeof entry !== "object" || !Array.isArray(entry.rows)) return {
-    rows: baseRows,
-    expenses: TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-      ...item
-    }))
+    rows: baseRows
   };
   return {
-    rows: hydrateTimesheetRowsFromDraft(baseRows, entry.rows),
-    expenses: normalizeTimesheetExpenseList(entry.expenses)
+    rows: hydrateTimesheetRowsFromDraft(baseRows, entry.rows, entry.expenses)
   };
 }
-function saveTimesheetDraftData(driverName, weekTabName, rows, expenses) {
+function saveTimesheetDraftData(driverName, weekTabName, rows) {
   const key = getTimesheetDraftEntryKey(driverName, weekTabName);
   if (!key || !Array.isArray(rows) || rows.length === 0) return;
   const compactRows = rows.map(row => ({
@@ -401,18 +433,17 @@ function saveTimesheetDraftData(driverName, weekTabName, rows, expenses) {
     dutyCode: String(row.dutyCode || "").trim(),
     startTime: row.startTime || "",
     finishTime: row.finishTime || "",
-    travelCost: row.travelCost === "" || row.travelCost === null || row.travelCost === undefined ? "" : normalizeTimesheetTravelCost(row.travelCost, "")
-  }));
-  const compactExpenses = normalizeTimesheetExpenseList(expenses).map(expense => ({
-    id: expense.id,
-    date: normalizeTimesheetExpenseDate(expense.date),
-    description: expense.description,
-    amount: expense.amount === "" ? "" : normalizeTimesheetExpenseAmount(expense.amount, "")
+    travelCost: row.travelCost === "" || row.travelCost === null || row.travelCost === undefined ? "" : normalizeTimesheetTravelCost(row.travelCost, ""),
+    expenses: normalizeTimesheetExpenseList(row.expenses, row.rowDate).map(expense => ({
+      id: expense.id,
+      date: normalizeTimesheetExpenseDate(expense.date) || normalizeTimesheetExpenseDate(row.rowDate),
+      description: expense.description,
+      amount: expense.amount === "" ? "" : normalizeTimesheetExpenseAmount(expense.amount, "")
+    }))
   }));
   const store = readTimesheetDraftStore();
   store[key] = {
     rows: compactRows,
-    expenses: compactExpenses,
     updatedAt: Date.now()
   };
   const allKeys = Object.keys(store);
@@ -969,9 +1000,6 @@ function App() {
   const [swapRequestsError, setSwapRequestsError] = React.useState("");
   const [swapActionPending, setSwapActionPending] = React.useState("");
   const [timesheetRows, setTimesheetRows] = React.useState([]);
-  const [timesheetExpenses, setTimesheetExpenses] = React.useState(() => TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-    ...item
-  })));
   const [timesheetSubmitted, setTimesheetSubmitted] = React.useState(false);
   const [timesheetSending, setTimesheetSending] = React.useState(false);
   const [timesheetError, setTimesheetError] = React.useState("");
@@ -1094,14 +1122,17 @@ function App() {
       const dutyValueRaw = ROTA[driverName]?.[dayIndex];
       const dutyValue = dutyValueRaw === null || dutyValueRaw === undefined || dutyValueRaw === "" ? "—" : String(dutyValueRaw);
       const defaults = getTimesheetDefaultsForDuty(dutyValue, driverName);
+      const rowDate = getTimesheetRowIsoDate(activeTimesheetWeekKey, dayIndex);
       return {
         dayIndex,
         dayName,
+        rowDate,
         dutyCode: defaults.dutyCode,
         dutyLabel: defaults.dutyLabel,
         startTime: defaults.startTime,
         finishTime: defaults.finishTime,
-        travelCost: defaults.travelCost
+        travelCost: defaults.travelCost,
+        expenses: []
       };
     });
   };
@@ -1378,7 +1409,6 @@ function App() {
     const baseRows = buildTimesheetRowsForDriver(actionDriver);
     const hydratedDraft = readTimesheetDraftData(actionDriver, activeTimesheetWeekKey, baseRows);
     setTimesheetRows(hydratedDraft.rows);
-    setTimesheetExpenses(hydratedDraft.expenses);
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
@@ -1386,8 +1416,8 @@ function App() {
   React.useEffect(() => {
     if (screen !== "timesheet" || !actionDriver || !activeTimesheetWeekKey) return;
     if (!Array.isArray(timesheetRows) || timesheetRows.length !== DAYS.length) return;
-    saveTimesheetDraftData(actionDriver, activeTimesheetWeekKey, timesheetRows, timesheetExpenses);
-  }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows, timesheetExpenses]);
+    saveTimesheetDraftData(actionDriver, activeTimesheetWeekKey, timesheetRows);
+  }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows]);
   React.useEffect(() => {
     if (!authed || !currentUser) return;
     loadSwapBadgeCountForCurrentUser();
@@ -1748,9 +1778,6 @@ function App() {
     setNameSearch("");
     setSearch("");
     setTimesheetRows([]);
-    setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-      ...item
-    })));
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
@@ -1814,14 +1841,8 @@ function App() {
     setTimesheetError("");
     if (actionDriver) {
       setTimesheetRows(buildTimesheetRowsForDriver(actionDriver));
-      setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-        ...item
-      })));
     } else {
       setTimesheetRows([]);
-      setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-        ...item
-      })));
     }
     setScreen("timesheet");
   };
@@ -3879,8 +3900,11 @@ function App() {
     }, swapRequestsError)));
   })(), screen === "timesheet" && actionDriver && (() => {
     const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(actionDriver);
-    const expenses = normalizeTimesheetExpenseList(timesheetExpenses);
     const resolveTimesheetDutyLabel = dutyCode => getTimesheetDefaultsForDuty(dutyCode, actionDriver).dutyLabel;
+    const clearTimesheetStateFlags = () => {
+      if (timesheetSubmitted) setTimesheetSubmitted(false);
+      if (timesheetError) setTimesheetError("");
+    };
     const updateTimesheetRow = (dayIndex, patch) => {
       setTimesheetRows(prev => {
         const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(actionDriver);
@@ -3889,44 +3913,43 @@ function App() {
           ...patch
         } : row);
       });
-      if (timesheetSubmitted) setTimesheetSubmitted(false);
-      if (timesheetError) setTimesheetError("");
+      clearTimesheetStateFlags();
     };
     const resetTimesheetView = () => {
       setTimesheetRows(buildTimesheetRowsForDriver(actionDriver));
-      setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-        ...item
-      })));
       setTimesheetSubmitted(false);
       setTimesheetSending(false);
       setTimesheetError("");
     };
-    const updateTimesheetExpense = (expenseId, patch) => {
-      setTimesheetExpenses(prev => normalizeTimesheetExpenseList(prev).map(expense => expense.id === expenseId ? {
+    const updateTimesheetExpensesForDay = (dayIndex, updater) => {
+      setTimesheetRows(prev => {
+        const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(actionDriver);
+        return baseRows.map(row => {
+          if (row.dayIndex !== dayIndex) return row;
+          const nextExpenses = normalizeTimesheetExpenseList(updater(normalizeTimesheetExpenseList(row.expenses, row.rowDate)), row.rowDate);
+          return {
+            ...row,
+            expenses: nextExpenses
+          };
+        });
+      });
+      clearTimesheetStateFlags();
+    };
+    const addTimesheetExpense = dayIndex => {
+      updateTimesheetExpensesForDay(dayIndex, expensesForDay => {
+        const rowDate = rows.find(row => row.dayIndex === dayIndex)?.rowDate || "";
+        const nextId = expensesForDay.reduce((maxId, expense) => Math.max(maxId, expense.id), 0) + 1;
+        return [...expensesForDay, createEmptyTimesheetExpense(nextId, rowDate)];
+      });
+    };
+    const updateTimesheetExpense = (dayIndex, expenseId, patch) => {
+      updateTimesheetExpensesForDay(dayIndex, expensesForDay => expensesForDay.map(expense => expense.id === expenseId ? {
         ...expense,
         ...patch
       } : expense));
-      if (timesheetSubmitted) setTimesheetSubmitted(false);
-      if (timesheetError) setTimesheetError("");
     };
-    const addTimesheetExpense = () => {
-      setTimesheetExpenses(prev => {
-        const baseExpenses = normalizeTimesheetExpenseList(prev);
-        const nextId = baseExpenses.reduce((maxId, expense) => Math.max(maxId, expense.id), 0) + 1;
-        return [...baseExpenses, createEmptyTimesheetExpense(nextId)];
-      });
-      if (timesheetSubmitted) setTimesheetSubmitted(false);
-      if (timesheetError) setTimesheetError("");
-    };
-    const removeTimesheetExpense = expenseId => {
-      setTimesheetExpenses(prev => {
-        const filtered = normalizeTimesheetExpenseList(prev).filter(expense => expense.id !== expenseId);
-        return filtered.length > 0 ? filtered : TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
-          ...item
-        }));
-      });
-      if (timesheetSubmitted) setTimesheetSubmitted(false);
-      if (timesheetError) setTimesheetError("");
+    const removeTimesheetExpense = (dayIndex, expenseId) => {
+      updateTimesheetExpensesForDay(dayIndex, expensesForDay => expensesForDay.filter(expense => expense.id !== expenseId));
     };
     const totals = rows.reduce((acc, row) => {
       const minutes = getDurationMinutes(row.startTime, row.finishTime);
@@ -3938,16 +3961,18 @@ function App() {
       minutes: 0,
       travelCost: 0
     });
-    const expenseTotals = expenses.reduce((acc, expense) => {
-      const amount = Math.max(0, Number(expense.amount) || 0);
-      if (expense.description || amount > 0) {
+    const expenseTotals = rows.reduce((acc, row) => {
+      normalizeTimesheetExpenseList(row.expenses, row.rowDate).forEach(expense => {
+        const amount = Math.max(0, Number(expense.amount) || 0);
+        if (!expense.description && amount <= 0) return;
         acc.total += amount;
         acc.items.push({
-          date: normalizeTimesheetExpenseDate(expense.date),
+          dayName: row.dayName,
+          date: normalizeTimesheetExpenseDate(expense.date) || normalizeTimesheetExpenseDate(row.rowDate),
           description: expense.description || "Unlabelled expense",
           amount
         });
-      }
+      });
       return acc;
     }, {
       total: 0,
@@ -3974,7 +3999,7 @@ function App() {
           const finishTime = isTimeValue(row.finishTime) ? row.finishTime : "--:--";
           return `${row.dayName}: ${dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
-        const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: Date ${expense.date || "--"} | ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: Date -- | None | Amount ${formatMoneyPounds(0)}`];
+        const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: ${expense.dayName} ${expense.date || "--"} | ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: -- | None | Amount ${formatMoneyPounds(0)}`];
         const subject = `Driver Timesheet - ${actionDriver} - ${getWeekCommencing()}`;
         const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `OTHER EXPENSES`, ...expenseLines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, `TOTAL OTHER EXPENSES: ${formatMoneyPounds(expenseTotals.total)}`, `TOTAL EXPENSES CLAIMED: ${formatMoneyPounds(overallExpenseTotal)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
         window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
@@ -4096,6 +4121,8 @@ function App() {
       const rowMinutes = getDurationMinutes(row.startTime, row.finishTime);
       const rowHours = (rowMinutes / 60).toFixed(2);
       const rowDutyLabel = resolveTimesheetDutyLabel(row.dutyCode);
+      const rowDateLabel = formatTimesheetRowDateLabel(row.rowDate);
+      const rowExpenses = normalizeTimesheetExpenseList(row.expenses, row.rowDate);
       return /*#__PURE__*/React.createElement("div", {
         key: row.dayIndex,
         style: {
@@ -4124,7 +4151,7 @@ function App() {
           color: C.textMuted,
           marginTop: "2px"
         }
-      }, rowDutyLabel)), /*#__PURE__*/React.createElement("div", {
+      }, rowDateLabel ? `${rowDutyLabel} · ${rowDateLabel}` : rowDutyLabel)), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: "11px",
           color: "#38bdf8",
@@ -4233,14 +4260,12 @@ function App() {
           });
         },
         style: inputStyle
-      }))));
-    })), /*#__PURE__*/React.createElement("div", {
+      })), /*#__PURE__*/React.createElement("div", {
         style: {
-          marginTop: "14px",
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          borderRadius: "10px",
-          padding: "12px 14px"
+          gridColumn: "1 / -1",
+          marginTop: "4px",
+          paddingTop: "12px",
+          borderTop: `1px solid ${C.border}`
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
@@ -4248,23 +4273,23 @@ function App() {
           justifyContent: "space-between",
           alignItems: "center",
           gap: "8px",
-          marginBottom: "10px",
+          marginBottom: rowExpenses.length > 0 ? "10px" : "0",
           flexWrap: "wrap"
         }
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
         style: {
-          fontSize: "12px",
+          fontSize: "11px",
           fontWeight: 700,
           color: C.white
         }
-      }, "Other Expenses"), /*#__PURE__*/React.createElement("div", {
+      }, "Expenses"), /*#__PURE__*/React.createElement("div", {
         style: {
-          fontSize: "10px",
+          fontSize: "9px",
           color: C.textMuted,
           marginTop: "2px"
         }
-      }, "Add parking, tolls, meals, or other reimbursable costs.")), /*#__PURE__*/React.createElement("button", {
-        onClick: addTimesheetExpense,
+      }, rowDateLabel ? `Add parking, tolls, meals, or other costs for ${rowDateLabel}.` : "Add parking, tolls, meals, or other reimbursable costs.")), /*#__PURE__*/React.createElement("button", {
+        onClick: () => addTimesheetExpense(row.dayIndex),
         type: "button",
         style: {
           background: C.accent + "22",
@@ -4277,13 +4302,19 @@ function App() {
           cursor: "pointer",
           fontFamily: "inherit"
         }
-      }, "+ Add Expense")), /*#__PURE__*/React.createElement("div", {
+      }, "+ Add Expense")), rowExpenses.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textDim,
+          lineHeight: 1.5
+        }
+      }, "No extra expenses added for this day.") : /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           flexDirection: "column",
           gap: "8px"
         }
-      }, expenses.map((expense, index) => /*#__PURE__*/React.createElement("div", {
+      }, rowExpenses.map((expense, index) => /*#__PURE__*/React.createElement("div", {
         key: expense.id,
         style: {
           display: "grid",
@@ -4302,32 +4333,9 @@ function App() {
           letterSpacing: "0.5px",
           fontWeight: 600
         }
-      }, "DATE"), /*#__PURE__*/React.createElement("input", {
-        type: "date",
-        value: expense.date || "",
-        onChange: e => updateTimesheetExpense(expense.id, {
-          date: e.target.value
-        }),
-        style: {
-          ...inputStyle,
-          appearance: "none",
-          WebkitAppearance: "none",
-          colorScheme: "dark"
-        }
-      })), /*#__PURE__*/React.createElement("div", {
-        style: fieldWrapStyle
-      }, /*#__PURE__*/React.createElement("label", {
-        style: {
-          display: "block",
-          fontSize: "9px",
-          color: C.textDim,
-          marginBottom: "4px",
-          letterSpacing: "0.5px",
-          fontWeight: 600
-        }
       }, "DESCRIPTION"), /*#__PURE__*/React.createElement("input", {
         value: expense.description,
-        onChange: e => updateTimesheetExpense(expense.id, {
+        onChange: e => updateTimesheetExpense(row.dayIndex, expense.id, {
           description: e.target.value
         }),
         placeholder: `Expense ${index + 1}`,
@@ -4351,33 +4359,33 @@ function App() {
         onChange: e => {
           const raw = e.target.value;
           if (raw === "") {
-            updateTimesheetExpense(expense.id, {
+            updateTimesheetExpense(row.dayIndex, expense.id, {
               amount: ""
             });
             return;
           }
           const next = parseFloat(raw);
-          updateTimesheetExpense(expense.id, {
+          updateTimesheetExpense(row.dayIndex, expense.id, {
             amount: Number.isFinite(next) ? Math.max(0, Number(next.toFixed(2))) : 0
           });
         },
         style: inputStyle
       })), /*#__PURE__*/React.createElement("button", {
-        onClick: () => removeTimesheetExpense(expense.id),
+        onClick: () => removeTimesheetExpense(row.dayIndex, expense.id),
         type: "button",
-        disabled: expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0),
         style: {
           background: "transparent",
-          color: expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0) ? C.textDim : "#ef4444",
-          border: `1px solid ${expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0) ? C.border : "#ef444455"}`,
+          color: "#ef4444",
+          border: "1px solid #ef444455",
           borderRadius: "6px",
           padding: "10px 12px",
           fontSize: "11px",
           fontWeight: 700,
-          cursor: expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0) ? "not-allowed" : "pointer",
+          cursor: "pointer",
           fontFamily: "inherit"
         }
-      }, "Remove"))))), /*#__PURE__*/React.createElement("div", {
+      }, "Remove")))))));
+    })), /*#__PURE__*/React.createElement("div", {
         style: {
           marginTop: "14px",
           background: "linear-gradient(135deg, #38bdf814, #0284c70d)",

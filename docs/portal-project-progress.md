@@ -1,6 +1,6 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 10 March 2026 (UK time) — admin rota navigation cleanup, route-learning duty-card behaviour fix, timesheet generation expansion, and staff-name alias/auth sync
+Last updated: 10 March 2026 (UK time) — admin rota navigation cleanup, route-learning duty-card behaviour fix, per-day timesheet expenses, and staff-name alias/auth sync
 
 ## 1) Project purpose
 
@@ -225,8 +225,9 @@ Important:
    - Victoria travel default -> `£9`,
    - all generated day fields remain editable by the driver, including duty number, start time, finish time, and travel cost,
    - the timesheet view now has a single `Reset` action that restores all day rows to current duty-card-derived defaults and clears extra expenses,
-   - an `Other Expenses` section is now included on every timesheet for additional reimbursable costs, with per-expense date, description, and amount fields,
-   - draft persistence now includes both day rows and the extra expenses list,
+   - additional reimbursable expenses now live inside each day card instead of one shared section, so drivers can add them as they go through the week,
+   - expense totals and the submitted email still aggregate correctly across the whole week,
+   - draft persistence now stores expenses inside each day row, and legacy global-expense drafts are migrated into matching day rows where possible,
    - still submitted via `mailto:` today, drafting to `errol@jasonedwardstravel.co.uk`.
 
 6. Duty cards
