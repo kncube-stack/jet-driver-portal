@@ -128,6 +128,13 @@ const TIMESHEET_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const TIMESHEET_DRAFTS_STORAGE_KEY = "jet_timesheet_drafts_v1";
 const PADDINGTON_TRAVEL_COST = 6;
 const VICTORIA_TRAVEL_COST = 9;
+const WORKSHOP_DEFAULT_START_TIME = "08:00";
+const WORKSHOP_DEFAULT_FINISH_TIME = "18:00";
+const TIMESHEET_EXPENSES_EMPTY_STATE = [{
+  id: 1,
+  description: "",
+  amount: ""
+}];
 const BREAK_STOP_IGNORE_TOKENS = new Set(["coach", "station", "bus", "stop", "stn", "arrivals", "arrival", "departures", "departure", "airport"]);
 function isTimeValue(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || "").trim());
@@ -304,6 +311,36 @@ function normalizeTimesheetTravelCost(value, fallback) {
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return Number(parsed.toFixed(2));
 }
+function normalizeTimesheetExpenseAmount(value, fallback) {
+  if (value === "" || value === null || value === undefined) return "";
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Number(parsed.toFixed(2));
+}
+function createEmptyTimesheetExpense(id) {
+  return {
+    id,
+    description: "",
+    amount: ""
+  };
+}
+function normalizeTimesheetExpenseList(expenses) {
+  if (!Array.isArray(expenses) || expenses.length === 0) return TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+    ...item
+  }));
+  const normalized = expenses.map((expense, index) => {
+    const fallbackId = index + 1;
+    const rawId = Number(expense?.id);
+    return {
+      id: Number.isInteger(rawId) && rawId > 0 ? rawId : fallbackId,
+      description: String(expense?.description || "").trim(),
+      amount: normalizeTimesheetExpenseAmount(expense?.amount, "")
+    };
+  });
+  return normalized.length > 0 ? normalized : TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+    ...item
+  }));
+}
 function hydrateTimesheetRowsFromDraft(baseRows, draftRows) {
   if (!Array.isArray(baseRows) || baseRows.length === 0 || !Array.isArray(draftRows)) return baseRows;
   const byDay = new Map();
@@ -328,15 +365,28 @@ function hydrateTimesheetRowsFromDraft(baseRows, draftRows) {
     };
   });
 }
-function readTimesheetDraftRows(driverName, weekTabName, baseRows) {
+function readTimesheetDraftData(driverName, weekTabName, baseRows) {
   const key = getTimesheetDraftEntryKey(driverName, weekTabName);
-  if (!key) return baseRows;
+  if (!key) return {
+    rows: baseRows,
+    expenses: TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+      ...item
+    }))
+  };
   const store = readTimesheetDraftStore();
   const entry = store[key];
-  if (!entry || typeof entry !== "object" || !Array.isArray(entry.rows)) return baseRows;
-  return hydrateTimesheetRowsFromDraft(baseRows, entry.rows);
+  if (!entry || typeof entry !== "object" || !Array.isArray(entry.rows)) return {
+    rows: baseRows,
+    expenses: TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+      ...item
+    }))
+  };
+  return {
+    rows: hydrateTimesheetRowsFromDraft(baseRows, entry.rows),
+    expenses: normalizeTimesheetExpenseList(entry.expenses)
+  };
 }
-function saveTimesheetDraftRows(driverName, weekTabName, rows) {
+function saveTimesheetDraftData(driverName, weekTabName, rows, expenses) {
   const key = getTimesheetDraftEntryKey(driverName, weekTabName);
   if (!key || !Array.isArray(rows) || rows.length === 0) return;
   const compactRows = rows.map(row => ({
@@ -346,9 +396,15 @@ function saveTimesheetDraftRows(driverName, weekTabName, rows) {
     finishTime: row.finishTime || "",
     travelCost: row.travelCost === "" || row.travelCost === null || row.travelCost === undefined ? "" : normalizeTimesheetTravelCost(row.travelCost, "")
   }));
+  const compactExpenses = normalizeTimesheetExpenseList(expenses).map(expense => ({
+    id: expense.id,
+    description: expense.description,
+    amount: expense.amount === "" ? "" : normalizeTimesheetExpenseAmount(expense.amount, "")
+  }));
   const store = readTimesheetDraftStore();
   store[key] = {
     rows: compactRows,
+    expenses: compactExpenses,
     updatedAt: Date.now()
   };
   const allKeys = Object.keys(store);
@@ -905,6 +961,9 @@ function App() {
   const [swapRequestsError, setSwapRequestsError] = React.useState("");
   const [swapActionPending, setSwapActionPending] = React.useState("");
   const [timesheetRows, setTimesheetRows] = React.useState([]);
+  const [timesheetExpenses, setTimesheetExpenses] = React.useState(() => TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+    ...item
+  })));
   const [timesheetSubmitted, setTimesheetSubmitted] = React.useState(false);
   const [timesheetSending, setTimesheetSending] = React.useState(false);
   const [timesheetError, setTimesheetError] = React.useState("");
@@ -1005,12 +1064,13 @@ function App() {
     const routeLearningNum = routeLearningMatch ? parseInt(routeLearningMatch[1], 10) : null;
     const routeLearningCard = routeLearningNum && DUTY_CARDS[routeLearningNum] ? DUTY_CARDS[routeLearningNum] : null;
     const special = getSpecialDuty(dutyValue);
+    const isWorkshopDuty = dutyValue.toUpperCase() === "WS";
     const resolvedDutyTimes = dutyCard ? resolveDutyTimesFromCard(dutyCard) : routeLearningCard ? resolveDutyTimesFromCard(routeLearningCard) : {
       startTime: special?.signOn && special.signOn !== "—" && isTimeValue(special.signOn) ? special.signOn : "",
       finishTime: special?.signOff && special.signOff !== "—" && isTimeValue(special.signOff) ? special.signOff : ""
     };
-    const startTime = forceBlankTimesheetFields ? "" : resolvedDutyTimes.startTime;
-    const finishTime = forceBlankTimesheetFields ? "" : resolvedDutyTimes.finishTime;
+    const startTime = forceBlankTimesheetFields ? "" : isWorkshopDuty ? WORKSHOP_DEFAULT_START_TIME : resolvedDutyTimes.startTime;
+    const finishTime = forceBlankTimesheetFields ? "" : isWorkshopDuty ? WORKSHOP_DEFAULT_FINISH_TIME : resolvedDutyTimes.finishTime;
     const baseTravelCost = dutyCard ? inferDutyTravelCost(dutyCard) : routeLearningCard ? inferDutyTravelCost(routeLearningCard) : 0;
     const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION, C).label;
     return {
@@ -1308,8 +1368,9 @@ function App() {
   React.useEffect(() => {
     if (screen !== "timesheet" || !actionDriver) return;
     const baseRows = buildTimesheetRowsForDriver(actionDriver);
-    const hydratedRows = readTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, baseRows);
-    setTimesheetRows(hydratedRows);
+    const hydratedDraft = readTimesheetDraftData(actionDriver, activeTimesheetWeekKey, baseRows);
+    setTimesheetRows(hydratedDraft.rows);
+    setTimesheetExpenses(hydratedDraft.expenses);
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
@@ -1317,8 +1378,8 @@ function App() {
   React.useEffect(() => {
     if (screen !== "timesheet" || !actionDriver || !activeTimesheetWeekKey) return;
     if (!Array.isArray(timesheetRows) || timesheetRows.length !== DAYS.length) return;
-    saveTimesheetDraftRows(actionDriver, activeTimesheetWeekKey, timesheetRows);
-  }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows]);
+    saveTimesheetDraftData(actionDriver, activeTimesheetWeekKey, timesheetRows, timesheetExpenses);
+  }, [screen, actionDriver, activeTimesheetWeekKey, timesheetRows, timesheetExpenses]);
   React.useEffect(() => {
     if (!authed || !currentUser) return;
     loadSwapBadgeCountForCurrentUser();
@@ -1679,6 +1740,9 @@ function App() {
     setNameSearch("");
     setSearch("");
     setTimesheetRows([]);
+    setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+      ...item
+    })));
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
@@ -1742,8 +1806,14 @@ function App() {
     setTimesheetError("");
     if (actionDriver) {
       setTimesheetRows(buildTimesheetRowsForDriver(actionDriver));
+      setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+        ...item
+      })));
     } else {
       setTimesheetRows([]);
+      setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+        ...item
+      })));
     }
     setScreen("timesheet");
   };
@@ -3801,6 +3871,7 @@ function App() {
     }, swapRequestsError)));
   })(), screen === "timesheet" && actionDriver && (() => {
     const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(actionDriver);
+    const expenses = normalizeTimesheetExpenseList(timesheetExpenses);
     const updateTimesheetRow = (dayIndex, patch) => {
       setTimesheetRows(prev => {
         const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(actionDriver);
@@ -3808,6 +3879,33 @@ function App() {
           ...row,
           ...patch
         } : row);
+      });
+      if (timesheetSubmitted) setTimesheetSubmitted(false);
+      if (timesheetError) setTimesheetError("");
+    };
+    const updateTimesheetExpense = (expenseId, patch) => {
+      setTimesheetExpenses(prev => normalizeTimesheetExpenseList(prev).map(expense => expense.id === expenseId ? {
+        ...expense,
+        ...patch
+      } : expense));
+      if (timesheetSubmitted) setTimesheetSubmitted(false);
+      if (timesheetError) setTimesheetError("");
+    };
+    const addTimesheetExpense = () => {
+      setTimesheetExpenses(prev => {
+        const baseExpenses = normalizeTimesheetExpenseList(prev);
+        const nextId = baseExpenses.reduce((maxId, expense) => Math.max(maxId, expense.id), 0) + 1;
+        return [...baseExpenses, createEmptyTimesheetExpense(nextId)];
+      });
+      if (timesheetSubmitted) setTimesheetSubmitted(false);
+      if (timesheetError) setTimesheetError("");
+    };
+    const removeTimesheetExpense = expenseId => {
+      setTimesheetExpenses(prev => {
+        const filtered = normalizeTimesheetExpenseList(prev).filter(expense => expense.id !== expenseId);
+        return filtered.length > 0 ? filtered : TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+          ...item
+        }));
       });
       if (timesheetSubmitted) setTimesheetSubmitted(false);
       if (timesheetError) setTimesheetError("");
@@ -3822,6 +3920,21 @@ function App() {
       minutes: 0,
       travelCost: 0
     });
+    const expenseTotals = expenses.reduce((acc, expense) => {
+      const amount = Math.max(0, Number(expense.amount) || 0);
+      if (expense.description || amount > 0) {
+        acc.total += amount;
+        acc.items.push({
+          description: expense.description || "Unlabelled expense",
+          amount
+        });
+      }
+      return acc;
+    }, {
+      total: 0,
+      items: []
+    });
+    const overallExpenseTotal = totals.travelCost + expenseTotals.total;
     const totalHoursDecimal = (totals.minutes / 60).toFixed(2);
     const isSundayEvening = (() => {
       const now = new Date();
@@ -3839,10 +3952,11 @@ function App() {
           const dutyCode = String(row.dutyCode || "—").trim() || "—";
           const startTime = isTimeValue(row.startTime) ? row.startTime : "--:--";
           const finishTime = isTimeValue(row.finishTime) ? row.finishTime : "--:--";
-          return `${row.dayName}: Duty ${dutyCode} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
+          return `${row.dayName}: ${row.dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
+        const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: None | Amount ${formatMoneyPounds(0)}`];
         const subject = `Driver Timesheet - ${actionDriver} - ${getWeekCommencing()}`;
-        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `OTHER EXPENSES`, ...expenseLines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, `TOTAL OTHER EXPENSES: ${formatMoneyPounds(expenseTotals.total)}`, `TOTAL EXPENSES CLAIMED: ${formatMoneyPounds(overallExpenseTotal)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
         window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
         clearTimesheetDraftRows(actionDriver, activeTimesheetWeekKey);
         setTimesheetSubmitted(true);
@@ -4078,54 +4192,216 @@ function App() {
         },
         style: inputStyle
       }))));
-    })), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: "14px",
-        background: "linear-gradient(135deg, #38bdf814, #0284c70d)",
-        border: "1px solid #38bdf833",
-        borderRadius: "10px",
-        padding: "12px 14px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "6px"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "11px",
-        color: C.textMuted,
-        letterSpacing: "0.5px",
-        fontWeight: 600
-      }
-    }, "TOTAL HOURS"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "16px",
-        fontWeight: 700,
-        color: "#38bdf8"
-      }
-    }, formatDurationLabel(totals.minutes), " (", totalHoursDecimal, "h)")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "11px",
-        color: C.textMuted,
-        letterSpacing: "0.5px",
-        fontWeight: 600
-      }
-    }, "TOTAL TRAVEL COST"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: "16px",
-        fontWeight: 700,
-        color: "#38bdf8"
-      }
-    }, formatMoneyPounds(totals.travelCost)))), /*#__PURE__*/React.createElement("button", {
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: "14px",
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: "10px",
+          padding: "12px 14px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "10px",
+          flexWrap: "wrap"
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "12px",
+          fontWeight: 700,
+          color: C.white
+        }
+      }, "Other Expenses"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: "10px",
+          color: C.textMuted,
+          marginTop: "2px"
+        }
+      }, "Add parking, tolls, meals, or other reimbursable costs.")), /*#__PURE__*/React.createElement("button", {
+        onClick: addTimesheetExpense,
+        type: "button",
+        style: {
+          background: C.accent + "22",
+          color: C.accent,
+          border: "none",
+          borderRadius: "6px",
+          padding: "7px 12px",
+          fontSize: "11px",
+          fontWeight: 700,
+          cursor: "pointer",
+          fontFamily: "inherit"
+        }
+      }, "+ Add Expense")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px"
+        }
+      }, expenses.map((expense, index) => /*#__PURE__*/React.createElement("div", {
+        key: expense.id,
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "8px",
+          alignItems: "end"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "DESCRIPTION"), /*#__PURE__*/React.createElement("input", {
+        value: expense.description,
+        onChange: e => updateTimesheetExpense(expense.id, {
+          description: e.target.value
+        }),
+        placeholder: `Expense ${index + 1}`,
+        style: inputStyle
+      })), /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "AMOUNT (\xA3)"), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.01",
+        value: expense.amount === "" || expense.amount === null || expense.amount === undefined ? "" : expense.amount,
+        onChange: e => {
+          const raw = e.target.value;
+          if (raw === "") {
+            updateTimesheetExpense(expense.id, {
+              amount: ""
+            });
+            return;
+          }
+          const next = parseFloat(raw);
+          updateTimesheetExpense(expense.id, {
+            amount: Number.isFinite(next) ? Math.max(0, Number(next.toFixed(2))) : 0
+          });
+        },
+        style: inputStyle
+      })), /*#__PURE__*/React.createElement("button", {
+        onClick: () => removeTimesheetExpense(expense.id),
+        type: "button",
+        disabled: expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0),
+        style: {
+          background: "transparent",
+          color: expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0) ? C.textDim : "#ef4444",
+          border: `1px solid ${expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0) ? C.border : "#ef444455"}`,
+          borderRadius: "6px",
+          padding: "10px 12px",
+          fontSize: "11px",
+          fontWeight: 700,
+          cursor: expenses.length === 1 && !expense.description && (expense.amount === "" || Number(expense.amount) === 0) ? "not-allowed" : "pointer",
+          fontFamily: "inherit"
+        }
+      }, "Remove"))))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: "14px",
+          background: "linear-gradient(135deg, #38bdf814, #0284c70d)",
+          border: "1px solid #38bdf833",
+          borderRadius: "10px",
+          padding: "12px 14px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "6px"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "11px",
+          color: C.textMuted,
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "TOTAL HOURS"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "16px",
+          fontWeight: 700,
+          color: "#38bdf8"
+        }
+      }, formatDurationLabel(totals.minutes), " (", totalHoursDecimal, "h)")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "11px",
+          color: C.textMuted,
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "TOTAL TRAVEL COST"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "16px",
+          fontWeight: 700,
+          color: "#38bdf8"
+        }
+      }, formatMoneyPounds(totals.travelCost))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: "6px"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "11px",
+          color: C.textMuted,
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "TOTAL OTHER EXPENSES"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "16px",
+          fontWeight: 700,
+          color: "#38bdf8"
+        }
+      }, formatMoneyPounds(expenseTotals.total))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: "6px",
+          paddingTop: "6px",
+          borderTop: "1px solid #38bdf822"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "11px",
+          color: C.white,
+          letterSpacing: "0.5px",
+          fontWeight: 700
+        }
+      }, "TOTAL EXPENSES CLAIMED"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: "16px",
+          fontWeight: 700,
+          color: "#38bdf8"
+        }
+      }, formatMoneyPounds(overallExpenseTotal)))), /*#__PURE__*/React.createElement("button", {
       onClick: handleTimesheetSubmit,
       disabled: timesheetSending || rows.length === 0,
       style: {
