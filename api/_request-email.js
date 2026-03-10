@@ -1,5 +1,16 @@
-const LEAVE_REQUEST_TO = "errol@jasonedwardstravel.co.uk";
-const SWAP_REQUEST_TO = "operations@jasonedwardstravel.co.uk";
+const LEAVE_REQUEST_TO = [
+  "errol@jasonedwardstravel.co.uk",
+  "alfie.hoque@jasonedwardstravel.co.uk",
+  "relief.controller@jasonedwardstravel.co.uk"
+];
+const SWAP_REQUEST_TO = [
+  "operations@jasonedwardstravel.co.uk",
+  "relief.controller@jasonedwardstravel.co.uk"
+];
+const TIMESHEET_EMAIL_TO = [
+  "errol@jasonedwardstravel.co.uk",
+  "relief.controller@jasonedwardstravel.co.uk"
+];
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 function asCleanString(value, maxLength = 4000) {
@@ -116,7 +127,7 @@ function buildTimesheetMessage(payload) {
   const text = asCleanString(payload.text, 8000);
   const replyTo = asCleanString(payload.driverEmail, 200);
   return {
-    to: LEAVE_REQUEST_TO,
+    to: TIMESHEET_EMAIL_TO,
     subject: `Driver Timesheet - ${driverName} - ${weekCommencing}`,
     ...(replyTo ? { replyTo } : {}),
     text
@@ -132,7 +143,7 @@ async function sendWithResend(apiKey, from, email) {
     },
     body: JSON.stringify({
       from,
-      to: [email.to],
+      to: Array.isArray(email.to) ? email.to : [email.to],
       subject: email.subject,
       text: email.text,
       ...(email.replyTo ? { reply_to: email.replyTo } : {})
