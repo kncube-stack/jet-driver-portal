@@ -1703,6 +1703,13 @@ function App() {
     setDutySearch("");
     setScreen("home");
   };
+  const openCurrentUserWeek = () => {
+    if (!currentUser || !DRIVERS.includes(currentUser)) return;
+    setSelectedDriver(currentUser);
+    setScreen("week");
+    setSearch("");
+    setShowWeekMenu(false);
+  };
   const openLeaveRequestScreen = () => {
     setShowWeekMenu(false);
     setLeaveSubmitted(false);
@@ -2391,11 +2398,10 @@ function App() {
         setTimesheetSending(false);
         setTimesheetError("");
       } else if (screen === "home") {
-        setSelectedDriver(currentUser);
-        setScreen("week");
-        setSearch("");
+        openCurrentUserWeek();
       } else if (screen === "week" && selectedDriver !== currentUser) {
-        setSelectedDriver(currentUser);
+        setScreen("home");
+        setSearch("");
       } else {
         setScreen("home");
         setSelectedDriver(null);
@@ -2522,7 +2528,19 @@ function App() {
       fontSize: "10px",
       color: C.accent
     }
-  }, "\u23F3"), /*#__PURE__*/React.createElement("button", {
+  }, "\u23F3"), canBrowseStaff && currentUser && DRIVERS.includes(currentUser) && /*#__PURE__*/React.createElement("button", {
+    onClick: openCurrentUserWeek,
+    style: {
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "6px",
+      padding: "6px 10px",
+      cursor: "pointer",
+      color: C.textMuted,
+      fontSize: "12px",
+      fontFamily: "inherit"
+    }
+  }, "Rota View"), /*#__PURE__*/React.createElement("button", {
     onClick: refreshRota,
     disabled: rotaLoading,
     title: "Refresh rota data",
@@ -2566,7 +2584,7 @@ function App() {
       letterSpacing: "0.5px",
       borderBottom: !showingDutyLookup ? `2px solid ${C.accent}` : "2px solid transparent"
     }
-  }, "Rota"), /*#__PURE__*/React.createElement("button", {
+  }, "Directory"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDutyLookup(true),
     style: {
       flex: canBrowseStaff ? 1 : undefined,
