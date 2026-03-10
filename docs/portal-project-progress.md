@@ -225,7 +225,7 @@ Important:
    - Victoria travel default -> `£9`,
    - all generated day fields remain editable by the driver, including duty number, start time, finish time, and travel cost,
    - the timesheet view now has a single `Reset` action that restores all day rows to current duty-card-derived defaults and clears extra expenses,
-   - an `Other Expenses` section is now included on every timesheet for additional reimbursable costs,
+   - an `Other Expenses` section is now included on every timesheet for additional reimbursable costs, with per-expense date, description, and amount fields,
    - draft persistence now includes both day rows and the extra expenses list,
    - still submitted via `mailto:` today, drafting to `errol@jasonedwardstravel.co.uk`.
 

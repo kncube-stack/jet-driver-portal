@@ -132,6 +132,7 @@ const WORKSHOP_DEFAULT_START_TIME = "08:00";
 const WORKSHOP_DEFAULT_FINISH_TIME = "18:00";
 const TIMESHEET_EXPENSES_EMPTY_STATE = [{
   id: 1,
+  date: "",
   description: "",
   amount: ""
 }];
@@ -320,9 +321,14 @@ function normalizeTimesheetExpenseAmount(value, fallback) {
 function createEmptyTimesheetExpense(id) {
   return {
     id,
+    date: "",
     description: "",
     amount: ""
   };
+}
+function normalizeTimesheetExpenseDate(value) {
+  const raw = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
 }
 function normalizeTimesheetExpenseList(expenses) {
   if (!Array.isArray(expenses) || expenses.length === 0) return TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
@@ -333,6 +339,7 @@ function normalizeTimesheetExpenseList(expenses) {
     const rawId = Number(expense?.id);
     return {
       id: Number.isInteger(rawId) && rawId > 0 ? rawId : fallbackId,
+      date: normalizeTimesheetExpenseDate(expense?.date),
       description: String(expense?.description || "").trim(),
       amount: normalizeTimesheetExpenseAmount(expense?.amount, "")
     };
@@ -398,6 +405,7 @@ function saveTimesheetDraftData(driverName, weekTabName, rows, expenses) {
   }));
   const compactExpenses = normalizeTimesheetExpenseList(expenses).map(expense => ({
     id: expense.id,
+    date: normalizeTimesheetExpenseDate(expense.date),
     description: expense.description,
     amount: expense.amount === "" ? "" : normalizeTimesheetExpenseAmount(expense.amount, "")
   }));
@@ -3935,6 +3943,7 @@ function App() {
       if (expense.description || amount > 0) {
         acc.total += amount;
         acc.items.push({
+          date: normalizeTimesheetExpenseDate(expense.date),
           description: expense.description || "Unlabelled expense",
           amount
         });
@@ -3965,7 +3974,7 @@ function App() {
           const finishTime = isTimeValue(row.finishTime) ? row.finishTime : "--:--";
           return `${row.dayName}: ${dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
-        const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: None | Amount ${formatMoneyPounds(0)}`];
+        const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: Date ${expense.date || "--"} | ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: Date -- | None | Amount ${formatMoneyPounds(0)}`];
         const subject = `Driver Timesheet - ${actionDriver} - ${getWeekCommencing()}`;
         const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `OTHER EXPENSES`, ...expenseLines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, `TOTAL OTHER EXPENSES: ${formatMoneyPounds(expenseTotals.total)}`, `TOTAL EXPENSES CLAIMED: ${formatMoneyPounds(overallExpenseTotal)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
         window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
@@ -4283,6 +4292,29 @@ function App() {
           alignItems: "end"
         }
       }, /*#__PURE__*/React.createElement("div", {
+        style: fieldWrapStyle
+      }, /*#__PURE__*/React.createElement("label", {
+        style: {
+          display: "block",
+          fontSize: "9px",
+          color: C.textDim,
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+          fontWeight: 600
+        }
+      }, "DATE"), /*#__PURE__*/React.createElement("input", {
+        type: "date",
+        value: expense.date || "",
+        onChange: e => updateTimesheetExpense(expense.id, {
+          date: e.target.value
+        }),
+        style: {
+          ...inputStyle,
+          appearance: "none",
+          WebkitAppearance: "none",
+          colorScheme: "dark"
+        }
+      })), /*#__PURE__*/React.createElement("div", {
         style: fieldWrapStyle
       }, /*#__PURE__*/React.createElement("label", {
         style: {
