@@ -121,6 +121,7 @@ const AUTH_LOGOUT_ENDPOINT = "/api/auth-logout";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
 const SWAP_REQUESTS_ENDPOINT = "/api/swap-requests";
 const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
+const SEND_REQUEST_ENDPOINT = "/api/send-request";
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
@@ -3014,7 +3015,7 @@ function App() {
       }
     }, "\u203A"))));
   })()))), screen === "week" && selectedDriver && renderWeekScreen(), screen === "leave" && actionDriver && (() => {
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
       if (!leaveForm.dateFrom || !leaveForm.dateTo || leaveSending) return;
       const fromDate = new Date(leaveForm.dateFrom).toLocaleDateString("en-GB", {
         weekday: "long",
@@ -3034,14 +3035,35 @@ function App() {
       setLeaveSending(true);
       setLeaveError("");
       try {
-        const subject = `Annual Leave Request - ${actionDriver}`;
-        const body = [`ANNUAL LEAVE REQUEST`, ``, `Driver: ${actionDriver}`, `From: ${fromDate}`, `To: ${toDate}`, `Total days: ${diffDays}`, `Reason: ${leaveForm.reason || "Annual leave"}`, `Notes: ${leaveForm.notes || "None"}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
-        window.open(`mailto:${LEAVE_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+        const response = await fetch(SEND_REQUEST_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            kind: "leave",
+            payload: {
+              driverName: actionDriver,
+              fromDateLabel: fromDate,
+              toDateLabel: toDate,
+              dateFrom: leaveForm.dateFrom,
+              dateTo: leaveForm.dateTo,
+              totalDays: diffDays,
+              reason: leaveForm.reason || "Annual leave",
+              notes: leaveForm.notes || "",
+              submittedAtIso: new Date().toISOString()
+            }
+          })
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to send leave request. Please try again.");
+        }
         setLeaveSubmitted(true);
       } catch (err) {
-        setLeaveError(err?.message || "Unable to open your email app.");
+        setLeaveError(err?.message || "Failed to send leave request. Please try again.");
+      } finally {
+        setLeaveSending(false);
       }
-      setLeaveSending(false);
     };
     const inputStyle = {
       width: "100%",
@@ -3984,7 +4006,7 @@ function App() {
       const now = new Date();
       return now.getDay() === 0 && now.getHours() >= 18;
     })();
-    const handleTimesheetSubmit = () => {
+    const handleTimesheetSubmit = async () => {
       if (timesheetSending) return;
       setTimesheetSending(true);
       setTimesheetError("");
@@ -4000,15 +4022,32 @@ function App() {
           return `${row.dayName}: ${dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
         const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: ${expense.dayName} ${expense.date || "--"} | ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: -- | None | Amount ${formatMoneyPounds(0)}`];
-        const subject = `Driver Timesheet - ${actionDriver} - ${getWeekCommencing()}`;
         const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `OTHER EXPENSES`, ...expenseLines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, `TOTAL OTHER EXPENSES: ${formatMoneyPounds(expenseTotals.total)}`, `TOTAL EXPENSES CLAIMED: ${formatMoneyPounds(overallExpenseTotal)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
-        window.open(`mailto:${TIMESHEET_EMAIL_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+        const response = await fetch(SEND_REQUEST_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            kind: "timesheet",
+            payload: {
+              driverName: actionDriver,
+              weekCommencing: getWeekCommencing(),
+              text: body,
+              submittedAtIso: new Date().toISOString()
+            }
+          })
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to send timesheet. Please try again.");
+        }
         clearTimesheetDraftRows(actionDriver, activeTimesheetWeekKey);
         setTimesheetSubmitted(true);
       } catch (err) {
-        setTimesheetError(err?.message || "Unable to open your email app.");
+        setTimesheetError(err?.message || "Failed to send timesheet. Please try again.");
+      } finally {
+        setTimesheetSending(false);
       }
-      setTimesheetSending(false);
     };
     const inputStyle = {
       width: "100%",

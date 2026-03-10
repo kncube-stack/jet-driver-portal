@@ -108,6 +108,17 @@ function buildApprovedSwapMessage(payload) {
   };
 }
 
+function buildTimesheetMessage(payload) {
+  const driverName = asCleanString(payload.driverName, 120) || "Unknown driver";
+  const weekCommencing = asCleanString(payload.weekCommencing, 80) || "Unknown week";
+  const text = asCleanString(payload.text, 8000);
+  return {
+    to: LEAVE_REQUEST_TO,
+    subject: `Driver Timesheet - ${driverName} - ${weekCommencing}`,
+    text
+  };
+}
+
 async function sendWithResend(apiKey, from, email) {
   const response = await fetch(RESEND_ENDPOINT, {
     method: "POST",
@@ -148,5 +159,6 @@ module.exports = {
   buildLeaveMessage,
   buildSwapMessage,
   buildApprovedSwapMessage,
+  buildTimesheetMessage,
   sendConfiguredPortalEmail
 };

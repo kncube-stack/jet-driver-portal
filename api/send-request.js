@@ -1,5 +1,5 @@
 const { verifyRequestSession, parseRequestBody } = require("./_auth");
-const { asCleanString, buildLeaveMessage, buildSwapMessage, sendConfiguredPortalEmail } = require("./_request-email");
+const { asCleanString, buildLeaveMessage, buildSwapMessage, buildTimesheetMessage, sendConfiguredPortalEmail } = require("./_request-email");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -31,6 +31,12 @@ module.exports = async function handler(req, res) {
         return res.status(403).json({ ok: false, error: "Not allowed to submit swap for another driver." });
       }
     }
+    if (kind === "timesheet") {
+      const requestedDriver = asCleanString(payload.driverName, 120);
+      if (requestedDriver !== session.name) {
+        return res.status(403).json({ ok: false, error: "Not allowed to submit a timesheet for another driver." });
+      }
+    }
   }
 
   let email;
@@ -38,6 +44,8 @@ module.exports = async function handler(req, res) {
     email = buildLeaveMessage(payload);
   } else if (kind === "swap") {
     email = buildSwapMessage(payload);
+  } else if (kind === "timesheet") {
+    email = buildTimesheetMessage(payload);
   } else {
     return res.status(400).json({ ok: false, error: "Unsupported request type." });
   }
