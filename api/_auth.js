@@ -212,6 +212,42 @@ function verifyToken(token, config) {
   }
 }
 
+function createSignedActionToken(payload, ttlSeconds) {
+  const config = getAuthConfig();
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const tokenTtlSeconds = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0 ? Number(ttlSeconds) : config.tokenTtlSeconds;
+  const exp = issuedAt + tokenTtlSeconds;
+  const header = toBase64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = toBase64Url(JSON.stringify({
+    ...payload,
+    iat: issuedAt,
+    exp
+  }));
+  const data = `${header}.${body}`;
+  const signature = toBase64Url(crypto.createHmac("sha256", config.tokenSecret).update(data).digest());
+  return `${data}.${signature}`;
+}
+
+function verifySignedActionToken(token) {
+  const config = getAuthConfig();
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [header, payload, sig] = parts;
+  const data = `${header}.${payload}`;
+  const expectedSig = toBase64Url(crypto.createHmac("sha256", config.tokenSecret).update(data).digest());
+  if (!safeEqual(sig, expectedSig)) return null;
+  try {
+    const parsedPayload = JSON.parse(fromBase64Url(payload).toString("utf8"));
+    if (!parsedPayload || typeof parsedPayload !== "object") return null;
+    const exp = Number.parseInt(parsedPayload.exp, 10);
+    if (!Number.isFinite(exp) || Math.floor(Date.now() / 1000) >= exp) return null;
+    return parsedPayload;
+  } catch {
+    return null;
+  }
+}
+
 function extractBearerToken(req) {
   const header = (req.headers && (req.headers.authorization || req.headers.Authorization)) || "";
   if (typeof header !== "string") return "";
@@ -238,6 +274,17 @@ function isSecureRequest(req) {
   if (typeof proto === "string" && proto.toLowerCase().includes("https")) return true;
   const host = (req.headers && (req.headers.host || req.headers.Host)) || "";
   return typeof host === "string" && !/localhost|127\.0\.0\.1/i.test(host);
+}
+
+function getRequestOrigin(req) {
+  const protoHeader = (req.headers && (req.headers["x-forwarded-proto"] || req.headers["X-Forwarded-Proto"])) || "";
+  const protocol = typeof protoHeader === "string" && protoHeader.trim() ? protoHeader.split(",")[0].trim() : isSecureRequest(req) ? "https" : "http";
+  const host = (req.headers && (req.headers["x-forwarded-host"] || req.headers["X-Forwarded-Host"] || req.headers.host || req.headers.Host)) || "";
+  if (typeof host === "string" && host.trim()) {
+    return `${protocol}://${host.split(",")[0].trim()}`;
+  }
+  const fallbackHost = process.env.VERCEL_URL || "localhost:3000";
+  return `${protocol}://${fallbackHost}`;
 }
 
 function buildSessionCookie(token, expiresAt, req) {
@@ -349,6 +396,9 @@ function verifyRequestSession(req) {
 module.exports = {
   authenticateNamePin,
   verifyRequestSession,
+  createSignedActionToken,
+  verifySignedActionToken,
+  getRequestOrigin,
   parseRequestBody,
   buildSessionCookie,
   buildClearedSessionCookie

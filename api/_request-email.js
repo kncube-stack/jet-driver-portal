@@ -3,6 +3,17 @@ const LEAVE_REQUEST_TO = [
   "alfie.hoque@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
+const LEAVE_REQUEST_ACTION_RECIPIENTS = [
+  {
+    name: "Errol Thomas",
+    email: "errol@jasonedwardstravel.co.uk"
+  },
+  {
+    name: "Alfie Hoque",
+    email: "alfie.hoque@jasonedwardstravel.co.uk"
+  }
+];
+const LEAVE_REQUEST_INFO_RECIPIENTS = ["relief.controller@jasonedwardstravel.co.uk"];
 const SWAP_REQUEST_TO = [
   "operations@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
@@ -32,7 +43,11 @@ function formatSubmittedAt(isoValue) {
   return date.toLocaleString("en-GB", { timeZone: "Europe/London" });
 }
 
-function buildLeaveMessage(payload) {
+function escapeHtml(value) {
+  return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function buildLeaveMessage(payload, options = {}) {
   const driverName = asCleanString(payload.driverName, 120) || "Unknown driver";
   const fromDate = asCleanString(payload.fromDateLabel, 120) || asCleanString(payload.dateFrom, 20) || "Not provided";
   const toDate = asCleanString(payload.toDateLabel, 120) || asCleanString(payload.dateTo, 20) || "Not provided";
@@ -40,24 +55,118 @@ function buildLeaveMessage(payload) {
   const reason = asCleanString(payload.reason, 200) || "Annual leave";
   const notes = asCleanString(payload.notes, 1200);
   const submittedAt = formatSubmittedAt(payload.submittedAtIso);
-
+  const approveUrl = asCleanString(options.approveUrl, 2000);
+  const declineUrl = asCleanString(options.declineUrl, 2000);
+  const recipientName = asCleanString(options.recipientName, 120);
   const replyTo = asCleanString(payload.driverEmail, 200);
+  const includeActionLinks = Boolean(approveUrl && declineUrl);
+  const textLines = [
+    "ANNUAL LEAVE REQUEST",
+    "",
+    `Driver: ${driverName}`,
+    `From: ${fromDate}`,
+    `To: ${toDate}`,
+    `Total days: ${totalDays}`,
+    `Reason: ${reason}`,
+    notes ? `Notes: ${notes}` : "Notes: None",
+    "",
+    `Submitted: ${submittedAt}`
+  ];
+  if (includeActionLinks) {
+    textLines.push(
+      "",
+      `Approve: ${approveUrl}`,
+      `Decline: ${declineUrl}`,
+      "These links expire in 14 days and work only while the request is still pending."
+    );
+  }
+  textLines.push("Submitted via JET Driver Portal");
+
+  const safeDriverName = escapeHtml(driverName);
+  const safeFromDate = escapeHtml(fromDate);
+  const safeToDate = escapeHtml(toDate);
+  const safeReason = escapeHtml(reason);
+  const safeNotes = escapeHtml(notes || "None");
+  const safeSubmittedAt = escapeHtml(submittedAt);
+  const safeGreeting = recipientName ? `Hello ${escapeHtml(recipientName)},` : "Hello,";
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;">
+      <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:16px;padding:24px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#475569;margin-bottom:16px;">Annual Leave Request</div>
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${safeGreeting}</p>
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">
+          <strong>${safeDriverName}</strong> has submitted a leave request.
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;width:120px;">From</td><td style="padding:6px 0;font-size:14px;"><strong>${safeFromDate}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">To</td><td style="padding:6px 0;font-size:14px;"><strong>${safeToDate}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Total days</td><td style="padding:6px 0;font-size:14px;"><strong>${totalDays}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Reason</td><td style="padding:6px 0;font-size:14px;"><strong>${safeReason}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;vertical-align:top;">Notes</td><td style="padding:6px 0;font-size:14px;line-height:1.5;">${safeNotes}</td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Submitted</td><td style="padding:6px 0;font-size:14px;">${safeSubmittedAt}</td></tr>
+        </table>
+        ${includeActionLinks ? `
+          <div style="margin:20px 0 12px;">
+            <a href="${escapeHtml(approveUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;margin-right:10px;">Approve</a>
+            <a href="${escapeHtml(declineUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;">Decline</a>
+          </div>
+          <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">These links expire in 14 days and only work while the request is still pending.</p>
+        ` : `
+          <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">Review this request inside the JET Driver Portal.</p>
+        `}
+      </div>
+    </div>
+  `.trim();
   return {
-    to: LEAVE_REQUEST_TO,
+    to: options.to || LEAVE_REQUEST_TO,
     subject: `Annual Leave Request - ${driverName}`,
     ...(replyTo ? { replyTo } : {}),
+    text: textLines.join("\n"),
+    html
+  };
+}
+
+function buildLeaveRequestActionEmails(payload, buildActionUrl) {
+  const emails = LEAVE_REQUEST_ACTION_RECIPIENTS.map(recipient => buildLeaveMessage(payload, {
+    to: recipient.email,
+    recipientName: recipient.name,
+    approveUrl: buildActionUrl("approve", recipient.name),
+    declineUrl: buildActionUrl("decline", recipient.name)
+  }));
+  if (LEAVE_REQUEST_INFO_RECIPIENTS.length > 0) {
+    emails.push(buildLeaveMessage(payload, {
+      to: LEAVE_REQUEST_INFO_RECIPIENTS
+    }));
+  }
+  return emails;
+}
+
+function buildDriverLeaveDecisionEmail(request, action) {
+  const driverName = request.driverName || "Driver";
+  const fromDate = request.fromDateLabel || request.dateFrom || "Unknown date";
+  const toDate = request.toDateLabel || request.dateTo || "Unknown date";
+  const totalDays = request.totalDays || 1;
+  const reason = request.reason || "Annual leave";
+  const respondedBy = request.respondedBy || "The office";
+  const isApproved = action === "approve";
+  const statusWord = isApproved ? "Approved" : "Declined";
+  return {
+    to: request.driverEmail,
+    subject: `Leave Request ${statusWord} - ${driverName}`,
     text: [
-      "ANNUAL LEAVE REQUEST",
+      `ANNUAL LEAVE REQUEST ${statusWord.toUpperCase()}`,
       "",
       `Driver: ${driverName}`,
       `From: ${fromDate}`,
       `To: ${toDate}`,
       `Total days: ${totalDays}`,
       `Reason: ${reason}`,
-      notes ? `Notes: ${notes}` : "Notes: None",
       "",
-      `Submitted: ${submittedAt}`,
-      "Submitted via JET Driver Portal"
+      isApproved
+        ? `Your annual leave request has been approved by ${respondedBy}.`
+        : `Your annual leave request has been declined by ${respondedBy}.`,
+      "",
+      "JET Driver Portal"
     ].join("\n")
   };
 }
@@ -146,6 +255,7 @@ async function sendWithResend(apiKey, from, email) {
       to: Array.isArray(email.to) ? email.to : [email.to],
       subject: email.subject,
       text: email.text,
+      ...(email.html ? { html: email.html } : {}),
       ...(email.replyTo ? { reply_to: email.replyTo } : {})
     })
   });
@@ -173,6 +283,8 @@ module.exports = {
   asPositiveInt,
   formatSubmittedAt,
   buildLeaveMessage,
+  buildLeaveRequestActionEmails,
+  buildDriverLeaveDecisionEmail,
   buildSwapMessage,
   buildApprovedSwapMessage,
   buildTimesheetMessage,

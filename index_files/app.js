@@ -1524,6 +1524,8 @@ function App() {
   React.useEffect(() => {
     if (!authed || screen !== "leave-manager" || !isLeaveManager) return;
     loadLeaveRequestsForManager();
+    const pollInterval = setInterval(loadLeaveRequestsForManager, 20000);
+    return () => clearInterval(pollInterval);
   }, [authed, screen, isLeaveManager, loadLeaveRequestsForManager]);
   React.useEffect(() => {
     setLeavePendingCount(leaveRequests.filter(r => r.status === "pending").length);

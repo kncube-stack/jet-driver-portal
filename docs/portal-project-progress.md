@@ -1,6 +1,6 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 10 March 2026 (UK time) — admin rota navigation cleanup, route-learning duty-card behaviour fix, per-day timesheet expenses, and staff-name alias/auth sync
+Last updated: 10 March 2026 (UK time) — email-driven leave approvals, route-learning duty-card behaviour fix, per-day timesheet expenses, and staff-name alias/auth sync
 
 ## 1) Project purpose
 
@@ -81,7 +81,9 @@ Auth/session:
 - `api/_auth-rate-limit.js` — login throttling helper
 
 Requests/email:
-- `api/send-request.js` — leave emails via Resend, plus legacy direct swap email support
+- `api/leave-requests.js` — create/list/update leave requests in Blob storage
+- `api/leave-request-action.js` — signed email approval/decline links for office users
+- `api/send-request.js` — legacy direct email helper for older request flows
 - `api/_request-email.js` — shared email payload builders and Resend send helper
 
 Swap workflow:
@@ -206,8 +208,12 @@ Important:
    - when a manager opens another driver's week and taps back, they now return to the all-staff directory instead of being dropped straight into their own week.
 
 4. Leave and swap
-   - leave currently uses the user's email app (`mailto:`) again for pilot testing
-   - leave drafts to `errol@jasonedwardstravel.co.uk`
+   - leave requests are stored in Blob at `leave-requests/index.json`,
+   - drivers submit leave inside the portal and their own leave history screen polls every 20 seconds,
+   - Errol and Alfie now receive personalized email `Approve` / `Decline` buttons,
+   - those email links are HMAC-signed, expire after 14 days, and only work while the request is still pending,
+   - clicking an email action updates the same leave record the app reads, so driver status moves off `pending` without manual portal work,
+   - the leave-manager screen also auto-refreshes every 20 seconds,
    - swap is now a two-step in-app workflow:
      - requester creates a pending swap for another driver
      - target driver approves or declines inside the dedicated `Swap Request` screen

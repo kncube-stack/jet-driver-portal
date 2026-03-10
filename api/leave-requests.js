@@ -1,38 +1,26 @@
-const { verifyRequestSession, parseRequestBody } = require("./_auth");
-const { asCleanString, asPositiveInt, buildLeaveMessage, sendConfiguredPortalEmail } = require("./_request-email");
+const { verifyRequestSession, createSignedActionToken, getRequestOrigin, parseRequestBody } = require("./_auth");
+const { asCleanString, asPositiveInt, buildLeaveRequestActionEmails, buildDriverLeaveDecisionEmail, sendConfiguredPortalEmail } = require("./_request-email");
 const { loadAndSyncLeaveRequests, saveLeaveRequests, createLeaveRequestRecord, getRelevantLeaveRequests, sortLeaveRequests } = require("./_leave-requests");
 
 // Only these managers can view all requests, approve, and decline
 const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
+const LEAVE_EMAIL_ACTION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
-function buildDriverNotificationEmail(request, action) {
-  const driverName = request.driverName || "Driver";
-  const fromDate = request.fromDateLabel || request.dateFrom || "Unknown date";
-  const toDate = request.toDateLabel || request.dateTo || "Unknown date";
-  const totalDays = request.totalDays || 1;
-  const reason = request.reason || "Annual leave";
-  const respondedBy = request.respondedBy || "The office";
-  const isApproved = action === "approve";
-  const statusWord = isApproved ? "Approved" : "Declined";
-  return {
-    to: request.driverEmail,
-    subject: `Leave Request ${statusWord} - ${driverName}`,
-    text: [
-      `ANNUAL LEAVE REQUEST ${statusWord.toUpperCase()}`,
-      "",
-      `Driver: ${driverName}`,
-      `From: ${fromDate}`,
-      `To: ${toDate}`,
-      `Total days: ${totalDays}`,
-      `Reason: ${reason}`,
-      "",
-      isApproved
-        ? `Your annual leave request has been approved by ${respondedBy}.`
-        : `Your annual leave request has been declined by ${respondedBy}.`,
-      "",
-      "JET Driver Portal"
-    ].join("\n")
-  };
+function buildLeaveEmailActionUrl(req, requestId, action, managerName) {
+  const token = createSignedActionToken({
+    kind: "leave-request-action",
+    requestId,
+    action,
+    managerName
+  }, LEAVE_EMAIL_ACTION_TTL_SECONDS);
+  return `${getRequestOrigin(req)}/api/leave-request-action?token=${encodeURIComponent(token)}`;
+}
+
+async function sendLeaveRequestNotificationEmails(request, req) {
+  const emails = buildLeaveRequestActionEmails({ ...request, submittedAtIso: request.createdAt }, (action, managerName) => buildLeaveEmailActionUrl(req, request.id, action, managerName));
+  for (const email of emails) {
+    await sendConfiguredPortalEmail(email);
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -103,7 +91,7 @@ module.exports = async function handler(req, res) {
       await saveLeaveRequests(requests);
       if (updated.driverEmail) {
         try {
-          await sendConfiguredPortalEmail(buildDriverNotificationEmail(updated, action));
+          await sendConfiguredPortalEmail(buildDriverLeaveDecisionEmail(updated, action));
         } catch (emailError) {
           console.error("Leave action driver notification failed:", emailError);
         }
@@ -151,7 +139,7 @@ module.exports = async function handler(req, res) {
     const requests = await loadAndSyncLeaveRequests();
     requests.unshift(record);
     await saveLeaveRequests(requests);
-    await sendConfiguredPortalEmail(buildLeaveMessage({ ...record, submittedAtIso: record.createdAt }));
+    await sendLeaveRequestNotificationEmails(record, req);
     return res.status(201).json({ ok: true, request: record });
   } catch (error) {
     console.error("Leave request create failed:", error);
