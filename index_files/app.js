@@ -630,8 +630,8 @@ async function fetchLeaveRequests() {
   return data.requests;
 }
 async function updateLeaveRequestAction(id, action) {
-  const response = await fetch(LEAVE_REQUEST_ACTION_ENDPOINT, {
-    method: "POST",
+  const response = await fetch(LEAVE_REQUESTS_ENDPOINT, {
+    method: "PATCH",
     headers: {
       "Content-Type": "application/json"
     },
