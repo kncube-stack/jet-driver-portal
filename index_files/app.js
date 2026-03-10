@@ -3884,15 +3884,14 @@ function App() {
       if (timesheetSubmitted) setTimesheetSubmitted(false);
       if (timesheetError) setTimesheetError("");
     };
-    const resetTimesheetRow = (dayIndex, dutyCode) => {
-      const defaults = getTimesheetDefaultsForDuty(dutyCode, actionDriver);
-      updateTimesheetRow(dayIndex, {
-        dutyCode: defaults.dutyCode,
-        dutyLabel: defaults.dutyLabel,
-        startTime: defaults.startTime,
-        finishTime: defaults.finishTime,
-        travelCost: defaults.travelCost
-      });
+    const resetTimesheetView = () => {
+      setTimesheetRows(buildTimesheetRowsForDriver(actionDriver));
+      setTimesheetExpenses(TIMESHEET_EXPENSES_EMPTY_STATE.map(item => ({
+        ...item
+      })));
+      setTimesheetSubmitted(false);
+      setTimesheetSending(false);
+      setTimesheetError("");
     };
     const updateTimesheetExpense = (expenseId, patch) => {
       setTimesheetExpenses(prev => normalizeTimesheetExpenseList(prev).map(expense => expense.id === expenseId ? {
@@ -4043,9 +4042,14 @@ function App() {
     }, "Back to Rota"));
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
-        marginBottom: "14px"
+        marginBottom: "14px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: "12px",
+        flexWrap: "wrap"
       }
-    }, /*#__PURE__*/React.createElement("h2", {
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
       style: {
         fontSize: "17px",
         fontWeight: 600,
@@ -4058,18 +4062,31 @@ function App() {
         color: C.textMuted,
         margin: 0
       }
-    }, actionDriver, " \xB7 ", getWeekCommencing())), /*#__PURE__*/React.createElement("div", {
+    }, actionDriver, " \xB7 ", getWeekCommencing())), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: resetTimesheetView,
+      style: {
+        background: "transparent",
+        color: C.accent,
+        border: `1px solid ${C.accent + "55"}`,
+        borderRadius: "8px",
+        padding: "8px 12px",
+        fontSize: "11px",
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.5px"
+      }
+    }, "Reset")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
         gap: "10px"
       }
     }, rows.map(row => {
-      const rowDefaults = getTimesheetDefaultsForDuty(row.dutyCode, actionDriver);
       const rowMinutes = getDurationMinutes(row.startTime, row.finishTime);
       const rowHours = (rowMinutes / 60).toFixed(2);
       const rowDutyLabel = resolveTimesheetDutyLabel(row.dutyCode);
-      const rowResetDisabled = row.startTime === rowDefaults.startTime && row.finishTime === rowDefaults.finishTime && row.travelCost === rowDefaults.travelCost;
       return /*#__PURE__*/React.createElement("div", {
         key: row.dayIndex,
         style: {
@@ -4100,36 +4117,12 @@ function App() {
         }
       }, rowDutyLabel)), /*#__PURE__*/React.createElement("div", {
         style: {
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          flexWrap: "wrap",
-          justifyContent: "flex-end"
-        }
-      }, /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => resetTimesheetRow(row.dayIndex, row.dutyCode),
-        disabled: rowResetDisabled,
-        style: {
-          background: "transparent",
-          color: rowResetDisabled ? C.textDim : C.accent,
-          border: `1px solid ${rowResetDisabled ? C.border : C.accent + "55"}`,
-          borderRadius: "6px",
-          padding: "6px 10px",
-          fontSize: "10px",
-          fontWeight: 700,
-          cursor: rowResetDisabled ? "not-allowed" : "pointer",
-          fontFamily: "inherit",
-          letterSpacing: "0.5px"
-        }
-      }, "Reset"), /*#__PURE__*/React.createElement("div", {
-        style: {
           fontSize: "11px",
           color: "#38bdf8",
           fontWeight: 700,
           whiteSpace: "nowrap"
         }
-      }, rowHours, "h"))), /*#__PURE__*/React.createElement("div", {
+      }, rowHours, "h")), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
