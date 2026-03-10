@@ -192,7 +192,7 @@ Important:
 3. Weekly action layout
    - primary actions below rota:
      - `Swap Request`
-     - `Generate Timesheet`
+     - `Timesheet`
    - secondary actions moved into the top-right menu:
      - duty cards
      - leave request
@@ -252,7 +252,7 @@ Important:
   - refresh icon
   - menu icon
 - Weekly manager header is tuned to stay inline on larger phones and web, with controlled wrap only on genuinely narrow widths.
-- `Generate Timesheet` and `Swap Request` now share the same button treatment in both light and dark mode.
+- `Timesheet` and `Swap Request` now share the same button treatment in both light and dark mode.
 - the `Swap Request` button can now show a red top-right badge count for pending inbound approvals.
 - Admin browsing another driver's week now hides the bottom action buttons, and leave/swap/timesheet actions always stay tied to the logged-in user.
 - current-day route-learning entries now keep the active `View Card` button in the top banner only; the day row no longer shows a disabled duplicate button.

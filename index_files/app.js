@@ -4065,7 +4065,7 @@ function App() {
         margin: "0 0 2px",
         color: C.white
       }
-    }, "Generate Timesheet"), /*#__PURE__*/React.createElement("p", {
+    }, "Timesheet"), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: "11px",
         color: C.textMuted,
