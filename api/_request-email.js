@@ -230,6 +230,70 @@ function buildApprovedSwapMessage(payload) {
   };
 }
 
+function buildSwapOfficeActionEmail(swap, approveUrl, declineUrl) {
+  const requestingDriver = asCleanString(swap.requestingDriver, 120) || "Unknown driver";
+  const targetDriver = asCleanString(swap.targetDriver, 120) || "Unknown driver";
+  const dayName = asCleanString(swap.dayName, 40) || "Unknown day";
+  const weekCommencing = asCleanString(swap.weekCommencingLabel || swap.weekCommencing, 80) || "Unknown week";
+  const requestingDuty = asCleanString(swap.requestingDuty, 120) || "—";
+  const targetDuty = asCleanString(swap.targetDuty, 120) || "—";
+  const notes = asCleanString(swap.notes, 1200);
+  const safeReqDriver = escapeHtml(requestingDriver);
+  const safeTgtDriver = escapeHtml(targetDriver);
+  const safeDayName = escapeHtml(dayName);
+  const safeWeek = escapeHtml(weekCommencing);
+  const safeReqDuty = escapeHtml(requestingDuty);
+  const safeTgtDuty = escapeHtml(targetDuty);
+  const safeNotes = escapeHtml(notes || "None");
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;">
+      <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:16px;padding:24px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#475569;margin-bottom:16px;">Shift Swap — Awaiting Office Confirmation</div>
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Both drivers have agreed to this swap. Please confirm or decline below.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;width:140px;">Requesting Driver</td><td style="padding:6px 0;font-size:14px;"><strong>${safeReqDriver}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Their Duty</td><td style="padding:6px 0;font-size:14px;"><strong>${safeReqDuty}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Swap With</td><td style="padding:6px 0;font-size:14px;"><strong>${safeTgtDriver}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Their Duty</td><td style="padding:6px 0;font-size:14px;"><strong>${safeTgtDuty}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Day</td><td style="padding:6px 0;font-size:14px;"><strong>${safeDayName}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Week</td><td style="padding:6px 0;font-size:14px;"><strong>${safeWeek}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;vertical-align:top;">Notes</td><td style="padding:6px 0;font-size:14px;line-height:1.5;">${safeNotes}</td></tr>
+        </table>
+        <div style="margin:20px 0 12px;">
+          <a href="${escapeHtml(approveUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;margin-right:10px;">Approve Swap</a>
+          <a href="${escapeHtml(declineUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;">Decline Swap</a>
+        </div>
+        <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">These links expire in 14 days and only work while the swap is awaiting confirmation.</p>
+      </div>
+    </div>
+  `.trim();
+  return {
+    to: SWAP_REQUEST_TO,
+    subject: `Shift Swap Confirmation Needed — ${requestingDriver} ↔ ${targetDriver} (${dayName})`,
+    replyTo: "requests@jetportal.co",
+    text: [
+      "SHIFT SWAP — AWAITING OFFICE CONFIRMATION",
+      "",
+      "Both drivers have agreed to this swap. Please confirm or decline.",
+      "",
+      `Requesting Driver: ${requestingDriver}`,
+      `Their duty: ${requestingDuty}`,
+      `Swap With: ${targetDriver}`,
+      `Their duty: ${targetDuty}`,
+      `Day: ${dayName}`,
+      `Week: ${weekCommencing}`,
+      notes ? `Notes: ${notes}` : "Notes: None",
+      "",
+      `Approve: ${approveUrl}`,
+      `Decline: ${declineUrl}`,
+      "",
+      "These links expire in 14 days and only work while the swap is awaiting confirmation.",
+      "JET Driver Portal"
+    ].join("\n"),
+    html
+  };
+}
+
 function buildTimesheetMessage(payload) {
   const driverName = asCleanString(payload.driverName, 120) || "Unknown driver";
   const weekCommencing = asCleanString(payload.weekCommencing, 80) || "Unknown week";
@@ -287,6 +351,7 @@ module.exports = {
   buildDriverLeaveDecisionEmail,
   buildSwapMessage,
   buildApprovedSwapMessage,
+  buildSwapOfficeActionEmail,
   buildTimesheetMessage,
   sendConfiguredPortalEmail
 };

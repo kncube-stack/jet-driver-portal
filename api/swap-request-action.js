@@ -1,7 +1,8 @@
-const { verifyRequestSession, parseRequestBody } = require("./_auth");
-const { asCleanString } = require("./_request-email");
-const { buildApprovedSwapMessage, sendConfiguredPortalEmail } = require("./_request-email");
+const { verifyRequestSession, parseRequestBody, createSignedActionToken, getRequestOrigin } = require("./_auth");
+const { asCleanString, buildSwapOfficeActionEmail, sendConfiguredPortalEmail } = require("./_request-email");
 const { loadAndSyncSwapRequests, saveSwapRequests } = require("./_swap-requests");
+
+const SWAP_OFFICE_ACTION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 function formatWeekCommencingLabel(weekCommencing) {
   const match = String(weekCommencing || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -9,6 +10,14 @@ function formatWeekCommencingLabel(weekCommencing) {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const monthIndex = Number.parseInt(match[2], 10) - 1;
   return `${Number.parseInt(match[3], 10)} ${months[monthIndex] || match[2]} ${match[1]}`;
+}
+
+function buildSwapOfficeActionUrl(req, swapId, action) {
+  const token = createSignedActionToken(
+    { kind: "swap-office-action", swapId, action },
+    SWAP_OFFICE_ACTION_TTL_SECONDS
+  );
+  return `${getRequestOrigin(req)}/api/swap-requests?token=${encodeURIComponent(token)}`;
 }
 
 module.exports = async function handler(req, res) {
@@ -74,19 +83,26 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, request: updated });
     }
 
-    const approvedRequest = {
+    // Target driver approves — move to "agreed", await office confirmation
+    const agreedRequest = {
       ...current,
-      status: "approved",
-      respondedAt: nowIso
+      status: "agreed",
+      agreedAt: nowIso
     };
-    await sendConfiguredPortalEmail(buildApprovedSwapMessage({
-      ...approvedRequest,
-      approvedAtIso: nowIso,
-      weekCommencingLabel: formatWeekCommencingLabel(approvedRequest.weekCommencing)
-    }));
-    requests[index] = approvedRequest;
+    requests[index] = agreedRequest;
     await saveSwapRequests(requests);
-    return res.status(200).json({ ok: true, request: approvedRequest });
+    try {
+      const approveUrl = buildSwapOfficeActionUrl(req, agreedRequest.id, "approve");
+      const declineUrl = buildSwapOfficeActionUrl(req, agreedRequest.id, "decline");
+      await sendConfiguredPortalEmail(buildSwapOfficeActionEmail(
+        { ...agreedRequest, weekCommencingLabel: formatWeekCommencingLabel(agreedRequest.weekCommencing) },
+        approveUrl,
+        declineUrl
+      ));
+    } catch (emailError) {
+      console.error("Swap office action email failed:", emailError);
+    }
+    return res.status(200).json({ ok: true, request: agreedRequest });
   } catch (error) {
     console.error("Swap request action failed:", error);
     return res.status(500).json({ ok: false, error: error?.message || "Failed to update swap request." });

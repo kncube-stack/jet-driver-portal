@@ -3627,6 +3627,10 @@ function App() {
         background: "#f59e0b22",
         color: "#fbbf24"
       },
+      agreed: {
+        background: "#f9731622",
+        color: "#fb923c"
+      },
       approved: {
         background: "#22c55e22",
         color: "#4ade80"
@@ -3686,7 +3690,8 @@ function App() {
       const isInbound = context === "inbound";
       const isOutbound = context === "outbound";
       const actionDisabled = swapActionPending !== "";
-      const summaryLabel = isInbound ? `${request.requestingDriver} wants your ${request.dayName} duty` : isOutbound ? `Awaiting ${request.targetDriver}` : `${request.requestingDriver} ↔ ${request.targetDriver}`;
+      const isAgreed = request.status === "agreed";
+      const summaryLabel = isAgreed ? `${request.requestingDriver} ↔ ${request.targetDriver} — Awaiting office confirmation` : isInbound ? `${request.requestingDriver} wants your ${request.dayName} duty` : isOutbound ? `Awaiting ${request.targetDriver}` : `${request.requestingDriver} ↔ ${request.targetDriver}`;
       return /*#__PURE__*/React.createElement("div", {
         key: request.id,
         style: {

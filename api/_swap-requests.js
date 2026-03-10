@@ -3,7 +3,7 @@ const { getJsonBlob, putJsonBlob } = require("./_blob-json");
 
 const SWAP_REQUESTS_BLOB_PATH = "swap-requests/index.json";
 const SWAP_REQUEST_TTL_MS = 48 * 60 * 60 * 1000;
-const ALLOWED_STATUSES = new Set(["pending", "approved", "declined", "cancelled", "expired"]);
+const ALLOWED_STATUSES = new Set(["pending", "agreed", "approved", "declined", "cancelled", "expired"]);
 
 function toIsoOrNull(value) {
   if (!value || typeof value !== "string") return null;
@@ -42,6 +42,7 @@ function normalizeSwapRequest(rawRequest) {
     notes: normalizeString(rawRequest.notes, 1200),
     status,
     createdAt,
+    agreedAt: toIsoOrNull(rawRequest.agreedAt),
     respondedAt: toIsoOrNull(rawRequest.respondedAt),
     expiresAt: expiresAt || new Date(new Date(createdAt).getTime() + SWAP_REQUEST_TTL_MS).toISOString()
   };
