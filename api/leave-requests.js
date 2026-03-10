@@ -2,6 +2,9 @@ const { verifyRequestSession, parseRequestBody } = require("./_auth");
 const { asCleanString, asPositiveInt, buildLeaveMessage, sendConfiguredPortalEmail } = require("./_request-email");
 const { loadAndSyncLeaveRequests, saveLeaveRequests, createLeaveRequestRecord, getRelevantLeaveRequests, sortLeaveRequests } = require("./_leave-requests");
 
+// Only these managers can view all requests, approve, and decline
+const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
+
 function buildDriverNotificationEmail(request, action) {
   const driverName = request.driverName || "Driver";
   const fromDate = request.fromDateLabel || request.dateFrom || "Unknown date";
@@ -42,7 +45,16 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const requests = await loadAndSyncLeaveRequests();
-      const result = session.role === "manager"
+
+      // Calendar view — approved requests only, accessible to all authenticated users
+      const urlStr = req.url || "";
+      if (urlStr.includes("calendar=1")) {
+        const approved = requests.filter(r => r.status === "approved");
+        return res.status(200).json({ ok: true, requests: approved });
+      }
+
+      const isLeaveManager = LEAVE_MANAGERS.includes(session.name);
+      const result = isLeaveManager
         ? sortLeaveRequests(requests)
         : getRelevantLeaveRequests(requests, session.name);
       return res.status(200).json({ ok: true, requests: result });
@@ -63,8 +75,8 @@ module.exports = async function handler(req, res) {
     if (!id || !["approve", "decline", "cancel"].includes(action)) {
       return res.status(400).json({ ok: false, error: "Invalid leave request action." });
     }
-    if ((action === "approve" || action === "decline") && session.role !== "manager") {
-      return res.status(403).json({ ok: false, error: "Only managers can approve or decline leave requests." });
+    if ((action === "approve" || action === "decline") && !LEAVE_MANAGERS.includes(session.name)) {
+      return res.status(403).json({ ok: false, error: "Only designated leave managers can approve or decline leave requests." });
     }
     try {
       const requests = await loadAndSyncLeaveRequests();
@@ -77,7 +89,7 @@ module.exports = async function handler(req, res) {
         return res.status(409).json({ ok: false, error: `Leave request is already ${current.status}.` });
       }
       if (action === "cancel") {
-        if (session.role !== "manager" && current.driverName !== session.name) {
+        if (!LEAVE_MANAGERS.includes(session.name) && current.driverName !== session.name) {
           return res.status(403).json({ ok: false, error: "Only the requesting driver can cancel this leave request." });
         }
         const updated = { ...current, status: "cancelled", respondedAt: new Date().toISOString(), respondedBy: session.name };

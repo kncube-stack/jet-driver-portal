@@ -124,6 +124,7 @@ const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
 const SEND_REQUEST_ENDPOINT = "/api/send-request";
 const LEAVE_REQUESTS_ENDPOINT = "/api/leave-requests";
 const LEAVE_REQUEST_ACTION_ENDPOINT = "/api/leave-request-action";
+const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
@@ -648,6 +649,20 @@ async function updateLeaveRequestAction(id, action) {
   }
   return data.request;
 }
+async function fetchCalendarRequests() {
+  try {
+    const response = await fetch(LEAVE_REQUESTS_ENDPOINT + "?calendar=1", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.ok) return [];
+    return Array.isArray(data.requests) ? data.requests : [];
+  } catch {
+    return [];
+  }
+}
 function countPendingSwapApprovals(requests, driverName) {
   if (!driverName || !Array.isArray(requests)) return 0;
   return requests.filter(request => request.status === "pending" && request.targetDriver === driverName).length;
@@ -1039,6 +1054,10 @@ function App() {
   const [leaveRequestsError, setLeaveRequestsError] = React.useState("");
   const [leaveActionPending, setLeaveActionPending] = React.useState("");
   const [leavePendingCount, setLeavePendingCount] = React.useState(0);
+  const [myLeaveRequests, setMyLeaveRequests] = React.useState([]);
+  const [myLeaveRequestsLoading, setMyLeaveRequestsLoading] = React.useState(false);
+  const [calendarRequests, setCalendarRequests] = React.useState([]);
+  const [calendarMonth, setCalendarMonth] = React.useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [timesheetRows, setTimesheetRows] = React.useState([]);
   const [timesheetSubmitted, setTimesheetSubmitted] = React.useState(false);
   const [timesheetSending, setTimesheetSending] = React.useState(false);
@@ -1078,6 +1097,7 @@ function App() {
   };
   const C = THEMES[theme] || _defaultC;
   const isManager = currentRole === "manager";
+  const isLeaveManager = isManager && !!currentUser && LEAVE_MANAGERS.includes(currentUser);
   const isNarrowWeekHeader = viewportWidth <= 480;
   const shouldWrapWeekHeader = viewportWidth <= 430;
 
@@ -1142,6 +1162,23 @@ function App() {
       setLeaveRequestsError(error?.message || "Unable to load leave requests right now.");
     } finally {
       setLeaveRequestsLoading(false);
+    }
+  }, []);
+  const loadMyLeaveRequests = React.useCallback(async () => {
+    setMyLeaveRequestsLoading(true);
+    try {
+      const requests = await fetchLeaveRequests();
+      // Keep last 12 months + any pending (pending may be older than 12mo)
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - 12);
+      const recent = (Array.isArray(requests) ? requests : []).filter(r =>
+        r.status === "pending" || new Date(r.createdAt) >= cutoff
+      );
+      setMyLeaveRequests(recent);
+    } catch {
+      // Silent — this is supplementary info
+    } finally {
+      setMyLeaveRequestsLoading(false);
     }
   }, []);
   const getTimesheetDefaultsForDuty = (dutyCode, driverName) => {
@@ -1485,12 +1522,19 @@ function App() {
     setSwapBadgeCount(countPendingSwapApprovals(swapRequests, currentUser));
   }, [screen, swapRequests, currentUser]);
   React.useEffect(() => {
-    if (!authed || screen !== "leave-manager" || !isManager) return;
+    if (!authed || screen !== "leave-manager" || !isLeaveManager) return;
     loadLeaveRequestsForManager();
-  }, [authed, screen, isManager, loadLeaveRequestsForManager]);
+  }, [authed, screen, isLeaveManager, loadLeaveRequestsForManager]);
   React.useEffect(() => {
     setLeavePendingCount(leaveRequests.filter(r => r.status === "pending").length);
   }, [leaveRequests]);
+  React.useEffect(() => {
+    if (!authed || screen !== "leave") return;
+    loadMyLeaveRequests();
+    fetchCalendarRequests().then(setCalendarRequests).catch(() => {});
+    const pollInterval = setInterval(loadMyLeaveRequests, 20000);
+    return () => clearInterval(pollInterval);
+  }, [authed, screen, loadMyLeaveRequests]);
   React.useEffect(() => {
     setShowWeekMenu(false);
   }, [screen, selectedDriver, currentUser]);
@@ -2096,7 +2140,7 @@ function App() {
     style: weekPrimaryActionStyle,
     onMouseEnter: handleWeekPrimaryActionMouseEnter,
     onMouseLeave: handleWeekPrimaryActionMouseLeave
-  }, "\uD83E\uDDFE Generate Timesheet"), isManager && /*#__PURE__*/React.createElement("button", {
+  }, "\uD83E\uDDFE Generate Timesheet"), isLeaveManager && /*#__PURE__*/React.createElement("button", {
     onClick: openLeaveManagerScreen,
     style: {
       ...weekPrimaryActionStyle,
@@ -3182,6 +3226,136 @@ function App() {
       colorScheme: "dark",
       cursor: "pointer"
     };
+    const leaveStatusStyles = {
+      pending: { background: "#f59e0b22", color: "#fbbf24" },
+      approved: { background: "#22c55e22", color: "#4ade80" },
+      declined: { background: "#ef444422", color: "#f87171" },
+      cancelled: { background: "#64748b22", color: "#94a3b8" }
+    };
+    const renderMyLeaveRequests = () => {
+      if (myLeaveRequests.length === 0) return null;
+      return /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: "24px" }
+      },
+        /*#__PURE__*/React.createElement("p", {
+          style: { fontSize: "11px", fontWeight: 600, color: C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 10px" }
+        }, "My Leave Requests"),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: "flex", flexDirection: "column", gap: "8px" }
+        }, myLeaveRequests.map(req => {
+          const badge = leaveStatusStyles[req.status] || leaveStatusStyles.cancelled;
+          const fromLabel = req.fromDateLabel || req.dateFrom || "—";
+          const toLabel = req.toDateLabel || req.dateTo || "—";
+          return /*#__PURE__*/React.createElement("div", {
+            key: req.id,
+            style: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "4px" }
+          },
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }
+            },
+              /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: "12px", fontWeight: 600, color: C.white }
+              }, `${fromLabel}${fromLabel !== toLabel ? ` → ${toLabel}` : ""}`),
+              /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "999px", ...badge, textTransform: "capitalize" }
+              }, req.status)
+            ),
+            /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: "11px", color: C.textDim }
+            }, `${req.totalDays} ${req.totalDays === 1 ? "day" : "days"}${req.reason && req.reason !== "Annual leave" ? ` · ${req.reason}` : ""}`,
+              req.respondedBy && req.status !== "pending" ? ` · ${req.status === "approved" ? "Approved" : req.status === "declined" ? "Declined" : "Actioned"} by ${req.respondedBy}` : null
+            )
+          );
+        }))
+      );
+    };
+    const renderLeaveCalendar = () => {
+      const { year, month } = calendarMonth;
+      const leaveDays = {};
+      for (const req of calendarRequests) {
+        if (req.status !== "approved" || !req.dateFrom || !req.dateTo) continue;
+        const from = new Date(req.dateFrom + "T00:00:00");
+        const to = new Date(req.dateTo + "T00:00:00");
+        const cur = new Date(from);
+        while (cur <= to) {
+          const key = cur.toISOString().slice(0, 10);
+          if (!leaveDays[key]) leaveDays[key] = [];
+          leaveDays[key].push(req.driverName);
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+      const firstDay = new Date(year, month, 1);
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      const startDow = firstDay.getDay();
+      const monthLabel = firstDay.toLocaleString("en-GB", { month: "long", year: "numeric" });
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const days = [];
+      for (let i = 0; i < startDow; i++) days.push(null);
+      for (let d = 1; d <= lastDate; d++) days.push(d);
+      return /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: "24px" }
+      },
+        /*#__PURE__*/React.createElement("p", {
+          style: { fontSize: "11px", fontWeight: 600, color: C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 10px" }
+        }, "Approved Leave Calendar"),
+        /*#__PURE__*/React.createElement("div", {
+          style: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "12px" }
+        },
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }
+          },
+            /*#__PURE__*/React.createElement("button", {
+              onClick: () => setCalendarMonth(prev => { const d = new Date(prev.year, prev.month - 1); return { year: d.getFullYear(), month: d.getMonth() }; }),
+              style: { background: "none", border: "none", color: C.text, cursor: "pointer", fontSize: "18px", padding: "2px 8px", lineHeight: 1 }
+            }, "‹"),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: "13px", fontWeight: 600, color: C.white }
+            }, monthLabel),
+            /*#__PURE__*/React.createElement("button", {
+              onClick: () => setCalendarMonth(prev => { const d = new Date(prev.year, prev.month + 1); return { year: d.getFullYear(), month: d.getMonth() }; }),
+              style: { background: "none", border: "none", color: C.text, cursor: "pointer", fontSize: "18px", padding: "2px 8px", lineHeight: 1 }
+            }, "›")
+          ),
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", marginBottom: "4px" }
+          }, ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d =>
+            /*#__PURE__*/React.createElement("div", {
+              key: d,
+              style: { textAlign: "center", fontSize: "10px", fontWeight: 600, color: C.textDim, padding: "2px 0" }
+            }, d)
+          )),
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px" }
+          }, days.map((day, i) => {
+            if (day === null) return /*#__PURE__*/React.createElement("div", { key: `pad${i}` });
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const onLeave = leaveDays[dateStr] || [];
+            const isToday = dateStr === todayStr;
+            const hasLeave = onLeave.length > 0;
+            return /*#__PURE__*/React.createElement("div", {
+              key: dateStr,
+              title: hasLeave ? `On leave: ${onLeave.join(", ")}` : undefined,
+              style: {
+                textAlign: "center",
+                padding: "5px 2px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: isToday ? 700 : 400,
+                background: hasLeave ? "#22c55e18" : "transparent",
+                color: hasLeave ? "#4ade80" : isToday ? C.accent : C.text,
+                border: isToday ? `1px solid ${C.accent}44` : "1px solid transparent",
+                cursor: hasLeave ? "help" : "default"
+              }
+            },
+              day,
+              hasLeave && /*#__PURE__*/React.createElement("div", {
+                style: { width: "4px", height: "4px", borderRadius: "50%", background: "#4ade80", margin: "1px auto 0" }
+              })
+            );
+          }))
+        )
+      );
+    };
     if (leaveSubmitted) return /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
@@ -3231,7 +3405,7 @@ function App() {
         cursor: "pointer",
         fontFamily: "inherit"
       }
-    }, "Back to Rota"));
+    }, "Back to Rota"), renderMyLeaveRequests(), renderLeaveCalendar());
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: "20px"
@@ -3426,7 +3600,7 @@ function App() {
         lineHeight: 1.5,
         margin: "4px 0 0"
       }
-    }, "Leave requests are reviewed by the office.")));
+    }, "Leave requests are reviewed by the office.")), renderMyLeaveRequests(), renderLeaveCalendar());
   })(), screen === "swap" && actionDriver && (() => {
     const myRota = ROTA[actionDriver] || [];
     const otherDrivers = DRIVERS.filter(d => d !== actionDriver);
@@ -4039,7 +4213,7 @@ function App() {
         margin: "2px 0 0"
       }
     }, swapRequestsError)));
-  })(), screen === "leave-manager" && isManager && (() => {
+  })(), screen === "leave-manager" && isLeaveManager && (() => {
     const pendingRequests = leaveRequests.filter(r => r.status === "pending");
     const resolvedRequests = leaveRequests.filter(r => r.status !== "pending");
     const statusStyles = {
