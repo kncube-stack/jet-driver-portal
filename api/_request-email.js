@@ -30,9 +30,11 @@ function buildLeaveMessage(payload) {
   const notes = asCleanString(payload.notes, 1200);
   const submittedAt = formatSubmittedAt(payload.submittedAtIso);
 
+  const replyTo = asCleanString(payload.driverEmail, 200);
   return {
     to: LEAVE_REQUEST_TO,
     subject: `Annual Leave Request - ${driverName}`,
+    ...(replyTo ? { replyTo } : {}),
     text: [
       "ANNUAL LEAVE REQUEST",
       "",
@@ -112,9 +114,11 @@ function buildTimesheetMessage(payload) {
   const driverName = asCleanString(payload.driverName, 120) || "Unknown driver";
   const weekCommencing = asCleanString(payload.weekCommencing, 80) || "Unknown week";
   const text = asCleanString(payload.text, 8000);
+  const replyTo = asCleanString(payload.driverEmail, 200);
   return {
     to: LEAVE_REQUEST_TO,
     subject: `Driver Timesheet - ${driverName} - ${weekCommencing}`,
+    ...(replyTo ? { replyTo } : {}),
     text
   };
 }
@@ -130,7 +134,8 @@ async function sendWithResend(apiKey, from, email) {
       from,
       to: [email.to],
       subject: email.subject,
-      text: email.text
+      text: email.text,
+      ...(email.replyTo ? { reply_to: email.replyTo } : {})
     })
   });
 

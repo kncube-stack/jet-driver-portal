@@ -982,7 +982,8 @@ function App() {
     dateFrom: "",
     dateTo: "",
     reason: "",
-    notes: ""
+    notes: "",
+    email: ""
   });
   const [leaveSubmitted, setLeaveSubmitted] = React.useState(false);
   const [leaveSending, setLeaveSending] = React.useState(false);
@@ -1004,6 +1005,7 @@ function App() {
   const [timesheetSubmitted, setTimesheetSubmitted] = React.useState(false);
   const [timesheetSending, setTimesheetSending] = React.useState(false);
   const [timesheetError, setTimesheetError] = React.useState("");
+  const [timesheetDriverEmail, setTimesheetDriverEmail] = React.useState("");
   const printRef = React.useRef(null);
   const today = (() => {
     const d = new Date().getDay();
@@ -1413,6 +1415,7 @@ function App() {
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
+    setTimesheetDriverEmail("");
   }, [screen, actionDriver, activeTimesheetWeekKey]);
   React.useEffect(() => {
     if (screen !== "timesheet" || !actionDriver || !activeTimesheetWeekKey) return;
@@ -1782,6 +1785,7 @@ function App() {
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
+    setTimesheetDriverEmail("");
   };
 
   // Is the user viewing the current calendar week?
@@ -1819,7 +1823,8 @@ function App() {
       dateFrom: "",
       dateTo: "",
       reason: "",
-      notes: ""
+      notes: "",
+      email: ""
     });
     setScreen("leave");
   };
@@ -1840,6 +1845,7 @@ function App() {
     setTimesheetSubmitted(false);
     setTimesheetSending(false);
     setTimesheetError("");
+    setTimesheetDriverEmail("");
     if (actionDriver) {
       setTimesheetRows(buildTimesheetRowsForDriver(actionDriver));
     } else {
@@ -2488,7 +2494,8 @@ function App() {
           dateFrom: "",
           dateTo: "",
           reason: "",
-          notes: ""
+          notes: "",
+          email: ""
         });
       } else if (screen === "swap") {
         setScreen("week");
@@ -2503,6 +2510,7 @@ function App() {
         setTimesheetSubmitted(false);
         setTimesheetSending(false);
         setTimesheetError("");
+        setTimesheetDriverEmail("");
       } else if (screen === "home") {
         openCurrentUserWeek();
       } else if (screen === "week" && selectedDriver !== currentUser) {
@@ -3050,6 +3058,7 @@ function App() {
               totalDays: diffDays,
               reason: leaveForm.reason || "Annual leave",
               notes: leaveForm.notes || "",
+              driverEmail: leaveForm.email || "",
               submittedAtIso: new Date().toISOString()
             }
           })
@@ -3106,7 +3115,7 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your annual leave request is ready in your email app. Send it to submit your request."), /*#__PURE__*/React.createElement("button", {
+    }, "Your annual leave request has been sent to the office."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setLeaveSubmitted(false);
@@ -3116,7 +3125,8 @@ function App() {
           dateFrom: "",
           dateTo: "",
           reason: "",
-          notes: ""
+          notes: "",
+          email: ""
         });
       },
       style: {
@@ -3274,6 +3284,24 @@ function App() {
         ...inputStyle,
         resize: "vertical"
       }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "YOUR EMAIL (OPTIONAL — FOR REPLIES)"), /*#__PURE__*/React.createElement("input", {
+      type: "email",
+      value: leaveForm.email,
+      onChange: e => setLeaveForm(f => ({
+        ...f,
+        email: e.target.value
+      })),
+      placeholder: "your@email.com",
+      style: inputStyle
     })), /*#__PURE__*/React.createElement("button", {
       onClick: handleSubmit,
       disabled: !leaveForm.dateFrom || !leaveForm.dateTo || leaveSending,
@@ -3942,6 +3970,7 @@ function App() {
       setTimesheetSubmitted(false);
       setTimesheetSending(false);
       setTimesheetError("");
+      setTimesheetDriverEmail("");
     };
     const updateTimesheetExpensesForDay = (dayIndex, updater) => {
       setTimesheetRows(prev => {
@@ -4033,6 +4062,7 @@ function App() {
               driverName: actionDriver,
               weekCommencing: getWeekCommencing(),
               text: body,
+              driverEmail: timesheetDriverEmail || "",
               submittedAtIso: new Date().toISOString()
             }
           })
@@ -4094,12 +4124,13 @@ function App() {
         margin: "0 0 24px",
         lineHeight: 1.5
       }
-    }, "Your timesheet draft is ready in your email app. Send it to submit this week's record."), /*#__PURE__*/React.createElement("button", {
+    }, "Your timesheet has been sent to the office."), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setScreen("week");
         setTimesheetSubmitted(false);
         setTimesheetSending(false);
         setTimesheetError("");
+        setTimesheetDriverEmail("");
       },
       style: {
         background: "#38bdf8",
@@ -4513,7 +4544,37 @@ function App() {
           fontWeight: 700,
           color: "#38bdf8"
         }
-      }, formatMoneyPounds(overallExpenseTotal)))), /*#__PURE__*/React.createElement("button", {
+      }, formatMoneyPounds(overallExpenseTotal)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "block",
+        fontSize: "11px",
+        color: C.textMuted,
+        marginBottom: "6px",
+        fontWeight: 600,
+        letterSpacing: "0.5px"
+      }
+    }, "YOUR EMAIL (OPTIONAL — FOR REPLIES)"), /*#__PURE__*/React.createElement("input", {
+      type: "email",
+      value: timesheetDriverEmail,
+      onChange: e => setTimesheetDriverEmail(e.target.value),
+      placeholder: "your@email.com",
+      style: {
+        width: "100%",
+        padding: "10px 12px",
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: "8px",
+        color: C.white,
+        fontSize: "12px",
+        fontFamily: "inherit",
+        outline: "none",
+        boxSizing: "border-box"
+      }
+    })), /*#__PURE__*/React.createElement("button", {
       onClick: handleTimesheetSubmit,
       disabled: timesheetSending || rows.length === 0,
       style: {
