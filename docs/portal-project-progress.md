@@ -224,6 +224,7 @@ Important:
    - Paddington travel default -> `£6`,
    - Victoria travel default -> `£9`,
    - all generated day fields remain editable by the driver, including duty number, start time, finish time, and travel cost,
+   - each day row now has a `Reset` action that restores duty-card-derived defaults for the current duty code, or clears values when no default exists,
    - an `Other Expenses` section is now included on every timesheet for additional reimbursable costs,
    - draft persistence now includes both day rows and the extra expenses list,
    - still submitted via `mailto:` today, drafting to `errol@jasonedwardstravel.co.uk`.
