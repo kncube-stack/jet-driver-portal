@@ -1751,6 +1751,11 @@ function App() {
     setShowWeekMenu(false);
     refreshRota();
   };
+  const openDutyCardScreen = dutyNumber => {
+    if (!dutyNumber || !DUTY_CARDS[dutyNumber]) return;
+    setSelectedDuty(dutyNumber);
+    setScreen("duty");
+  };
   const weekMenuButtonStyle = {
     display: "block",
     width: "100%",
@@ -1930,10 +1935,15 @@ function App() {
     const runout = getDriverRunoutLive(selectedDriver);
     const todayNote = null;
     const todayDutyNum = isDutyNumber(todayVal) ? parseInt(todayVal) : null;
+    const todayRouteLearningMatch = String(todayVal).match(/^RL\s*(\d+)$/i);
+    const todayRouteLearningNum = todayRouteLearningMatch ? parseInt(todayRouteLearningMatch[1], 10) : null;
     const todayDutyCard = todayDutyNum && DUTY_CARDS[todayDutyNum] ? DUTY_CARDS[todayDutyNum] : null;
-    const runoutForDuty = todayDutyNum ? getTodayRunoutLive(todayDutyNum) : null;
+    const todayRouteLearningCard = todayRouteLearningNum && DUTY_CARDS[todayRouteLearningNum] ? DUTY_CARDS[todayRouteLearningNum] : null;
+    const todayCardDutyNum = todayDutyNum || todayRouteLearningNum;
+    const todayDisplayCard = todayDutyCard || todayRouteLearningCard;
+    const runoutForDuty = todayCardDutyNum ? getTodayRunoutLive(todayCardDutyNum) : null;
     const activeRunout = runout || runoutForDuty;
-    const showTodayBanner = isCurrentWeek && (todayDutyCard || activeRunout || todayVal !== "—");
+    const showTodayBanner = isCurrentWeek && (todayDisplayCard || activeRunout || todayVal !== "—");
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: "20px"
@@ -2034,7 +2044,7 @@ function App() {
       day: "2-digit",
       month: "2-digit",
       year: "numeric"
-    })), todayDutyCard && /*#__PURE__*/React.createElement("div", {
+    })), todayDisplayCard && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -2047,19 +2057,16 @@ function App() {
       style: {
         fontSize: "18px",
         fontWeight: 700,
-        color: C.white
+        color: todayDutyCard ? C.white : C.blue
       }
-    }, "Duty ", todayVal), /*#__PURE__*/React.createElement("div", {
+    }, todayDutyCard ? "Duty " : "Route Learning ", todayCardDutyNum), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.textMuted,
         marginTop: "2px"
       }
-    }, todayDutyCard.route, " \xB7 ", todayDutyCard.signOn, " \u2013 ", todayDutyCard.signOff)), /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setSelectedDuty(todayDutyNum);
-        setScreen("duty");
-      },
+    }, todayDisplayCard.route, " \xB7 ", todayDisplayCard.signOn, " \u2013 ", todayDisplayCard.signOff)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => openDutyCardScreen(todayCardDutyNum),
       style: {
         background: C.accent,
         color: C.bg,
@@ -2071,7 +2078,7 @@ function App() {
         cursor: "pointer",
         fontFamily: "inherit"
       }
-    }, "View Card \u2192")), !todayDutyCard && todayVal === "R" && /*#__PURE__*/React.createElement("div", {
+    }, "View Card \u2192")), !todayDisplayCard && todayVal === "R" && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: activeRunout ? "10px" : "0"
       }
@@ -2081,7 +2088,7 @@ function App() {
         fontWeight: 700,
         color: getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).color
       }
-    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label)), !todayDutyCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
+    }, getStatusStyle(todayVal, selectedDriver, true, DRIVER_SECTION, C).label)), !todayDisplayCard && todayVal !== "R" && todayVal !== "—" && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: activeRunout ? "10px" : "0"
       }
@@ -2223,9 +2230,12 @@ function App() {
       const dutyCard = hasDutyCard ? DUTY_CARDS[parseInt(val)] : null;
       const special = getSpecialDuty(val);
       const cellNote = null;
-      const rlDutyNum = val?.startsWith("RL") ? parseInt(val.slice(2)) : null;
+      const routeLearningMatch = String(val).match(/^RL\s*(\d+)$/i);
+      const rlDutyNum = routeLearningMatch ? parseInt(routeLearningMatch[1], 10) : null;
       const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
       const hideRowViewCardButton = isToday && hasDutyCard && !!todayDutyCard;
+      const showActiveRowViewCardButton = (hasDutyCard && !hideRowViewCardButton) || (!!rlDutyCard && !isToday);
+      const showDisabledRouteLearningButton = !!rlDutyCard && isToday;
       return /*#__PURE__*/React.createElement("div", {
         key: day,
         style: {
@@ -2308,11 +2318,8 @@ function App() {
           lineHeight: 1.3,
           whiteSpace: "pre-line"
         }
-      }, "\uD83D\uDCDD ", cellNote)), (hasDutyCard || rlDutyCard) && !hideRowViewCardButton && /*#__PURE__*/React.createElement("button", {
-        onClick: () => {
-          setSelectedDuty(hasDutyCard ? parseInt(val) : rlDutyNum);
-          setScreen("duty");
-        },
+      }, "\uD83D\uDCDD ", cellNote)), showActiveRowViewCardButton && /*#__PURE__*/React.createElement("button", {
+        onClick: () => openDutyCardScreen(hasDutyCard ? parseInt(val, 10) : rlDutyNum),
         style: {
           background: isToday ? C.accent : C.accent + "22",
           color: isToday ? C.bg : C.accent,
@@ -2335,6 +2342,23 @@ function App() {
             e.currentTarget.style.background = C.accent + "22";
             e.currentTarget.style.color = C.accent;
           }
+        }
+      }, "View Card \u2192"), showDisabledRouteLearningButton && /*#__PURE__*/React.createElement("button", {
+        disabled: true,
+        title: "Use the current day banner to view this duty card.",
+        style: {
+          background: C.textDim + "22",
+          color: C.textDim,
+          border: "none",
+          borderRadius: "6px",
+          padding: "7px 12px",
+          fontSize: "11px",
+          fontWeight: 600,
+          cursor: "not-allowed",
+          fontFamily: "inherit",
+          letterSpacing: "0.5px",
+          flexShrink: 0,
+          opacity: 0.7
         }
       }, "View Card \u2192")), isToday && /*#__PURE__*/React.createElement("div", {
         style: {
