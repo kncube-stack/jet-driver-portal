@@ -66,17 +66,67 @@ function loadClientData() {
     cachedClientData = {
       staffDirectory: Array.isArray(data.STAFF_DIRECTORY) ? data.STAFF_DIRECTORY : [],
       managerNames: Array.isArray(data.ACCESS_CONTROL && data.ACCESS_CONTROL.managerNames) ? data.ACCESS_CONTROL.managerNames : [],
-      sourceConfig: data.STAFF_SOURCE_CONFIG && typeof data.STAFF_SOURCE_CONFIG === "object" ? data.STAFF_SOURCE_CONFIG : {}
+      sourceConfig: data.STAFF_SOURCE_CONFIG && typeof data.STAFF_SOURCE_CONFIG === "object" ? data.STAFF_SOURCE_CONFIG : {},
+      nameAliases: data.STAFF_NAME_ALIASES && typeof data.STAFF_NAME_ALIASES === "object" ? data.STAFF_NAME_ALIASES : {}
     };
     return cachedClientData;
   } catch {
     cachedClientData = {
       staffDirectory: [],
       managerNames: [],
-      sourceConfig: {}
+      sourceConfig: {},
+      nameAliases: {}
     };
     return cachedClientData;
   }
+}
+
+function buildNameAliasConfig(aliasMap) {
+  const normalizedToCanonical = {};
+  const canonicalToSources = {};
+  if (!aliasMap || typeof aliasMap !== "object") {
+    return {
+      normalizedToCanonical,
+      canonicalToSources
+    };
+  }
+  Object.entries(aliasMap).forEach(([fromName, toName]) => {
+    const source = typeof fromName === "string" ? fromName.trim() : "";
+    const target = typeof toName === "string" ? toName.trim() : "";
+    if (!source || !target) return;
+    normalizedToCanonical[source.toLowerCase()] = target;
+    const canonicalKey = target.toLowerCase();
+    if (!canonicalToSources[canonicalKey]) canonicalToSources[canonicalKey] = [];
+    if (!canonicalToSources[canonicalKey].includes(source)) canonicalToSources[canonicalKey].push(source);
+  });
+  return {
+    normalizedToCanonical,
+    canonicalToSources
+  };
+}
+
+function resolveKnownName(rawName, config) {
+  const raw = typeof rawName === "string" ? rawName.trim() : "";
+  if (!raw) return "";
+  const lowerRaw = raw.toLowerCase();
+  for (const n of config.allowedNames) {
+    if (n.toLowerCase() === lowerRaw) return n;
+  }
+  for (const n of config.managerNames) {
+    if (n.toLowerCase() === lowerRaw) return n;
+  }
+  return config.nameAliases[lowerRaw] || raw;
+}
+
+function getPinHashCandidates(name, config) {
+  const resolvedName = typeof name === "string" ? name.trim() : "";
+  if (!resolvedName) return [];
+  const candidates = [resolvedName];
+  const aliasSources = config.pinHashAliasSources[resolvedName.toLowerCase()] || [];
+  aliasSources.forEach(sourceName => {
+    if (!candidates.includes(sourceName)) candidates.push(sourceName);
+  });
+  return candidates;
 }
 
 function getAllowedNames(staffDirectory, managerNames) {
@@ -99,6 +149,7 @@ function getAuthConfig() {
   const resolvedManagers = managerNames.length > 0 ? managerNames : clientData.managerNames.length > 0 ? clientData.managerNames : DEFAULT_MANAGER_NAMES;
   const allowedNameOverrides = parseList(process.env.AUTH_ALLOWED_NAMES);
   const allowedNames = allowedNameOverrides.length > 0 ? new Set(allowedNameOverrides) : getAllowedNames(clientData.staffDirectory, resolvedManagers);
+  const aliasConfig = buildNameAliasConfig(clientData.nameAliases);
   const mode = "strict";
   const tokenTtlCandidate = Number.parseInt(process.env.AUTH_TOKEN_TTL_SECONDS || "", 10);
   const tokenTtlSeconds = Number.isFinite(tokenTtlCandidate) && tokenTtlCandidate >= 300 ? tokenTtlCandidate : DEFAULT_TOKEN_TTL_SECONDS;
@@ -107,6 +158,8 @@ function getAuthConfig() {
     mode,
     managerNames: resolvedManagers,
     allowedNames,
+    nameAliases: aliasConfig.normalizedToCanonical,
+    pinHashAliasSources: aliasConfig.canonicalToSources,
     userPinHashes: parseJsonObject(process.env.AUTH_USER_PIN_HASHES, {}),
     tokenSecret: process.env.AUTH_SIGNING_SECRET || process.env.RESEND_API_KEY || getFallbackTokenSecret(),
     tokenTtlSeconds,
@@ -146,7 +199,7 @@ function verifyToken(token, config) {
     if (!parsedPayload || typeof parsedPayload !== "object") return null;
     const exp = Number.parseInt(parsedPayload.exp, 10);
     if (!Number.isFinite(exp) || Math.floor(Date.now() / 1000) >= exp) return null;
-    const name = typeof parsedPayload.name === "string" ? parsedPayload.name.trim() : "";
+    const name = resolveKnownName(typeof parsedPayload.name === "string" ? parsedPayload.name.trim() : "", config);
     const role = parsedPayload.role === "manager" ? "manager" : "driver";
     if (!name) return null;
     return {
@@ -244,17 +297,7 @@ function authenticateNamePin(nameInput, pinInput) {
       error: "Name and PIN are required."
     };
   }
-  // Case-insensitive canonical name lookup
-  const lowerRaw = rawName.toLowerCase();
-  let name = rawName;
-  for (const n of config.allowedNames) {
-    if (n.toLowerCase() === lowerRaw) { name = n; break; }
-  }
-  if (name === rawName) {
-    for (const n of config.managerNames) {
-      if (n.toLowerCase() === lowerRaw) { name = n; break; }
-    }
-  }
+  const name = resolveKnownName(rawName, config);
   const isManagerName = config.managerNames.includes(name);
   const isKnownName = config.allowedNames.has(name);
   if (!isKnownName && !(config.allowUnknownDrivers && !isManagerName && config.mode !== "strict")) {
@@ -265,8 +308,11 @@ function authenticateNamePin(nameInput, pinInput) {
   }
 
   const hash = crypto.createHash("sha256").update(pin).digest("hex");
-  const userHash = config.userPinHashes[name];
-  const passByUserPin = typeof userHash === "string" && safeEqual(userHash, hash);
+  const pinHashCandidates = getPinHashCandidates(name, config);
+  const passByUserPin = pinHashCandidates.some(candidateName => {
+    const userHash = config.userPinHashes[candidateName];
+    return typeof userHash === "string" && safeEqual(userHash, hash);
+  });
   if (!passByUserPin) {
     return {
       ok: false,

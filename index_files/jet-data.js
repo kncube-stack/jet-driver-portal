@@ -4610,7 +4610,7 @@ const DAILY_RUNOUT = {
       signOn: "03:00",
       handoverTo: {
         duty: 208,
-        driver: "Amar Habib",
+        driver: "Khurrum Habib",
         signOn: "14:05"
       }
     },
@@ -4655,7 +4655,7 @@ const DAILY_RUNOUT = {
     },
     208: {
       vehicle: "BV72 XFE",
-      driver: "Amar Habib",
+      driver: "Khurrum Habib",
       signOn: "14:05",
       takeoverFrom: {
         duty: 203,
@@ -4810,7 +4810,7 @@ const ROTA_NOTES = {
   "Oneil Thomas": {
     5: "Mahmudul Hoque:\nLOOK AT CM FOR MORE INFO\n\n0120 POSITION\n\n1230 IVER"
   },
-  "Amar Habib": {
+  "Khurrum Habib": {
     2: "RL with Sanjeev",
     4: "RL with Wegles"
   },
@@ -4902,7 +4902,9 @@ const SECTION_LABEL_MAP = {
 const STAFF_NAME_ALIASES = {
   "J. Ferreira": "Joao Ferreira",
   "M. Ali": "Mo ali",
-  "D. Howards": "Davina Howards"
+  "D. Howards": "Davina Howards",
+  "Amar Habib": "Khurrum Habib",
+  "Khorrum Habib": "Khurrum Habib"
 };
 
 // Authoritative in-app staff directory.
@@ -4922,7 +4924,7 @@ const STAFF_DIRECTORY = [{
 }, {
   key: "late_network",
   label: "Late Network",
-  drivers: ["Sanjeev Rana", "Emmanuel Owusu", "Vusi Maziya", "Amar Habib", "Azhar Khan", "Si Tun", "Jeffrey Ralph", "Jerome Lionel"]
+  drivers: ["Sanjeev Rana", "Emmanuel Owusu", "Vusi Maziya", "Khurrum Habib", "Azhar Khan", "Si Tun", "Jeffrey Ralph", "Jerome Lionel"]
 }, {
   key: "part_time",
   label: "Part Time",
