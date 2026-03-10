@@ -2235,7 +2235,6 @@ function App() {
       const rlDutyCard = rlDutyNum && DUTY_CARDS[rlDutyNum] ? DUTY_CARDS[rlDutyNum] : null;
       const hideRowViewCardButton = isToday && hasDutyCard && !!todayDutyCard;
       const showActiveRowViewCardButton = (hasDutyCard && !hideRowViewCardButton) || (!!rlDutyCard && !isToday);
-      const showDisabledRouteLearningButton = !!rlDutyCard && isToday;
       return /*#__PURE__*/React.createElement("div", {
         key: day,
         style: {
@@ -2342,23 +2341,6 @@ function App() {
             e.currentTarget.style.background = C.accent + "22";
             e.currentTarget.style.color = C.accent;
           }
-        }
-      }, "View Card \u2192"), showDisabledRouteLearningButton && /*#__PURE__*/React.createElement("button", {
-        disabled: true,
-        title: "Use the current day banner to view this duty card.",
-        style: {
-          background: C.textDim + "22",
-          color: C.textDim,
-          border: "none",
-          borderRadius: "6px",
-          padding: "7px 12px",
-          fontSize: "11px",
-          fontWeight: 600,
-          cursor: "not-allowed",
-          fontFamily: "inherit",
-          letterSpacing: "0.5px",
-          flexShrink: 0,
-          opacity: 0.7
         }
       }, "View Card \u2192")), isToday && /*#__PURE__*/React.createElement("div", {
         style: {
