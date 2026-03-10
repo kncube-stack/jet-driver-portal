@@ -81,8 +81,7 @@ Auth/session:
 - `api/_auth-rate-limit.js` — login throttling helper
 
 Requests/email:
-- `api/leave-requests.js` — create/list/update leave requests in Blob storage
-- `api/leave-request-action.js` — signed email approval/decline links for office users
+- `api/leave-requests.js` — create/list/update leave requests in Blob storage, including signed email approval/decline links for office users
 - `api/send-request.js` — legacy direct email helper for older request flows
 - `api/_request-email.js` — shared email payload builders and Resend send helper
 
@@ -212,7 +211,7 @@ Important:
    - drivers submit leave inside the portal and their own leave history screen polls every 20 seconds,
    - Errol and Alfie now receive personalized email `Approve` / `Decline` buttons,
    - those email links are HMAC-signed, expire after 14 days, and only work while the request is still pending,
-   - clicking an email action updates the same leave record the app reads, so driver status moves off `pending` without manual portal work,
+   - clicking an email action hits the existing `leave-requests` API, updates the same leave record the app reads, and moves driver status off `pending` without manual portal work,
    - the leave-manager screen also auto-refreshes every 20 seconds,
    - swap is now a two-step in-app workflow:
      - requester creates a pending swap for another driver
