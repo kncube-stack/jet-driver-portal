@@ -1,6 +1,6 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 09 March 2026 (UK time) — audit refresh after swap workflow rollout, auth hardening, PIN rollout, blob-read refactor, and weekly UI cleanup
+Last updated: 10 March 2026 (UK time) — admin rota navigation cleanup, route-learning duty-card behaviour fix, timesheet generation expansion, and staff-name alias/auth sync
 
 ## 1) Project purpose
 
@@ -149,6 +149,8 @@ Current manager/duty-manager access list in code:
   - `J. Ferreira` -> `Joao Ferreira`
   - `M. Ali` -> `Mo ali`
   - `D. Howards` -> `Davina Howards`
+  - `Amar Habib` -> `Khurrum Habib`
+  - `Khorrum Habib` -> `Khurrum Habib`
 
 ### Blob backend status
 
@@ -196,9 +198,12 @@ Important:
      - leave request
    - managers/duty managers also see:
      - `All Staff`
+     - `Rota View`
      - refresh icon
      - menu button
    - header layout has been tuned so larger phones keep those controls inline with the user name.
+   - in manager all-staff mode, the segmented tab now reads `Directory` instead of `Rota`.
+   - when a manager opens another driver's week and taps back, they now return to the all-staff directory instead of being dropped straight into their own week.
 
 4. Leave and swap
    - leave currently uses the user's email app (`mailto:`) again for pilot testing
@@ -214,9 +219,13 @@ Important:
 
 5. Timesheets
    - generated from duty-card sign-on/sign-off data,
+   - workshop (`WS`) defaults to a 10-hour day (`08:00` to `18:00`),
    - stale draft rows are ignored if the underlying duty changed,
    - Paddington travel default -> `£6`,
    - Victoria travel default -> `£9`,
+   - all generated day fields remain editable by the driver, including duty number, start time, finish time, and travel cost,
+   - an `Other Expenses` section is now included on every timesheet for additional reimbursable costs,
+   - draft persistence now includes both day rows and the extra expenses list,
    - still submitted via `mailto:` today, drafting to `errol@jasonedwardstravel.co.uk`.
 
 6. Duty cards
@@ -238,12 +247,14 @@ Important:
   - log out
 - Weekly manager header carries:
   - `All Staff`
+  - `Rota View`
   - refresh icon
   - menu icon
 - Weekly manager header is tuned to stay inline on larger phones and web, with controlled wrap only on genuinely narrow widths.
 - `Generate Timesheet` and `Swap Request` now share the same button treatment in both light and dark mode.
 - the `Swap Request` button can now show a red top-right badge count for pending inbound approvals.
 - Admin browsing another driver's week now hides the bottom action buttons, and leave/swap/timesheet actions always stay tied to the logged-in user.
+- current-day route-learning entries now keep the active `View Card` button in the top banner only; the day row no longer shows a disabled duplicate button.
 - Standalone duty-cards app remains separate and light-themed.
 
 ## 10) Security posture (current)
@@ -371,3 +382,4 @@ Swap-request store notes:
 10. Timesheet email flow is the main remaining user-facing request flow that has not yet been moved fully server-side.
 11. The swap workflow is now stateful; do not revert it back to immediate management email without an explicit process decision.
 12. If changing staff display names, keep alias handling in sync with the rota source naming until the source workbook is updated too.
+13. After any important user-visible or auth/data-model change, update this handover doc in the same change set.
