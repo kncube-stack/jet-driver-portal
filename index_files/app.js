@@ -3872,6 +3872,7 @@ function App() {
   })(), screen === "timesheet" && actionDriver && (() => {
     const rows = timesheetRows.length === DAYS.length ? timesheetRows : buildTimesheetRowsForDriver(actionDriver);
     const expenses = normalizeTimesheetExpenseList(timesheetExpenses);
+    const resolveTimesheetDutyLabel = dutyCode => getTimesheetDefaultsForDuty(dutyCode, actionDriver).dutyLabel;
     const updateTimesheetRow = (dayIndex, patch) => {
       setTimesheetRows(prev => {
         const baseRows = prev.length === DAYS.length ? prev : buildTimesheetRowsForDriver(actionDriver);
@@ -3950,9 +3951,10 @@ function App() {
           const rowHours = (rowMinutes / 60).toFixed(2);
           const rowCost = Math.max(0, Number(row.travelCost) || 0);
           const dutyCode = String(row.dutyCode || "—").trim() || "—";
+          const dutyLabel = resolveTimesheetDutyLabel(dutyCode);
           const startTime = isTimeValue(row.startTime) ? row.startTime : "--:--";
           const finishTime = isTimeValue(row.finishTime) ? row.finishTime : "--:--";
-          return `${row.dayName}: ${row.dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
+          return `${row.dayName}: ${dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
         const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: None | Amount ${formatMoneyPounds(0)}`];
         const subject = `Driver Timesheet - ${actionDriver} - ${getWeekCommencing()}`;
@@ -4055,6 +4057,7 @@ function App() {
     }, rows.map(row => {
       const rowMinutes = getDurationMinutes(row.startTime, row.finishTime);
       const rowHours = (rowMinutes / 60).toFixed(2);
+      const rowDutyLabel = resolveTimesheetDutyLabel(row.dutyCode);
       return /*#__PURE__*/React.createElement("div", {
         key: row.dayIndex,
         style: {
@@ -4083,7 +4086,7 @@ function App() {
           color: C.textMuted,
           marginTop: "2px"
         }
-      }, row.dutyLabel)), /*#__PURE__*/React.createElement("div", {
+      }, rowDutyLabel)), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: "11px",
           color: "#38bdf8",
@@ -4109,11 +4112,12 @@ function App() {
         }
       }, "DUTY NUMBER"), /*#__PURE__*/React.createElement("input", {
         value: row.dutyCode,
-        readOnly: true,
+        onChange: e => updateTimesheetRow(row.dayIndex, {
+          dutyCode: e.target.value,
+          dutyLabel: resolveTimesheetDutyLabel(e.target.value)
+        }),
         style: {
-          ...inputStyle,
-          background: C.surfaceHover,
-          color: C.textMuted
+          ...inputStyle
         }
       })), /*#__PURE__*/React.createElement("div", {
         style: fieldWrapStyle
