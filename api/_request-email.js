@@ -1,14 +1,14 @@
 const LEAVE_REQUEST_TO = [
-  "errol@jasonedwardstravel.co.uk",
-  "alfie.hoque@jasonedwardstravel.co.uk",
+  // "errol@jasonedwardstravel.co.uk",
+  // "alfie.hoque@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
 const SWAP_REQUEST_TO = [
-  "operations@jasonedwardstravel.co.uk",
+  // "operations@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
 const TIMESHEET_EMAIL_TO = [
-  "errol@jasonedwardstravel.co.uk",
+  // "errol@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
