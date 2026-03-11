@@ -1154,6 +1154,7 @@ function App() {
   const [swapSubmitted, setSwapSubmitted] = React.useState(false);
   const [swapSending, setSwapSending] = React.useState(false);
   const [swapError, setSwapError] = React.useState("");
+  const [showPushPrompt, setShowPushPrompt] = React.useState(false);
   const [swapBadgeCount, setSwapBadgeCount] = React.useState(0);
   const [swapRequests, setSwapRequests] = React.useState([]);
   const [swapRequestsLoading, setSwapRequestsLoading] = React.useState(false);
@@ -1457,6 +1458,12 @@ function App() {
       cancelled = true;
     };
   }, []);
+  React.useEffect(() => {
+    if (!authed) return;
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      setShowPushPrompt(true);
+    }
+  }, [authed]);
   React.useEffect(() => {
     if (!authed) return undefined;
     const syncCurrentWeekOnResume = () => {
@@ -2309,7 +2316,49 @@ function App() {
     const runoutForDuty = todayCardDutyNum ? getTodayRunoutLive(todayCardDutyNum) : null;
     const activeRunout = runout || runoutForDuty;
     const showTodayBanner = isCurrentWeek && (todayDisplayCard || activeRunout || todayVal !== "—");
-    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    const handleEnableNotifications = async () => {
+      if (!window.Notification) return;
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        setShowPushPrompt(false);
+        verifyServerSession(storedSession?.token || "").then(s => {
+          if (s.vapidPublicKey) setupPushNotifications(s.vapidPublicKey);
+        });
+      } else if (permission === "denied") {
+        setShowPushPrompt(false);
+      }
+    };
+    return /*#__PURE__*/React.createElement(React.Fragment, null, showPushPrompt && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.accent,
+        color: C.bg,
+        padding: "10px 16px",
+        borderRadius: "12px",
+        marginBottom: "20px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "12px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600
+      }
+    }, "\uD83D\uDCE2 Get notified about swaps \u0026 shifts"), /*#__PURE__*/React.createElement("button", {
+      onClick: handleEnableNotifications,
+      style: {
+        background: C.bg,
+        color: C.accent,
+        border: "none",
+        borderRadius: "6px",
+        padding: "6px 12px",
+        fontSize: "11px",
+        fontWeight: 700,
+        cursor: "pointer"
+      }
+    }, "Enable")), /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: "20px"
       }
