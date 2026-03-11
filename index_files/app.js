@@ -4156,7 +4156,34 @@ function App() {
         fontWeight: 700,
         lineHeight: 1
       }
-    }, inboundPending.length > 9 ? "9+" : String(inboundPending.length)), inboundPending.length === 1 ? "1 approval waiting below" : `${inboundPending.length} approvals waiting below`))), /*#__PURE__*/React.createElement("div", {
+    }, inboundPending.length > 9 ? "9+" : String(inboundPending.length)), inboundPending.length === 1 ? "1 approval waiting below" : `${inboundPending.length} approvals waiting below`))), LEAVE_MANAGERS.includes(actionDriver) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "flex-end",
+        marginTop: "-4px",
+        marginBottom: "4px"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: async () => {
+        if (!confirm("Clear ALL swap requests? This cannot be undone.")) return;
+        await fetch("/api/swap-requests", {
+          method: "DELETE",
+          credentials: "same-origin"
+        });
+        setSwapRequests([]);
+      },
+      style: {
+        background: "none",
+        border: "1px solid #ef4444",
+        borderRadius: "8px",
+        color: "#ef4444",
+        fontSize: "11px",
+        fontWeight: 600,
+        padding: "8px 12px",
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Clear All Swaps")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -4593,7 +4620,33 @@ function App() {
         color: C.textMuted,
         margin: 0
       }
-    }, "Review and respond to driver leave requests")), /*#__PURE__*/React.createElement("button", {
+    }, "Review and respond to driver leave requests")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: "8px",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: async () => {
+        if (!confirm("Clear ALL leave requests? This cannot be undone.")) return;
+        await fetch("/api/leave-requests", {
+          method: "DELETE",
+          credentials: "same-origin"
+        });
+        setLeaveRequests([]);
+      },
+      style: {
+        background: "none",
+        border: "1px solid #ef4444",
+        borderRadius: "8px",
+        color: "#ef4444",
+        fontSize: "11px",
+        fontWeight: 600,
+        padding: "8px 12px",
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "Clear All"), /*#__PURE__*/React.createElement("button", {
       onClick: loadLeaveRequestsForManager,
       disabled: leaveRequestsLoading,
       style: {
@@ -4607,7 +4660,7 @@ function App() {
         cursor: leaveRequestsLoading ? "not-allowed" : "pointer",
         fontFamily: "inherit"
       }
-    }, leaveRequestsLoading ? "Loading..." : "\u21BB Refresh"))), leaveRequestsLoading && leaveRequests.length === 0 && /*#__PURE__*/React.createElement("div", {
+    }, leaveRequestsLoading ? "Loading..." : "\u21BB Refresh")))), leaveRequestsLoading && leaveRequests.length === 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "12px",
         color: C.textMuted,

@@ -247,9 +247,23 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // DELETE — manager-only bulk clear (for testing / data reset)
+  if (req.method === "DELETE") {
+    if (!LEAVE_MANAGERS.includes(session.name)) {
+      return res.status(403).json({ ok: false, error: "Only managers can clear leave requests." });
+    }
+    try {
+      await saveLeaveRequests([]);
+      return res.status(200).json({ ok: true, cleared: true });
+    } catch (error) {
+      console.error("Leave requests clear failed:", error);
+      return res.status(500).json({ ok: false, error: "Failed to clear leave requests." });
+    }
+  }
+
   // POST — create new request
   if (req.method !== "POST") {
-    res.setHeader("Allow", "GET, POST, PATCH");
+    res.setHeader("Allow", "GET, POST, PATCH, DELETE");
     return res.status(405).json({ ok: false, error: "Method not allowed." });
   }
 

@@ -1,5 +1,8 @@
+const { randomUUID } = require("crypto");
 const { verifyRequestSession, parseRequestBody } = require("./_auth");
 const { asCleanString, buildLeaveMessage, buildSwapMessage, buildTimesheetMessage, sendConfiguredPortalEmail } = require("./_request-email");
+const { upsertTimesheet } = require("./_timesheets");
+const { sendPushToDriver } = require("./_push");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -52,6 +55,30 @@ module.exports = async function handler(req, res) {
 
   try {
     const result = await sendConfiguredPortalEmail(email);
+
+    // For timesheets: persist to blob and confirm to driver via push
+    if (kind === "timesheet") {
+      const driverName = asCleanString(payload.driverName, 120);
+      const weekCommencing = asCleanString(payload.weekCommencing, 20);
+      if (driverName && weekCommencing) {
+        upsertTimesheet({
+          id: randomUUID(),
+          driverName,
+          weekCommencing,
+          submittedAt: asCleanString(payload.submittedAtIso, 40) || new Date().toISOString(),
+          status: "submitted",
+          text: asCleanString(payload.text, 8000)
+        }).catch(err => console.error("Timesheet blob save failed:", err));
+
+        sendPushToDriver(driverName, {
+          title: "Timesheet Submitted \u2713",
+          body: `Your timesheet for w/c ${weekCommencing} has been received`,
+          url: "/",
+          tag: `timesheet-${driverName}-${weekCommencing}`
+        }).catch(() => {});
+      }
+    }
+
     return res.status(200).json({ ok: true, id: result.id || null });
   } catch (error) {
     console.error("Request email send failed:", error);

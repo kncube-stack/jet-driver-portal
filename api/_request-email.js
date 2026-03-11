@@ -1,24 +1,25 @@
-const LEAVE_REQUEST_TO = [
+// Testing mode: set TESTING_EMAIL_OVERRIDE=true in Vercel env vars to route all
+// emails to relief.controller only. Delete the env var to restore normal routing.
+const TESTING = process.env.TESTING_EMAIL_OVERRIDE === "true";
+const TEST_ONLY = ["relief.controller@jasonedwardstravel.co.uk"];
+
+const LEAVE_REQUEST_TO = TESTING ? TEST_ONLY : [
   "errol@jasonedwardstravel.co.uk",
   "alfie.hoque@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
-const LEAVE_REQUEST_ACTION_RECIPIENTS = [
-  {
-    name: "Errol Thomas",
-    email: "errol@jasonedwardstravel.co.uk"
-  },
-  {
-    name: "Alfie Hoque",
-    email: "alfie.hoque@jasonedwardstravel.co.uk"
-  }
-];
+const LEAVE_REQUEST_ACTION_RECIPIENTS = TESTING
+  ? [{ name: "Relief Controller", email: "relief.controller@jasonedwardstravel.co.uk" }]
+  : [
+      { name: "Errol Thomas", email: "errol@jasonedwardstravel.co.uk" },
+      { name: "Alfie Hoque",  email: "alfie.hoque@jasonedwardstravel.co.uk" }
+    ];
 const LEAVE_REQUEST_INFO_RECIPIENTS = ["relief.controller@jasonedwardstravel.co.uk"];
-const SWAP_REQUEST_TO = [
+const SWAP_REQUEST_TO = TESTING ? TEST_ONLY : [
   "operations@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
-const TIMESHEET_EMAIL_TO = [
+const TIMESHEET_EMAIL_TO = TESTING ? TEST_ONLY : [
   "errol@jasonedwardstravel.co.uk",
   "relief.controller@jasonedwardstravel.co.uk"
 ];
@@ -339,7 +340,9 @@ async function sendConfiguredPortalEmail(email) {
   if (!apiKey || !fromAddress) {
     throw new Error("Email service is not configured. Set RESEND_API_KEY and PORTAL_EMAIL_FROM.");
   }
-  return await sendWithResend(apiKey, fromAddress, email);
+  // In testing mode, force every email to relief.controller regardless of the `to` field
+  const effectiveEmail = TESTING ? { ...email, to: TEST_ONLY } : email;
+  return await sendWithResend(apiKey, fromAddress, effectiveEmail);
 }
 
 module.exports = {

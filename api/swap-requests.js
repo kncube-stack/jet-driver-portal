@@ -3,6 +3,8 @@ const { asCleanString, buildApprovedSwapMessage, sendConfiguredPortalEmail } = r
 const { loadAndSyncSwapRequests, saveSwapRequests, createSwapRequestRecord, getRelevantSwapRequests } = require("./_swap-requests");
 const { sendPushToDriver } = require("./_push");
 
+const MANAGERS = ["Alfie Hoque", "Errol Thomas"];
+
 function escapeHtml(value) {
   return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -132,12 +134,21 @@ module.exports = async function handler(req, res) {
           }).catch(() => {})
         ]);
       } else {
-        await sendPushToDriver(updated.requestingDriver, {
-          title: "Swap Not Approved",
-          body: `Your ${updated.dayName} swap request was not approved by the office`,
-          url: "/",
-          tag: `swap-${updated.id}`
-        }).catch(() => {});
+        await Promise.all([
+          sendPushToDriver(updated.requestingDriver, {
+            title: "Swap Not Approved",
+            body: `Your ${updated.dayName} swap request was not approved by the office`,
+            url: "/",
+            tag: `swap-${updated.id}`
+          }).catch(() => {}),
+          // Also tell the target driver — they agreed but office said no
+          sendPushToDriver(updated.targetDriver, {
+            title: "Swap Not Approved",
+            body: `Your ${updated.dayName} swap with ${updated.requestingDriver} was not approved by the office`,
+            url: "/",
+            tag: `swap-${updated.id}-t`
+          }).catch(() => {})
+        ]);
       }
       const statusWord = action === "approve" ? "Approved" : "Declined";
       return res.status(200).send(renderHtmlPage(statusWord, `The shift swap between ${updated.requestingDriver} and ${updated.targetDriver} has been ${action}d.`, action === "approve" ? "#16a34a" : "#dc2626", [
@@ -158,6 +169,19 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ ok: false, error: "Session expired. Please sign in again." });
   }
 
+  if (req.method === "DELETE") {
+    if (!MANAGERS.includes(session.name)) {
+      return res.status(403).json({ ok: false, error: "Only managers can clear swap requests." });
+    }
+    try {
+      await saveSwapRequests([]);
+      return res.status(200).json({ ok: true, cleared: true });
+    } catch (error) {
+      console.error("Swap requests clear failed:", error);
+      return res.status(500).json({ ok: false, error: "Failed to clear swap requests." });
+    }
+  }
+
   if (req.method === "GET") {
     try {
       const requests = await loadAndSyncSwapRequests();
@@ -172,7 +196,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method !== "POST") {
-    res.setHeader("Allow", "GET, POST");
+    res.setHeader("Allow", "GET, POST, DELETE");
     return res.status(405).json({ ok: false, error: "Method not allowed." });
   }
 
@@ -225,6 +249,13 @@ module.exports = async function handler(req, res) {
       body: `${createdRequest.requestingDriver} wants to swap your ${createdRequest.dayName} duty`,
       url: "/",
       tag: `swap-request-${createdRequest.id}`
+    }).catch(() => {});
+    // Confirm to requester that their request was sent
+    sendPushToDriver(createdRequest.requestingDriver, {
+      title: "Swap Request Sent",
+      body: `Waiting for ${createdRequest.targetDriver} to respond to your ${createdRequest.dayName} swap`,
+      url: "/",
+      tag: `swap-sent-${createdRequest.id}`
     }).catch(() => {});
     return res.status(201).json({ ok: true, request: createdRequest });
   } catch (error) {

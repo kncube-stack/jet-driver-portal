@@ -1,15 +1,19 @@
 self.addEventListener("push", event => {
-  if (!event.data) return;
-  const { title, body, url, tag } = event.data.json();
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: tag || "jet-portal",
-      data: { url: url || "/" }
-    })
-  );
+  event.waitUntil((async () => {
+    try {
+      if (!event.data) return;
+      const { title, body, url, tag } = event.data.json();
+      await self.registration.showNotification(title, {
+        body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: tag || "jet-portal",
+        data: { url: url || "/" }
+      });
+    } catch (e) {
+      // Malformed push payload — fail silently
+    }
+  })());
 });
 
 self.addEventListener("notificationclick", event => {

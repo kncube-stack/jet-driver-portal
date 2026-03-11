@@ -1,8 +1,9 @@
-// Triggered by Vercel cron daily at 05:30 UTC
-// Sends a push notification to all drivers working today
+// Shift reminder: every 10 min — sends push to drivers whose shift starts in ~1 hour
+// Timesheet reminder: Sundays at 10:00 UTC — pushes drivers who haven't submitted this week
 
 const { getJsonBlob } = require("./_blob-json");
 const { sendPushToDriver } = require("./_push");
+const { getSubmittedDriversForWeek } = require("./_timesheets");
 
 function isCronRequest(req) {
   return req.headers?.["x-vercel-cron"] === "1" ||
@@ -34,6 +35,31 @@ function parseTime(timeStr) {
 
 module.exports = async function handler(req, res) {
   if (!isCronRequest(req)) return res.status(401).json({ ok: false });
+
+  // --- Timesheet reminder branch (Sunday 10:00 UTC cron) ---
+  const reqType = (req.query && req.query.type) || "";
+  if (reqType === "timesheet") {
+    const today = getTodayUK();
+    const wc = getMondayOfWeek(today);
+    const rotaBlob = await getJsonBlob(`rota/${wc}.json`);
+    if (!rotaBlob || !rotaBlob.data.rota) {
+      return res.status(200).json({ ok: true, sent: 0, note: "No rota for this week." });
+    }
+    const submittedSet = await getSubmittedDriversForWeek(wc);
+    const allDrivers = Object.keys(rotaBlob.data.rota);
+    const unsubmitted = allDrivers.filter(name => !submittedSet.has(name));
+    let sent = 0;
+    await Promise.allSettled(unsubmitted.map(async name => {
+      await sendPushToDriver(name, {
+        title: "Timesheet Due",
+        body: `Please submit your timesheet for w/c ${wc} \u2014 tap to open`,
+        url: "/",
+        tag: `timesheet-reminder-${wc}`
+      });
+      sent++;
+    }));
+    return res.status(200).json({ ok: true, sent, unsubmitted });
+  }
 
   const nowUK = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
   const today = getTodayUK();
