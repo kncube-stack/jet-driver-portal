@@ -3690,7 +3690,7 @@ function App() {
     }, "LAST DAY OF LEAVE"), /*#__PURE__*/React.createElement("input", {
       type: "date",
       value: leaveForm.dateTo,
-      min: leaveForm.dateFrom || undefined,
+      min: leaveForm.dateFrom || new Date().toLocaleDateString("en-CA"),
       onClick: e => openNativeDatePicker(e.currentTarget),
       onFocus: e => openNativeDatePicker(e.currentTarget),
       onChange: e => setLeaveForm(f => ({
