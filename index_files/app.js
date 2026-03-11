@@ -117,7 +117,7 @@ function scoreDriverNameSearch(driverName, query) {
 }
 const AUTH_LOGIN_ENDPOINT = "/api/auth-login";
 const AUTH_SESSION_ENDPOINT = "/api/auth-session";
-const AUTH_LOGOUT_ENDPOINT = "/api/auth-logout";
+const AUTH_LOGOUT_ENDPOINT = "/api/auth-session";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
 const SWAP_REQUESTS_ENDPOINT = "/api/swap-requests";
 const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
@@ -535,14 +535,47 @@ async function verifyServerSession(token = "") {
     unavailableError.status = response.status;
     throw unavailableError;
   }
-  return data.session;
+  return { ...data.session, vapidPublicKey: data.vapidPublicKey || null };
 }
 async function logoutServerSession() {
   await fetch(AUTH_LOGOUT_ENDPOINT, {
-    method: "POST",
+    method: "DELETE",
     credentials: "same-origin",
     cache: "no-store"
   }).catch(() => null);
+}
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+async function setupPushNotifications(vapidPublicKey) {
+  if (!vapidPublicKey || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.register("/service-worker.js");
+    await navigator.serviceWorker.ready;
+    if (Notification.permission === "denied") return;
+    if (Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+    }
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      });
+    }
+    await fetch("/api/auth-session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ subscription: sub.toJSON() })
+    });
+  } catch (err) {
+    console.warn("Push notification setup failed:", err);
+  }
 }
 async function fetchLiveAllocationData() {
   try {
@@ -930,6 +963,84 @@ function resolveStopMapTarget(stopName, duty, segmentTitle) {
     webUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`
   };
 }
+function buildSegmentRouteUrl(segment, duty) {
+  const stops = Array.isArray(segment?.stops) ? segment.stops : [];
+  const resolved = stops
+    .map(s => resolveStopMapTarget(s.stop, duty, segment.title))
+    .filter(t => t && Number.isFinite(t.latitude) && Number.isFinite(t.longitude));
+  if (resolved.length < 2) return null;
+  const origin = resolved[0].latitude + "," + resolved[0].longitude;
+  const destination = resolved[resolved.length - 1].latitude + "," + resolved[resolved.length - 1].longitude;
+  const waypoints = resolved.slice(1, -1).map(t => t.latitude + "," + t.longitude).join("|");
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+  if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  return url;
+}
+function PortalSegmentTitle({ seg, duty, accentColor, textDimColor }) {
+  const [revealed, setRevealed] = React.useState(false);
+  const [tapCount, setTapCount] = React.useState(0);
+  const TAPS_NEEDED = 5;
+  const TAP_WINDOW_MS = 2000;
+  const resetTimerRef = React.useRef(null);
+  const routeUrl = React.useMemo(() => buildSegmentRouteUrl(seg, duty), [seg, duty]);
+  const handleTap = React.useCallback(() => {
+    if (!routeUrl) return;
+    if (resetTimerRef.current !== null) { clearTimeout(resetTimerRef.current); resetTimerRef.current = null; }
+    setTapCount(prev => {
+      const next = prev + 1;
+      if (next >= TAPS_NEEDED) {
+        setRevealed(true);
+        window.setTimeout(() => setRevealed(false), 10000);
+        return 0;
+      }
+      resetTimerRef.current = window.setTimeout(() => { setTapCount(0); resetTimerRef.current = null; }, TAP_WINDOW_MS);
+      return next;
+    });
+  }, [routeUrl]);
+  React.useEffect(() => () => { if (resetTimerRef.current !== null) clearTimeout(resetTimerRef.current); }, []);
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      onClick: handleTap,
+      style: {
+        fontSize: "12px",
+        fontWeight: 700,
+        color: tapCount > 0 ? "#d97706" : accentColor,
+        padding: "8px 0 6px",
+        letterSpacing: "0.5px",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        cursor: routeUrl ? "pointer" : "default"
+      }
+    }, seg.title,
+      tapCount > 0 && /*#__PURE__*/React.createElement("span", {
+        style: { marginLeft: "8px", fontSize: "10px", color: textDimColor, fontWeight: 400 }
+      }, `${tapCount}\u200a/\u200a${TAPS_NEEDED}`)
+    ),
+    revealed && /*#__PURE__*/React.createElement("a", {
+      href: routeUrl,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      onClick: () => setRevealed(false),
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "5px",
+        marginBottom: "8px",
+        padding: "6px 12px",
+        borderRadius: "20px",
+        background: accentColor + "22",
+        border: `1px solid ${accentColor}88`,
+        color: accentColor,
+        fontSize: "11px",
+        fontWeight: 700,
+        textDecoration: "none",
+        fontFamily: "inherit",
+        cursor: "pointer"
+      }
+    }, "\uD83D\uDDFA Open Route in Maps")
+  );
+}
 function getPreferredMapsAppUrl(target) {
   const ua = (navigator.userAgent || "").toLowerCase();
   const label = target?.label || target?.query || "Stop";
@@ -1267,6 +1378,7 @@ function App() {
       setCurrentRole(resolvedRole);
       setCurrentUser(serverSession.name);
       setAuthName(serverSession.name);
+      setupPushNotifications(serverSession.vapidPublicKey);
       if (DRIVERS.includes(serverSession.name)) {
         setSelectedDriver(serverSession.name);
         setScreen("week");
@@ -5338,15 +5450,12 @@ function App() {
       style: {
         marginBottom: "12px"
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: "12px",
-        fontWeight: 700,
-        color: C.accent,
-        padding: "8px 0 6px",
-        letterSpacing: "0.5px"
-      }
-    }, seg.title), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(PortalSegmentTitle, {
+      seg: seg,
+      duty: duty,
+      accentColor: C.accent,
+      textDimColor: C.textDim
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         background: C.surface,
         border: `1px solid ${C.border}`,
