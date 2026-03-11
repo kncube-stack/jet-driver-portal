@@ -45,10 +45,24 @@ async function getJsonBlob(pathname) {
       throw err;
     }
   }
-  const result = await get(pathname, { access: getBlobAccessMode() });
-  if (!result || result.statusCode !== 200 || !result.stream) return null;
-  const text = await readStreamAsText(result.stream);
-  return { data: JSON.parse(text), blob: result.blob };
+
+  // Vercel Blob logic: 
+  // 1. Find the blob by its pathname using list() to get its current URL.
+  // We use prefix matching and find exact pathname because Vercel Blobs are immutable with unique URLs.
+  const { blobs } = await list({ prefix: pathname });
+  const blobInfo = blobs.find(b => b.pathname === pathname);
+
+  if (!blobInfo) return null;
+
+  // 2. Fetch the JSON content from the resolved URL.
+  const res = await fetch(blobInfo.url);
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new Error(`Failed to fetch blob content (${res.status})`);
+  }
+
+  const data = await res.json();
+  return { data, blob: blobInfo };
 }
 
 async function putJsonBlob(pathname, payload) {
