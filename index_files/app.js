@@ -1557,6 +1557,15 @@ function App() {
     })).map(entry => entry.driver);
   }, [search, DRIVERS]);
   const handleLogin = async () => {
+    // iOS Safari requires Notification permission to be requested in the same synchronous 
+    // call stack as the user gesture. Eagerly invoke the prompt before any async awaits.
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      try {
+        const promise = Notification.requestPermission();
+        if (promise && promise.catch) promise.catch(() => {});
+      } catch (e) {}
+    }
+
     const rawName = authName.trim();
     const pin = authPin.trim();
     if (!rawName || !pin) {
@@ -1589,6 +1598,9 @@ function App() {
       setDutySearch("");
       setNameSearch("");
       setAuthPin("");
+      if (session.vapidPublicKey) {
+        setupPushNotifications(session.vapidPublicKey);
+      }
     } catch (err) {
       setAuthError(err?.message || "Unable to verify PIN. Please try again.");
     }
