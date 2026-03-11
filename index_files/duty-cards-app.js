@@ -1206,49 +1206,41 @@
   function SegmentTitle({ segment, duty }) {
     const h = React.createElement;
     const [revealed, setRevealed] = React.useState(false);
-    const [holding, setHolding] = React.useState(false);
-    const timerRef = React.useRef(null);
-    const LONG_PRESS_MS = 5000;
+    const [tapCount, setTapCount] = React.useState(0);
+    const TAPS_NEEDED = 5;
+    const TAP_WINDOW_MS = 2000;
+    const resetTimerRef = React.useRef(null);
     const routeUrl = React.useMemo(() => buildSegmentRouteUrl(segment, duty), [segment, duty]);
 
-    const titleRef = React.useRef(null);
-
-    const startPress = React.useCallback(() => {
+    const handleTap = React.useCallback(() => {
       if (!routeUrl) return;
-      setHolding(true);
-      timerRef.current = window.setTimeout(() => {
-        setHolding(false);
-        setRevealed(true);
-        window.setTimeout(() => setRevealed(false), 10000);
-      }, LONG_PRESS_MS);
+
+      // Clear any pending reset
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
+      }
+
+      setTapCount(prev => {
+        const next = prev + 1;
+        if (next >= TAPS_NEEDED) {
+          // Reveal the button and reset counter
+          setRevealed(true);
+          window.setTimeout(() => setRevealed(false), 10000);
+          return 0;
+        }
+        // Schedule a reset if no more taps come within the window
+        resetTimerRef.current = window.setTimeout(() => {
+          setTapCount(0);
+          resetTimerRef.current = null;
+        }, TAP_WINDOW_MS);
+        return next;
+      });
     }, [routeUrl]);
 
-    const cancelPress = React.useCallback(() => {
-      setHolding(false);
-      if (timerRef.current !== null) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
+    React.useEffect(() => () => {
+      if (resetTimerRef.current !== null) clearTimeout(resetTimerRef.current);
     }, []);
-
-    // Attach touch events as non-passive so we can call preventDefault(),
-    // which suppresses the iOS native long-press callout/text-selection.
-    React.useEffect(() => {
-      const el = titleRef.current;
-      if (!el || !routeUrl) return;
-      const onTouchStart = e => { e.preventDefault(); startPress(); };
-      const onTouchEnd = () => cancelPress();
-      const onTouchCancel = () => cancelPress();
-      el.addEventListener("touchstart", onTouchStart, { passive: false });
-      el.addEventListener("touchend", onTouchEnd);
-      el.addEventListener("touchcancel", onTouchCancel);
-      return () => {
-        el.removeEventListener("touchstart", onTouchStart);
-        el.removeEventListener("touchend", onTouchEnd);
-        el.removeEventListener("touchcancel", onTouchCancel);
-        if (timerRef.current !== null) clearTimeout(timerRef.current);
-      };
-    }, [routeUrl, startPress, cancelPress]);
 
     const stops = Array.isArray(segment?.stops) ? segment.stops : [];
 
@@ -1258,13 +1250,9 @@
       h(
         "div",
         {
-          ref: titleRef,
-          onMouseDown: startPress,
-          onMouseUp: cancelPress,
-          onMouseLeave: cancelPress,
-          onContextMenu: e => e.preventDefault(),
+          onClick: handleTap,
           style: {
-            color: holding ? "#d97706" : C.accent,
+            color: tapCount > 0 ? "#d97706" : C.accent,
             fontWeight: 700,
             fontSize: "13px",
             marginBottom: "6px",
@@ -1273,12 +1261,11 @@
             WebkitUserSelect: "none",
             WebkitTouchCallout: "none",
             cursor: routeUrl ? "pointer" : "default",
-            transition: "color 200ms ease, opacity 200ms ease",
-            opacity: holding ? 0.75 : 1
+            transition: "color 200ms ease",
           }
         },
         segment.title,
-        holding && h(
+        tapCount > 0 && h(
           "span",
           {
             style: {
@@ -1289,7 +1276,7 @@
               letterSpacing: 0
             }
           },
-          "hold..."
+          `${tapCount}\u200a/\u200a${TAPS_NEEDED}`
         )
       ),
       revealed && h(
