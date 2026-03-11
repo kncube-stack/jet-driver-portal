@@ -363,6 +363,20 @@
     };
   }
 
+  function buildSegmentRouteUrl(segment, duty) {
+    const stops = Array.isArray(segment?.stops) ? segment.stops : [];
+    const resolved = stops
+      .map(stop => resolveStopMapTarget(stop.stop, duty, segment.title))
+      .filter(t => t && Number.isFinite(t.latitude) && Number.isFinite(t.longitude));
+    if (resolved.length < 2) return null;
+    const origin = resolved[0].latitude + "," + resolved[0].longitude;
+    const destination = resolved[resolved.length - 1].latitude + "," + resolved[resolved.length - 1].longitude;
+    const waypoints = resolved.slice(1, -1).map(t => t.latitude + "," + t.longitude).join("|");
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+    if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+    return url;
+  }
+
   function getPreferredMapsAppUrl(target) {
     const ua = (navigator.userAgent || "").toLowerCase();
     const label = target?.label || target?.query || "Stop";
@@ -1166,125 +1180,12 @@
         reminder
       )),
       segments.map((segment, segmentIndex) => h(
-        "div",
+        SegmentTitle,
         {
           key: `${segment.title}-${segmentIndex}`,
-          style: {
-            marginBottom: "12px"
-          }
-        },
-        h(
-          "div",
-          {
-            style: {
-              color: C.accent,
-              fontWeight: 700,
-              fontSize: "13px",
-              marginBottom: "6px",
-              letterSpacing: "0.4px"
-            }
-          },
-          segment.title
-        ),
-        h(
-          "div",
-          {
-            style: {
-              border: `1px solid ${C.border}`,
-              borderRadius: "9px",
-              overflow: "hidden",
-              background: C.panel
-            }
-          },
-          (Array.isArray(segment.stops) ? segment.stops : []).map((stop, stopIndex, stops) => {
-            const isBreak = String(stop?.stop || "").includes("Pull on stand") ||
-              String(stop?.notes || "").toLowerCase().includes("break");
-            const mapTarget = resolveStopMapTarget(stop.stop, duty, segment.title);
-            return h(
-              "div",
-              {
-                key: `${segmentIndex}-${stopIndex}`,
-                style: {
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "12px",
-                  padding: "10px 12px",
-                  borderBottom: stopIndex < stops.length - 1 ? `1px solid ${C.border}` : "none",
-                  background: isBreak ? C.breakBg : "transparent",
-                  width: "100%"
-                }
-              },
-              h(
-                "div",
-                {
-                  style: {
-                    width: "58px",
-                    flexShrink: 0,
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: isBreak ? C.breakText : C.textMuted,
-                    fontVariantNumeric: "tabular-nums"
-                  }
-                },
-                stop.time || "--:--"
-              ),
-              h(
-                "div",
-                { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } },
-                h(
-                  "div",
-                  {
-                    style: {
-                      fontSize: "12px",
-                      color: C.text,
-                      fontWeight: stop.dep || stop.arr || isBreak ? 700 : 500,
-                      lineHeight: 1.5
-                    }
-                  },
-                  stop.dep ? h(
-                    "span",
-                    { style: { color: C.green, marginRight: "7px", fontSize: "10px" } },
-                    "DEP"
-                  ) : null,
-                  stop.arr ? h(
-                    "span",
-                    { style: { color: C.red, marginRight: "7px", fontSize: "10px" } },
-                    "ARR"
-                  ) : null,
-                  h(
-                    "a",
-                    {
-                      href: mapTarget.webUrl,
-                      target: "_blank",
-                      rel: "noopener noreferrer",
-                      onClick: e => openStopInPreferredMapsApp(e, mapTarget),
-                      style: {
-                        color: "inherit",
-                        textDecoration: "none",
-                        borderBottom: `1px dotted ${C.borderStrong}`,
-                        overflowWrap: "anywhere",
-                        wordBreak: "break-word"
-                      }
-                    },
-                    stop.stop
-                  )
-                ),
-                stop.notes ? h(
-                  "div",
-                  {
-                    style: {
-                      marginTop: "3px",
-                      fontSize: "10px",
-                      color: C.textMuted,
-                      lineHeight: 1.45
-                    }
-                  },
-                  stop.notes
-                ) : null
-              )
-            );
-          })
-        )
+          segment,
+          duty
+        }
       )),
       h(
         "div",
@@ -1301,6 +1202,207 @@
       )
     );
   }
+
+  function SegmentTitle({ segment, duty }) {
+    const h = React.createElement;
+    const [revealed, setRevealed] = React.useState(false);
+    const [holding, setHolding] = React.useState(false);
+    const timerRef = React.useRef(null);
+    const LONG_PRESS_MS = 5000;
+    const routeUrl = React.useMemo(() => buildSegmentRouteUrl(segment, duty), [segment, duty]);
+
+    const startPress = React.useCallback(() => {
+      if (!routeUrl) return;
+      setHolding(true);
+      timerRef.current = window.setTimeout(() => {
+        setHolding(false);
+        setRevealed(true);
+        window.setTimeout(() => setRevealed(false), 10000);
+      }, LONG_PRESS_MS);
+    }, [routeUrl]);
+
+    const cancelPress = React.useCallback(() => {
+      setHolding(false);
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }, []);
+
+    React.useEffect(() => () => { if (timerRef.current !== null) clearTimeout(timerRef.current); }, []);
+
+    const stops = Array.isArray(segment?.stops) ? segment.stops : [];
+
+    return h(
+      "div",
+      { style: { marginBottom: "12px" } },
+      h(
+        "div",
+        {
+          onMouseDown: startPress,
+          onMouseUp: cancelPress,
+          onMouseLeave: cancelPress,
+          onTouchStart: startPress,
+          onTouchEnd: cancelPress,
+          onTouchCancel: cancelPress,
+          style: {
+            color: holding ? "#d97706" : C.accent,
+            fontWeight: 700,
+            fontSize: "13px",
+            marginBottom: "6px",
+            letterSpacing: "0.4px",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            cursor: routeUrl ? "pointer" : "default",
+            transition: "color 200ms ease, opacity 200ms ease",
+            opacity: holding ? 0.75 : 1
+          }
+        },
+        segment.title,
+        holding && h(
+          "span",
+          {
+            style: {
+              marginLeft: "8px",
+              fontSize: "10px",
+              color: C.textDim,
+              fontWeight: 400,
+              letterSpacing: 0
+            }
+          },
+          "hold..."
+        )
+      ),
+      revealed && h(
+        "a",
+        {
+          href: routeUrl,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          onClick: () => setRevealed(false),
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            marginBottom: "8px",
+            padding: "6px 12px",
+            borderRadius: "20px",
+            background: C.accentSoft,
+            border: `1px solid ${C.accent}88`,
+            color: C.text,
+            fontSize: "11px",
+            fontWeight: 700,
+            textDecoration: "none",
+            fontFamily: "inherit",
+            cursor: "pointer",
+            animation: "jetRouteReveal 300ms ease"
+          }
+        },
+        "\uD83D\uDDFA Open Route in Maps"
+      ),
+      h(
+        "div",
+        {
+          style: {
+            border: `1px solid ${C.border}`,
+            borderRadius: "9px",
+            overflow: "hidden",
+            background: C.panel
+          }
+        },
+        stops.map((stop, stopIndex, stopsArr) => {
+          const isBreak = String(stop?.stop || "").includes("Pull on stand") ||
+            String(stop?.notes || "").toLowerCase().includes("break");
+          const mapTarget = resolveStopMapTarget(stop.stop, duty, segment.title);
+          return h(
+            "div",
+            {
+              key: `stop-${stopIndex}`,
+              style: {
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "12px",
+                padding: "10px 12px",
+                borderBottom: stopIndex < stopsArr.length - 1 ? `1px solid ${C.border}` : "none",
+                background: isBreak ? C.breakBg : "transparent",
+                width: "100%"
+              }
+            },
+            h(
+              "div",
+              {
+                style: {
+                  width: "58px",
+                  flexShrink: 0,
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: isBreak ? C.breakText : C.textMuted,
+                  fontVariantNumeric: "tabular-nums"
+                }
+              },
+              stop.time || "--:--"
+            ),
+            h(
+              "div",
+              { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } },
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: "12px",
+                    color: C.text,
+                    fontWeight: stop.dep || stop.arr || isBreak ? 700 : 500,
+                    lineHeight: 1.5
+                  }
+                },
+                stop.dep ? h(
+                  "span",
+                  { style: { color: C.green, marginRight: "7px", fontSize: "10px" } },
+                  "DEP"
+                ) : null,
+                stop.arr ? h(
+                  "span",
+                  { style: { color: C.red, marginRight: "7px", fontSize: "10px" } },
+                  "ARR"
+                ) : null,
+                h(
+                  "a",
+                  {
+                    href: mapTarget.webUrl,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    onClick: e => openStopInPreferredMapsApp(e, mapTarget),
+                    style: {
+                      color: "inherit",
+                      textDecoration: "none",
+                      borderBottom: `1px dotted ${C.borderStrong}`,
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word"
+                    }
+                  },
+                  stop.stop
+                )
+              ),
+              stop.notes ? h(
+                "div",
+                {
+                  style: {
+                    marginTop: "3px",
+                    fontSize: "10px",
+                    color: C.textMuted,
+                    lineHeight: 1.45
+                  }
+                },
+                stop.notes
+              ) : null
+            )
+          );
+        })
+      )
+    );
+  }
+
+  function _noop() {}  // removed dead code block
 
   function App() {
     const allDutyIndex = React.useMemo(() => buildDutySearchIndex(DUTY_CARDS), []);
