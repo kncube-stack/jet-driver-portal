@@ -1444,7 +1444,12 @@ function App() {
     let cancelled = false;
     setRotaLoading(true);
     setRotaError(null);
-    fetchRotaSnapshot("").then(snapshot => {
+    fetchRotaSnapshot("").catch(err => {
+      if (cancelled) return Promise.reject(err);
+      // Silent retry after 2 s — catches transient Vercel Blob / cold-start hiccups
+      return new Promise(resolve => setTimeout(resolve, 2000))
+        .then(() => cancelled ? Promise.reject(err) : fetchRotaSnapshot(""));
+    }).then(snapshot => {
       if (cancelled) return;
       applyRotaSnapshot(snapshot);
       setRotaLoading(false);
@@ -2924,9 +2929,28 @@ function App() {
       padding: "10px 12px",
       fontSize: "10px",
       color: "#b91c1c",
-      lineHeight: 1.5
+      lineHeight: 1.5,
+      display: "flex",
+      alignItems: "center",
+      gap: "8px"
     }
-  }, "\u26A0 ", rotaError, " Some duties may be out of date."), screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { flex: 1 }
+  }, "\u26A0 ", rotaError, " Some duties may be out of date."), /*#__PURE__*/React.createElement("button", {
+    onClick: refreshRota,
+    style: {
+      flexShrink: 0,
+      background: "transparent",
+      border: "1px solid #b91c1c",
+      borderRadius: "4px",
+      color: "#b91c1c",
+      fontSize: "9px",
+      fontWeight: 600,
+      padding: "3px 8px",
+      cursor: "pointer",
+      letterSpacing: "0.05em"
+    }
+  }, "Retry")), screen === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: "20px"
     }

@@ -158,7 +158,8 @@ function findCurrentWeekTab(tabs) {
     tabName: key2,
     gid: safeTabs[key2]
   };
-  const lastKey = tabKeys[tabKeys.length - 1];
+  // Fall back to the most recent available week (tabKeys[0] — list is newest-first from backend)
+  const lastKey = tabKeys[0];
   return {
     tabName: lastKey,
     gid: safeTabs[lastKey]
