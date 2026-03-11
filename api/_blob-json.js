@@ -1,7 +1,17 @@
-const { get, put } = require("@vercel/blob");
+const { get, put, list } = require("@vercel/blob");
+const { BlobServiceClient } = require("@azure/storage-blob");
+
+const STORAGE_BACKEND = (process.env.STORAGE_BACKEND || "vercel").trim().toLowerCase();
 
 function getBlobAccessMode() {
   return process.env.BLOB_ACCESS_MODE === "private" ? "private" : "public";
+}
+
+function getAzureContainerClient() {
+  const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  const container = process.env.AZURE_STORAGE_CONTAINER || "jet-portal";
+  if (!connStr) throw new Error("AZURE_STORAGE_CONNECTION_STRING is not set.");
+  return BlobServiceClient.fromConnectionString(connStr).getContainerClient(container);
 }
 
 async function readStreamAsText(stream) {
@@ -25,16 +35,31 @@ async function readStreamAsText(stream) {
 }
 
 async function getJsonBlob(pathname) {
+  if (STORAGE_BACKEND === "azure") {
+    const client = getAzureContainerClient().getBlobClient(pathname);
+    try {
+      const buffer = await client.downloadToBuffer();
+      return { data: JSON.parse(buffer.toString("utf-8")), blob: null };
+    } catch (err) {
+      if (err.statusCode === 404) return null;
+      throw err;
+    }
+  }
   const result = await get(pathname, { access: getBlobAccessMode() });
   if (!result || result.statusCode !== 200 || !result.stream) return null;
   const text = await readStreamAsText(result.stream);
-  return {
-    data: JSON.parse(text),
-    blob: result.blob
-  };
+  return { data: JSON.parse(text), blob: result.blob };
 }
 
 async function putJsonBlob(pathname, payload) {
+  if (STORAGE_BACKEND === "azure") {
+    const json = JSON.stringify(payload);
+    const client = getAzureContainerClient().getBlockBlobClient(pathname);
+    await client.upload(json, Buffer.byteLength(json), {
+      blobHTTPHeaders: { blobContentType: "application/json" }
+    });
+    return;
+  }
   return await put(pathname, JSON.stringify(payload), {
     access: getBlobAccessMode(),
     contentType: "application/json",
@@ -43,8 +68,20 @@ async function putJsonBlob(pathname, payload) {
   });
 }
 
-module.exports = {
-  getBlobAccessMode,
-  getJsonBlob,
-  putJsonBlob
-};
+async function listBlobs(prefix) {
+  if (STORAGE_BACKEND === "azure") {
+    const container = getAzureContainerClient();
+    const items = [];
+    for await (const blob of container.listBlobsFlat({ prefix })) {
+      items.push({
+        pathname: blob.name,
+        uploadedAt: blob.properties.lastModified?.toISOString() || ""
+      });
+    }
+    return items;
+  }
+  const { blobs } = await list({ prefix });
+  return blobs.map(b => ({ pathname: b.pathname, uploadedAt: b.uploadedAt }));
+}
+
+module.exports = { getBlobAccessMode, getJsonBlob, putJsonBlob, listBlobs };

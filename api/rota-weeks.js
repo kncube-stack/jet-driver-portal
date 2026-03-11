@@ -1,4 +1,4 @@
-const { list } = require("@vercel/blob");
+const { listBlobs } = require("./_blob-json");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") {
@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { blobs } = await list({ prefix: "rota/" });
+    const blobs = await listBlobs("rota/");
 
     const weeks = blobs
       .map(b => b.pathname.replace(/^rota\//, "").replace(/\.json$/, ""))
