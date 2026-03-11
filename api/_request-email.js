@@ -5,8 +5,7 @@ const TEST_ONLY = ["relief.controller@jasonedwardstravel.co.uk"];
 
 const LEAVE_REQUEST_TO = TESTING ? TEST_ONLY : [
   "errol@jasonedwardstravel.co.uk",
-  "alfie.hoque@jasonedwardstravel.co.uk",
-  "relief.controller@jasonedwardstravel.co.uk"
+  "alfie.hoque@jasonedwardstravel.co.uk"
 ];
 const LEAVE_REQUEST_ACTION_RECIPIENTS = TESTING
   ? [{ name: "Relief Controller", email: "relief.controller@jasonedwardstravel.co.uk" }]
@@ -14,14 +13,12 @@ const LEAVE_REQUEST_ACTION_RECIPIENTS = TESTING
       { name: "Errol Thomas", email: "errol@jasonedwardstravel.co.uk" },
       { name: "Alfie Hoque",  email: "alfie.hoque@jasonedwardstravel.co.uk" }
     ];
-const LEAVE_REQUEST_INFO_RECIPIENTS = ["relief.controller@jasonedwardstravel.co.uk"];
+const LEAVE_REQUEST_INFO_RECIPIENTS = [];
 const SWAP_REQUEST_TO = TESTING ? TEST_ONLY : [
-  "operations@jasonedwardstravel.co.uk",
-  "relief.controller@jasonedwardstravel.co.uk"
+  "operations@jasonedwardstravel.co.uk"
 ];
 const TIMESHEET_EMAIL_TO = TESTING ? TEST_ONLY : [
-  "errol@jasonedwardstravel.co.uk",
-  "relief.controller@jasonedwardstravel.co.uk"
+  "errol@jasonedwardstravel.co.uk"
 ];
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
