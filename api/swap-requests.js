@@ -3,7 +3,7 @@ const { asCleanString, buildApprovedSwapMessage, sendConfiguredPortalEmail } = r
 const { loadAndSyncSwapRequests, saveSwapRequests, createSwapRequestRecord, getRelevantSwapRequests } = require("./_swap-requests");
 const { sendPushToDriver } = require("./_push");
 
-const MANAGERS = ["Alfie Hoque", "Errol Thomas"];
+const MANAGERS = ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube"];
 
 function escapeHtml(value) {
   return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");

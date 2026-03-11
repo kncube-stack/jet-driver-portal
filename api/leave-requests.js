@@ -4,7 +4,7 @@ const { loadAndSyncLeaveRequests, saveLeaveRequests, createLeaveRequestRecord, g
 const { sendPushToDriver } = require("./_push");
 
 // Only these managers can view all requests, approve, and decline
-const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
+const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube"];
 const LEAVE_EMAIL_ACTION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 function escapeHtml(value) {

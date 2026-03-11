@@ -123,7 +123,7 @@ const SWAP_REQUESTS_ENDPOINT = "/api/swap-requests";
 const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
 const SEND_REQUEST_ENDPOINT = "/api/send-request";
 const LEAVE_REQUESTS_ENDPOINT = "/api/leave-requests";
-const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
+const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube"];
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
@@ -1310,12 +1310,14 @@ function App() {
     const finishTime = forceBlankTimesheetFields ? "" : isWorkshopDuty ? WORKSHOP_DEFAULT_FINISH_TIME : resolvedDutyTimes.finishTime;
     const baseTravelCost = dutyCard ? inferDutyTravelCost(dutyCard) : routeLearningCard ? inferDutyTravelCost(routeLearningCard) : 0;
     const dutyLabel = dutyCard ? `Duty ${dutyValue}` : routeLearningCard ? `Route Learning ${routeLearningNum}` : special ? special.label : getStatusStyle(dutyValue, driverName, true, DRIVER_SECTION, C).label;
+    const startTimeLocked = (dutyCard !== null || routeLearningCard !== null) && !forceBlankTimesheetFields && !!resolvedDutyTimes.startTime;
     return {
       dutyCode: dutyValue,
       dutyLabel,
       startTime,
       finishTime,
-      travelCost: forceBlankTimesheetFields ? "" : Number(baseTravelCost.toFixed(2))
+      travelCost: forceBlankTimesheetFields ? "" : Number(baseTravelCost.toFixed(2)),
+      startTimeLocked
     };
   };
   const buildTimesheetRowsForDriver = driverName => {
@@ -1333,6 +1335,7 @@ function App() {
         startTime: defaults.startTime,
         finishTime: defaults.finishTime,
         travelCost: defaults.travelCost,
+        startTimeLocked: defaults.startTimeLocked,
         expenses: []
       };
     });
@@ -5033,14 +5036,16 @@ function App() {
       }, "START TIME"), /*#__PURE__*/React.createElement("input", {
         type: "time",
         value: row.startTime,
-        onChange: e => updateTimesheetRow(row.dayIndex, {
+        readOnly: row.startTimeLocked,
+        onChange: row.startTimeLocked ? undefined : e => updateTimesheetRow(row.dayIndex, {
           startTime: e.target.value
         }),
         style: {
           ...inputStyle,
           appearance: "none",
           WebkitAppearance: "none",
-          colorScheme: "dark"
+          colorScheme: "dark",
+          ...(row.startTimeLocked ? { opacity: 0.5, cursor: "not-allowed" } : {})
         }
       })), /*#__PURE__*/React.createElement("div", {
         style: fieldWrapStyle
