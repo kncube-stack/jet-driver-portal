@@ -15,6 +15,11 @@ self.addEventListener("push", event => {
         const count = typeof badgeCount === "number" && badgeCount > 0 ? badgeCount : 1;
         await self.navigator.setAppBadge(count);
       }
+      // Notify any open app windows so they can refresh their notification count
+      const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: false });
+      for (const c of windowClients) {
+        c.postMessage({ type: "push-received", tag: tag || null });
+      }
     } catch (e) {
       // Malformed push payload — fail silently
     }

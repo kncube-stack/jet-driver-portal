@@ -1167,6 +1167,8 @@ function App() {
   const [selectedLeaveIds, setSelectedLeaveIds] = React.useState(new Set());
   const [selectedSwapIds, setSelectedSwapIds] = React.useState(new Set());
   const [leavePendingCount, setLeavePendingCount] = React.useState(0);
+  const [unreadPushCount, setUnreadPushCount] = React.useState(0);
+  const [myLeaveUnreadCount, setMyLeaveUnreadCount] = React.useState(0);
   const [myLeaveRequests, setMyLeaveRequests] = React.useState([]);
   const [myLeaveRequestsLoading, setMyLeaveRequestsLoading] = React.useState(false);
   const [calendarRequests, setCalendarRequests] = React.useState([]);
@@ -1670,24 +1672,60 @@ function App() {
   React.useEffect(() => {
     setLeavePendingCount(leaveRequests.filter(r => r.status === "pending").length);
   }, [leaveRequests]);
+  // Unread push notification count — keeps app icon badge alive after push arrives
+  // Uses getNotifications() so it stays > 0 until the user dismisses the notification shade
+  const refreshUnreadPushCount = React.useCallback(() => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(notifs => {
+      setUnreadPushCount(notifs.length);
+    }).catch(() => {});
+  }, []);
+  React.useEffect(() => {
+    if (!authed) return undefined;
+    refreshUnreadPushCount();
+    const handleVisibility = () => { if (document.visibilityState === "visible") refreshUnreadPushCount(); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [authed, refreshUnreadPushCount]);
+  React.useEffect(() => {
+    if (!("serviceWorker" in navigator)) return undefined;
+    const handler = e => { if (e.data?.type === "push-received") refreshUnreadPushCount(); };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, [refreshUnreadPushCount]);
   // Sync app icon badge with total pending action count (Badging API — PWA home screen)
   React.useEffect(() => {
-    const total = swapBadgeCount + leavePendingCount;
+    const total = swapBadgeCount + leavePendingCount + unreadPushCount;
     if (!("setAppBadge" in navigator)) return;
     if (total > 0) {
       navigator.setAppBadge(total).catch(() => {});
     } else {
       navigator.clearAppBadge().catch(() => {});
     }
-  }, [swapBadgeCount, leavePendingCount]);
+  }, [swapBadgeCount, leavePendingCount, unreadPushCount]);
   // Eagerly load leave requests for managers so the pending badge shows on the home screen
   React.useEffect(() => {
     if (!authed || !isLeaveManager) return;
     loadLeaveRequestsForManager();
   }, [authed, isLeaveManager, loadLeaveRequestsForManager]);
+  // Eagerly load own leave requests so the unread response badge shows on the home screen
+  React.useEffect(() => {
+    if (!authed || !actionDriver) return;
+    loadMyLeaveRequests();
+  }, [authed, actionDriver, loadMyLeaveRequests]);
+  // Derive unread leave response count (responded-to requests the driver hasn't checked yet)
+  React.useEffect(() => {
+    let lastSeen = 0;
+    try { lastSeen = parseInt(localStorage.getItem("jet_leave_last_viewed") || "0", 10) || 0; } catch {}
+    const count = myLeaveRequests.filter(r =>
+      r.status !== "pending" && r.respondedAt && new Date(r.respondedAt).getTime() > lastSeen
+    ).length;
+    setMyLeaveUnreadCount(count);
+  }, [myLeaveRequests]);
   React.useEffect(() => {
     if (!authed || screen !== "leave") return;
     loadMyLeaveRequests();
+    try { localStorage.setItem("jet_leave_last_viewed", String(Date.now())); } catch {}
     fetchCalendarRequests().then(setCalendarRequests).catch(() => {});
     const pollInterval = setInterval(loadMyLeaveRequests, 20000);
     return () => clearInterval(pollInterval);
@@ -2091,6 +2129,9 @@ function App() {
       notes: "",
       email: ""
     });
+    // Mark leave responses as seen
+    setMyLeaveUnreadCount(0);
+    try { localStorage.setItem("jet_leave_last_viewed", String(Date.now())); } catch {}
     setScreen("leave");
   };
   const openSwapRequestScreen = () => {
@@ -2331,7 +2372,34 @@ function App() {
       textAlign: "center",
       boxShadow: `0 0 0 2px ${theme === "dark" ? "#1e293b" : "#f8fafc"}`
     }
-  }, leavePendingCount > 9 ? "9+" : String(leavePendingCount))));
+  }, leavePendingCount > 9 ? "9+" : String(leavePendingCount))), !isLeaveManager && actionDriver && /*#__PURE__*/React.createElement("button", {
+    onClick: openLeaveRequestScreen,
+    style: {
+      ...weekPrimaryActionStyle,
+      position: "relative",
+      overflow: "visible"
+    },
+    onMouseEnter: handleWeekPrimaryActionMouseEnter,
+    onMouseLeave: handleWeekPrimaryActionMouseLeave
+  }, "\uD83D\uDCCB Annual Leave", myLeaveUnreadCount > 0 && /*#__PURE__*/React.createElement("span", {
+    title: `${myLeaveUnreadCount} leave ${myLeaveUnreadCount === 1 ? "response" : "responses"} to review`,
+    style: {
+      position: "absolute",
+      top: "-8px",
+      right: "-8px",
+      minWidth: "18px",
+      height: "18px",
+      padding: "0 5px",
+      borderRadius: "999px",
+      background: "#dc2626",
+      color: "#ffffff",
+      fontSize: "10px",
+      fontWeight: 700,
+      lineHeight: "18px",
+      textAlign: "center",
+      boxShadow: `0 0 0 2px ${theme === "dark" ? "#1e293b" : "#f8fafc"}`
+    }
+  }, myLeaveUnreadCount > 9 ? "9+" : String(myLeaveUnreadCount))));
   const renderWeekScreen = () => {
     if (!selectedDriver) return null;
     const canShowWeekPrimaryActions = !!actionDriver && selectedDriver === actionDriver;
