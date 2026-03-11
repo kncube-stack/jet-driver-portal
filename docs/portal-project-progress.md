@@ -298,7 +298,18 @@ Presentation-safe summary:
 - not yet at full enterprise-hardening level,
 - clear next upgrades are already identified.
 
-## 11) Open items / next steps
+## 11) The "Hybrid Hosting" Strategy (Enterprise Path)
+
+To balance corporate security requirements with modern development agility, the project is moving towards a **Hybrid Model**:
+
+*   **App Hosting (Vercel)**: The PWA engine remains on Vercel to leverage its high-performance Edge Network, seamless GitHub CI/CD, and superior support for the Service Worker and Push Notification features required by mobile drivers.
+*   **Data Storage (Azure)**: Sensitive driver data (rota, swaps, leave) will reside in the company's **Azure Blob Storage** tenant.
+*   **Benefits**:
+    *   **Compliance**: IT maintains full control over data residency and audit logs.
+    *   **Security**: The app uses managed identities/connection strings to securely bridge the platforms.
+    *   **Agility**: Developers can ship UI/Logic updates without disturbing IT infrastructure.
+
+## 12) Open items / next steps
 
 Recommended order:
 
@@ -310,11 +321,11 @@ Recommended order:
 6. Decide whether timesheet should also move from `mailto:` to backend email send.
 7. Harden the Office Scripts so Power Automate failures throw explicitly and return useful result data.
 8. If stronger security is required after rollout:
-   - add distributed rate limiting,
-   - consider shorter session TTL,
-   - consider stronger admin authentication requirements.
+    - add distributed rate limiting,
+    - consider shorter session TTL,
+    - consider stronger admin authentication requirements.
 
-## 12) Known docs and recommended reading order
+## 13) Known docs and recommended reading order
 
 Read in this order:
 
@@ -357,7 +368,14 @@ Blob + ingest:
 - **`VAPID_PUBLIC_KEY`**
 - **`VAPID_PRIVATE_KEY`**
 - **`VAPID_SUBJECT`** (mailto: link)
-- **`CRON_SECRET`** (secures shift-reminder cron)
+- **CRON_SECRET**: secures shift-reminder cron
+
+Branding (Managed in `index_files/jet-data.js`):
+- **BRAND_CONFIG**: Central object for platform white-labeling.
+
+Azure (Proposed for Hybrid Migration):
+- `AZURE_STORAGE_CONNECTION_STRING`: Required for transition away from Vercel Blob.
+- `AZURE_STORAGE_CONTAINER`: Target container for driver data.
 
 ## 14) Blob storage details
 
