@@ -4,6 +4,7 @@
 const { getJsonBlob } = require("./_blob-json");
 const { sendPushToDriver } = require("./_push");
 const { getSubmittedDriversForWeek } = require("./_timesheets");
+const DUTY_SIGN_ONS = require("./_duty-sign-ons");
 
 function isCronRequest(req) {
   return req.headers?.["x-vercel-cron"] === "1" ||
@@ -92,7 +93,7 @@ module.exports = async function handler(req, res) {
         if (!duty) return;
 
         const entry = allocation[String(duty)];
-        const signOnText = entry?.signOn || null;
+        const signOnText = entry?.signOn || DUTY_SIGN_ONS[Number(duty)] || null;
         if (!signOnText || !isWithinRange(signOnText, currentH, currentM, targetDate === today)) return;
 
         await sendPushToDriver(driverName, {

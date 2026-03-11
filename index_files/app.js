@@ -1670,6 +1670,21 @@ function App() {
   React.useEffect(() => {
     setLeavePendingCount(leaveRequests.filter(r => r.status === "pending").length);
   }, [leaveRequests]);
+  // Sync app icon badge with total pending action count (Badging API — PWA home screen)
+  React.useEffect(() => {
+    const total = swapBadgeCount + leavePendingCount;
+    if (!("setAppBadge" in navigator)) return;
+    if (total > 0) {
+      navigator.setAppBadge(total).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }, [swapBadgeCount, leavePendingCount]);
+  // Eagerly load leave requests for managers so the pending badge shows on the home screen
+  React.useEffect(() => {
+    if (!authed || !isLeaveManager) return;
+    loadLeaveRequestsForManager();
+  }, [authed, isLeaveManager, loadLeaveRequestsForManager]);
   React.useEffect(() => {
     if (!authed || screen !== "leave") return;
     loadMyLeaveRequests();
@@ -3651,6 +3666,7 @@ function App() {
     }, "FIRST DAY OF LEAVE"), /*#__PURE__*/React.createElement("input", {
       type: "date",
       value: leaveForm.dateFrom,
+      min: new Date().toLocaleDateString("en-CA"),
       onClick: e => openNativeDatePicker(e.currentTarget),
       onFocus: e => openNativeDatePicker(e.currentTarget),
       onChange: e => {

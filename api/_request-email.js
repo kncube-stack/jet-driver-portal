@@ -107,10 +107,17 @@ function buildLeaveMessage(payload, options = {}) {
           <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Submitted</td><td style="padding:6px 0;font-size:14px;">${safeSubmittedAt}</td></tr>
         </table>
         ${includeActionLinks ? `
-          <div style="margin:20px 0 12px;">
-            <a href="${escapeHtml(approveUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;margin-right:10px;">Approve</a>
-            <a href="${escapeHtml(declineUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;">Decline</a>
-          </div>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0 12px;">
+            <tr>
+              <td style="border-radius:10px;background:#16a34a;">
+                <a href="${escapeHtml(approveUrl)}" style="display:block;padding:14px 24px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif;white-space:nowrap;">Approve</a>
+              </td>
+              <td style="width:12px;"></td>
+              <td style="border-radius:10px;background:#dc2626;">
+                <a href="${escapeHtml(declineUrl)}" style="display:block;padding:14px 24px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif;white-space:nowrap;">Decline</a>
+              </td>
+            </tr>
+          </table>
           <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">These links expire in 14 days and only work while the request is still pending.</p>
         ` : `
           <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">Review this request inside the JET Driver Portal.</p>
@@ -260,10 +267,17 @@ function buildSwapOfficeActionEmail(swap, approveUrl, declineUrl) {
           <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Week</td><td style="padding:6px 0;font-size:14px;"><strong>${safeWeek}</strong></td></tr>
           <tr><td style="padding:6px 0;color:#475569;font-size:14px;vertical-align:top;">Notes</td><td style="padding:6px 0;font-size:14px;line-height:1.5;">${safeNotes}</td></tr>
         </table>
-        <div style="margin:20px 0 12px;">
-          <a href="${escapeHtml(approveUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;margin-right:10px;">Approve Swap</a>
-          <a href="${escapeHtml(declineUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;">Decline Swap</a>
-        </div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0 12px;">
+          <tr>
+            <td style="border-radius:10px;background:#16a34a;">
+              <a href="${escapeHtml(approveUrl)}" style="display:block;padding:14px 24px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif;white-space:nowrap;">Approve Swap</a>
+            </td>
+            <td style="width:12px;"></td>
+            <td style="border-radius:10px;background:#dc2626;">
+              <a href="${escapeHtml(declineUrl)}" style="display:block;padding:14px 24px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif;white-space:nowrap;">Decline Swap</a>
+            </td>
+          </tr>
+        </table>
         <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">These links expire in 14 days and only work while the swap is awaiting confirmation.</p>
       </div>
     </div>
