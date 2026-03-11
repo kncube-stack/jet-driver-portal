@@ -1,6 +1,7 @@
 const { verifyRequestSession, verifySignedActionToken, createSignedActionToken, getRequestOrigin, parseRequestBody } = require("./_auth");
 const { asCleanString, asPositiveInt, buildLeaveRequestActionEmails, buildDriverLeaveDecisionEmail, sendConfiguredPortalEmail } = require("./_request-email");
 const { loadAndSyncLeaveRequests, saveLeaveRequests, createLeaveRequestRecord, getRelevantLeaveRequests, sortLeaveRequests } = require("./_leave-requests");
+const { sendPushToDriver } = require("./_push");
 
 // Only these managers can view all requests, approve, and decline
 const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
@@ -120,6 +121,22 @@ module.exports = async function handler(req, res) {
           console.error("Email leave action driver notification failed:", emailError);
         }
       }
+      const datesText = fromLabel !== toLabel ? `${fromLabel} – ${toLabel}` : fromLabel;
+      if (action === "approve") {
+        sendPushToDriver(updated.driverName, {
+          title: "Leave Approved \u2713",
+          body: `Your leave request (${datesText}) has been approved`,
+          url: "/",
+          tag: `leave-${updated.id}`
+        }).catch(() => {});
+      } else {
+        sendPushToDriver(updated.driverName, {
+          title: "Leave Request Declined",
+          body: `Your leave request for ${fromLabel} was not approved`,
+          url: "/",
+          tag: `leave-${updated.id}`
+        }).catch(() => {});
+      }
       const statusWord = action === "approve" ? "Approved" : "Declined";
       return res.status(200).send(renderHtmlPage(statusWord, `${updated.driverName}'s leave request has been ${action}d.`, action === "approve" ? "#16a34a" : "#dc2626", [
         `Dates: ${fromLabel}${fromLabel !== toLabel ? ` to ${toLabel}` : ""}`,
@@ -204,6 +221,24 @@ module.exports = async function handler(req, res) {
         } catch (emailError) {
           console.error("Leave action driver notification failed:", emailError);
         }
+      }
+      const fromLbl = updated.fromDateLabel || updated.dateFrom || "";
+      const toLbl = updated.toDateLabel || updated.dateTo || "";
+      const dateRange = fromLbl !== toLbl ? `${fromLbl} – ${toLbl}` : fromLbl;
+      if (action === "approve") {
+        sendPushToDriver(updated.driverName, {
+          title: "Leave Approved \u2713",
+          body: `Your leave request (${dateRange}) has been approved`,
+          url: "/",
+          tag: `leave-${updated.id}`
+        }).catch(() => {});
+      } else if (action === "decline") {
+        sendPushToDriver(updated.driverName, {
+          title: "Leave Request Declined",
+          body: `Your leave request for ${fromLbl} was not approved`,
+          url: "/",
+          tag: `leave-${updated.id}`
+        }).catch(() => {});
       }
       return res.status(200).json({ ok: true, request: updated });
     } catch (error) {

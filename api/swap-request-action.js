@@ -1,6 +1,7 @@
 const { verifyRequestSession, parseRequestBody, createSignedActionToken, getRequestOrigin } = require("./_auth");
 const { asCleanString, buildSwapOfficeActionEmail, sendConfiguredPortalEmail } = require("./_request-email");
 const { loadAndSyncSwapRequests, saveSwapRequests } = require("./_swap-requests");
+const { sendPushToDriver } = require("./_push");
 
 const SWAP_OFFICE_ACTION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
@@ -80,6 +81,12 @@ module.exports = async function handler(req, res) {
       };
       requests[index] = updated;
       await saveSwapRequests(requests);
+      sendPushToDriver(updated.requestingDriver, {
+        title: "Swap Declined",
+        body: `${updated.targetDriver} declined your ${updated.dayName} swap request`,
+        url: "/",
+        tag: `swap-${updated.id}`
+      }).catch(() => {});
       return res.status(200).json({ ok: true, request: updated });
     }
 

@@ -1,6 +1,7 @@
 const { verifyRequestSession, verifySignedActionToken, parseRequestBody, getRequestOrigin } = require("./_auth");
 const { asCleanString, buildApprovedSwapMessage, sendConfiguredPortalEmail } = require("./_request-email");
 const { loadAndSyncSwapRequests, saveSwapRequests, createSwapRequestRecord, getRelevantSwapRequests } = require("./_swap-requests");
+const { sendPushToDriver } = require("./_push");
 
 function escapeHtml(value) {
   return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -115,6 +116,28 @@ module.exports = async function handler(req, res) {
         } catch (emailError) {
           console.error("Swap approval confirmation email failed:", emailError);
         }
+        const swapTag = `swap-${updated.id}`;
+        await Promise.all([
+          sendPushToDriver(updated.requestingDriver, {
+            title: "Swap Approved \u2713",
+            body: `Your ${updated.dayName} swap with ${updated.targetDriver} is confirmed`,
+            url: "/",
+            tag: swapTag
+          }).catch(() => {}),
+          sendPushToDriver(updated.targetDriver, {
+            title: "Swap Confirmed",
+            body: `Your ${updated.dayName} swap with ${updated.requestingDriver} is confirmed`,
+            url: "/",
+            tag: swapTag + "-t"
+          }).catch(() => {})
+        ]);
+      } else {
+        await sendPushToDriver(updated.requestingDriver, {
+          title: "Swap Not Approved",
+          body: `Your ${updated.dayName} swap request was not approved by the office`,
+          url: "/",
+          tag: `swap-${updated.id}`
+        }).catch(() => {});
       }
       const statusWord = action === "approve" ? "Approved" : "Declined";
       return res.status(200).send(renderHtmlPage(statusWord, `The shift swap between ${updated.requestingDriver} and ${updated.targetDriver} has been ${action}d.`, action === "approve" ? "#16a34a" : "#dc2626", [
@@ -197,6 +220,12 @@ module.exports = async function handler(req, res) {
     const requests = await loadAndSyncSwapRequests();
     requests.unshift(createdRequest);
     await saveSwapRequests(requests);
+    sendPushToDriver(createdRequest.targetDriver, {
+      title: "New Swap Request",
+      body: `${createdRequest.requestingDriver} wants to swap your ${createdRequest.dayName} duty`,
+      url: "/",
+      tag: `swap-request-${createdRequest.id}`
+    }).catch(() => {});
     return res.status(201).json({ ok: true, request: createdRequest });
   } catch (error) {
     console.error("Swap request create failed:", error);
