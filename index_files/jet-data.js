@@ -3,6 +3,15 @@
 // JASON EDWARDS TRAVEL — DRIVER DUTY PORTAL
 // Real data from duty cards PDF and weekly rota
 // ═══════════════════════════════════════════════════════════════
+const BRAND_CONFIG = {
+  id: "jet",
+  companyName: "Jason Edwards Travel",
+  brandName: "JET",
+  portalName: "Staff Portal",
+  accentColor: "#f59e0b",
+  loginSubtitle: "Jason Edwards Travel \u2014 Staff Portal",
+  timesheetFooter: "Submitted via JET Driver Portal"
+};
 const DUTY_CARDS = {
   // ── A6 EARLY DUTIES (200 series) ──────────────────────────
   201: {
@@ -4987,6 +4996,7 @@ const ACCESS_CONTROL = {
     STAFF_DIRECTORY,
     STAFF_SOURCE_CONFIG,
     MANUAL_STAFF_OVERRIDES,
-    ACCESS_CONTROL
+    ACCESS_CONTROL,
+    BRAND_CONFIG
   };
 })(window);

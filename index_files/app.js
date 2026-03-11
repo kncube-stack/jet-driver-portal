@@ -1,5 +1,5 @@
 (function (window) {
-  const { DUTY_CARDS, ACCESS_CONTROL } = window.JET_DATA;
+  const { DUTY_CARDS, ACCESS_CONTROL, BRAND_CONFIG } = window.JET_DATA;
   const {
     getTodayRunout,
     getDriverRunout,
@@ -1719,7 +1719,7 @@ function App() {
         color: "#ef4444",
         marginBottom: "2px"
       }
-    }, "JET"), /*#__PURE__*/React.createElement("div", {
+    }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "9px",
         letterSpacing: "1.5px",
@@ -1727,7 +1727,7 @@ function App() {
         textTransform: "uppercase",
         marginBottom: "20px"
       }
-    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+    }, BRAND_CONFIG.loginSubtitle), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "13px",
         color: C.white,
@@ -1911,7 +1911,7 @@ function App() {
         color: "#ef4444",
         marginBottom: "2px"
       }
-    }, "JET"), /*#__PURE__*/React.createElement("div", {
+    }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "9px",
         letterSpacing: "1.5px",
@@ -1919,7 +1919,7 @@ function App() {
         textTransform: "uppercase",
         marginBottom: "32px"
       }
-    }, "Jason Edwards Travel \u2014 Staff Portal"), /*#__PURE__*/React.createElement("div", {
+    }, BRAND_CONFIG.loginSubtitle), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.accent,
@@ -4739,7 +4739,7 @@ function App() {
           return `${row.dayName}: ${dutyLabel || `Duty ${dutyCode}`} | Start ${startTime} | Finish ${finishTime} | Hours ${rowHours} | Travel ${formatMoneyPounds(rowCost)}`;
         });
         const expenseLines = expenseTotals.items.length > 0 ? expenseTotals.items.map((expense, index) => `Expense ${index + 1}: ${expense.dayName} ${expense.date || "--"} | ${expense.description} | Amount ${formatMoneyPounds(expense.amount)}`) : [`Expense 1: -- | None | Amount ${formatMoneyPounds(0)}`];
-        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `OTHER EXPENSES`, ...expenseLines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, `TOTAL OTHER EXPENSES: ${formatMoneyPounds(expenseTotals.total)}`, `TOTAL EXPENSES CLAIMED: ${formatMoneyPounds(overallExpenseTotal)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, `Submitted via JET Driver Portal`].join("\n");
+        const body = [`DRIVER TIMESHEET`, ``, `Driver: ${actionDriver}`, `Week: ${getWeekCommencing()}`, ``, ...lines, ``, `OTHER EXPENSES`, ...expenseLines, ``, `TOTAL HOURS: ${totalHoursDecimal}`, `TOTAL TRAVEL COST: ${formatMoneyPounds(totals.travelCost)}`, `TOTAL OTHER EXPENSES: ${formatMoneyPounds(expenseTotals.total)}`, `TOTAL EXPENSES CLAIMED: ${formatMoneyPounds(overallExpenseTotal)}`, ``, `Submitted: ${new Date().toLocaleString("en-GB")}`, BRAND_CONFIG.timesheetFooter].join("\n");
         const response = await fetch(SEND_REQUEST_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

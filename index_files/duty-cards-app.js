@@ -1,5 +1,5 @@
 (function (window) {
-  const DUTY_CARDS = window.JET_DATA?.DUTY_CARDS || {};
+  const { DUTY_CARDS, BRAND_CONFIG } = window.JET_DATA || {};
   const STOP_DIRECTORY = Array.isArray(window.JET_STOP_DIRECTORY) ? window.JET_STOP_DIRECTORY : [];
 
   const C = {
@@ -733,7 +733,7 @@
                   lineHeight: 1
                 }
               },
-              "JET"
+              BRAND_CONFIG?.brandName || "JET"
             ),
             h(
               "div",
