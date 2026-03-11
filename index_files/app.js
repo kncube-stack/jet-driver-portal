@@ -124,6 +124,7 @@ const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
 const SEND_REQUEST_ENDPOINT = "/api/send-request";
 const LEAVE_REQUESTS_ENDPOINT = "/api/leave-requests";
 const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube"];
+const CLEAR_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
 const BREAK_REMINDER_TEXT = "Ensure you have a 45 minute break";
 const LEAVE_EMAIL_TO = "errol@jasonedwardstravel.co.uk";
 const SWAP_EMAIL_TO = "operations@jasonedwardstravel.co.uk";
@@ -4009,7 +4010,7 @@ function App() {
           alignItems: "flex-start",
           gap: "8px"
         }
-      }, LEAVE_MANAGERS.includes(actionDriver) && /*#__PURE__*/React.createElement("input", {
+      }, CLEAR_MANAGERS.includes(actionDriver) && /*#__PURE__*/React.createElement("input", {
         type: "checkbox",
         checked: selectedSwapIds.has(request.id),
         onChange: function(e) {
@@ -4267,7 +4268,7 @@ function App() {
         fontWeight: 700,
         lineHeight: 1
       }
-    }, inboundPending.length > 9 ? "9+" : String(inboundPending.length)), inboundPending.length === 1 ? "1 approval waiting below" : `${inboundPending.length} approvals waiting below`))), LEAVE_MANAGERS.includes(actionDriver) && /*#__PURE__*/React.createElement("div", {
+    }, inboundPending.length > 9 ? "9+" : String(inboundPending.length)), inboundPending.length === 1 ? "1 approval waiting below" : `${inboundPending.length} approvals waiting below`))), CLEAR_MANAGERS.includes(actionDriver) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "flex-end",
@@ -4628,7 +4629,7 @@ function App() {
           alignItems: "flex-start",
           gap: "8px"
         }
-      }, isLeaveManager && /*#__PURE__*/React.createElement("input", {
+      }, isLeaveManager && CLEAR_MANAGERS.includes(currentUser) && /*#__PURE__*/React.createElement("input", {
         type: "checkbox",
         checked: selectedLeaveIds.has(request.id),
         onChange: function(e) {
@@ -4764,7 +4765,7 @@ function App() {
         gap: "8px",
         alignItems: "center"
       }
-    }, /*#__PURE__*/React.createElement("button", {
+    }, CLEAR_MANAGERS.includes(currentUser) && /*#__PURE__*/React.createElement("button", {
       onClick: async () => {
         if (selectedLeaveIds.size === 0) return;
         if (!confirm(`Clear ${selectedLeaveIds.size} selected leave request(s)?`)) return;
