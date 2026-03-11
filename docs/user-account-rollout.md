@@ -3,7 +3,7 @@
 This script lets you apply your current agent automation setup to multiple repos in your **GitHub User account**.
 
 Script path:
-- [rollout-user-repos.sh](/Users/k_ncube/Documents/jet-driver-portal-main/scripts/agent/rollout-user-repos.sh)
+- [rollout-user-repos.sh](/Users/k_ncube/Documents/Projects/jet-driver-portal/scripts/agent/rollout-user-repos.sh)
 
 What it copies:
 1. `.github/workflows/agent.yml`

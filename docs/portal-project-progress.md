@@ -1,6 +1,6 @@
 # JET Driver Portal - Project Progress and Model Handover
 
-Last updated: 10 March 2026 (UK time) — email-driven leave approvals, route-learning duty-card behaviour fix, per-day timesheet expenses, and staff-name alias/auth sync
+Last updated: 11 March 2026 (UK time) — Web Push Notifications (swaps/leave/shift-reminders), individualized 1-hour shift pings, and Route 450 geocoding fixes.
 
 ## 1) Project purpose
 
@@ -34,7 +34,8 @@ There are two web experiences in this repo:
    - personal weekly rota view,
    - manager/duty-manager all-staff access,
    - duty-card details,
-   - leave, swap, and timesheet flows.
+   - leave, swap, and timesheet flows,
+   - **Web Push Notifications**: real-time alerts for swaps, leave decisions, and individualized shift reminders.
 
 2. Standalone duty cards app (`/duty-cards/`)
    - public, no login,
@@ -75,8 +76,8 @@ Serverless API endpoints:
 
 Auth/session:
 - `api/auth-login.js` — validates name + PIN, applies login throttling, sets `HttpOnly` session cookie
-- `api/auth-session.js` — verifies existing session and promotes legacy bearer sessions into cookie sessions
 - `api/auth-logout.js` — clears the server session cookie
+- `api/auth-session.js` — verifies existing sessions, promotes legacy tokens, and **manages Web Push subscriptions (PATCH)**
 - `api/_auth.js` — shared auth helpers (PIN hashing, JWT signing/verification, cookie helpers)
 - `api/_auth-rate-limit.js` — login throttling helper
 
@@ -98,6 +99,9 @@ Blob ingest/read:
 - `api/allocation-read.js`
 - `api/_ingest-auth.js`
 - `api/_blob-json.js` — shared blob read/write helper with access-mode support
+- `api/shift-reminder.js` — **Cron job (every 10m)**: Individualized 1-hour before sign-on reminders using UK timezone
+- `api/_push.js` — shared Web Push notification helper using `web-push`
+- `service-worker.js` — PWA push event listener and notification click handler
 
 Office Scripts:
 - `office-scripts/publish-rota.ts`
@@ -246,6 +250,12 @@ Important:
    - operational driver sections
    - `Jason Edwards` is now included under `Management` with blank days unless rota data is later added for him
 
+8. Push Notifications
+    - **Triggered events**: inbound swap requests, swap decisions, and leave request decisions,
+    - **Shift Reminders**: individualized pings exactly **1 hour before sign-on**,
+    - **Technical**: uses VAPID for security and `service-worker.js` for background delivery,
+    - **PWA support**: explicitly tuned to satisfy iOS Safari requirement for synchronous permission prompts during user gesture (login tap or banner tap).
+
 ## 9) Visual/UI state
 
 - Main portal has light/dark theme toggle.
@@ -344,6 +354,10 @@ Blob + ingest:
 - `BLOB_READ_WRITE_TOKEN`
 - `BLOB_ACCESS_MODE`
 - `API_INGEST_KEY`
+- **`VAPID_PUBLIC_KEY`**
+- **`VAPID_PRIVATE_KEY`**
+- **`VAPID_SUBJECT`** (mailto: link)
+- **`CRON_SECRET`** (secures shift-reminder cron)
 
 ## 14) Blob storage details
 
@@ -389,4 +403,5 @@ Swap-request store notes:
 10. Timesheet email flow is the main remaining user-facing request flow that has not yet been moved fully server-side.
 11. The swap workflow is now stateful; do not revert it back to immediate management email without an explicit process decision.
 12. If changing staff display names, keep alias handling in sync with the rota source naming until the source workbook is updated too.
-13. After any important user-visible or auth/data-model change, update this handover doc in the same change set.
+13. **Push Notification Permissions**: on iOS/Safari, the `Notification.requestPermission()` call **must** be synchronous with a user tap. It is currently fired during the "Sign In" button click or the "Enable Notifications" banner click.
+14. After any important user-visible or auth/data-model change, update this handover doc in the same change set.

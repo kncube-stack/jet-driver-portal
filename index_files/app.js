@@ -1858,7 +1858,14 @@ function App() {
         lineHeight: 1.5,
         marginTop: "8px"
       }
-    }, ACCESS_CONTROL.mode === "soft" ? "Soft mode enabled for testing. Shared driver PIN is active." : "Strict mode enabled. Per-user PIN required.", /*#__PURE__*/React.createElement("br", null), "This portal contains staff data protected under UK GDPR.")));
+    }, ACCESS_CONTROL.mode === "soft" ? "Soft mode enabled for testing. Shared driver PIN is active." : "Strict mode enabled. Per-user PIN required.", /*#__PURE__*/React.createElement("br", null), "This portal contains staff data protected under UK GDPR.", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginTop: "12px",
+        display: "block",
+        fontWeight: 600,
+        color: C.accent
+      }
+    }, "\u00A9 2026 Kennedy Ncube \u00B7 Powered by JetPortal.co"))));
   }
   const handlePrint = () => {
     const el = printRef.current;
@@ -5628,7 +5635,26 @@ function App() {
         lineHeight: 1.5
       }
     }, "If your actual duty differs from this card, contact the duty manager immediately."));
-  })()));
+  })(), /*#__PURE__*/React.createElement("footer", {
+    style: {
+      textAlign: "center",
+      padding: "24px 16px",
+      fontSize: "10px",
+      color: C.textDim,
+      borderTop: `1px solid ${C.border}`,
+      marginTop: "auto"
+    }
+  }, "\u00A9 2026 Kennedy Ncube \u00B7 All Rights Reserved", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("a", {
+    href: "https://jetportal.co",
+    target: "_blank",
+    style: {
+      color: C.accent,
+      textDecoration: "none",
+      marginTop: "4px",
+      display: "inline-block",
+      fontWeight: 600
+    }
+  }, "Powered by JetPortal.co"))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 })(window);
