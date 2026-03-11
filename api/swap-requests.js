@@ -1,6 +1,6 @@
 const { verifyRequestSession, verifySignedActionToken, parseRequestBody, getRequestOrigin } = require("./_auth");
 const { asCleanString, buildApprovedSwapMessage, sendConfiguredPortalEmail } = require("./_request-email");
-const { loadAndSyncSwapRequests, saveSwapRequests, createSwapRequestRecord, getRelevantSwapRequests } = require("./_swap-requests");
+const { loadSwapRequests, loadAndSyncSwapRequests, saveSwapRequests, createSwapRequestRecord, getRelevantSwapRequests } = require("./_swap-requests");
 const { sendPushToDriver } = require("./_push");
 
 const MANAGERS = ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube"];
@@ -174,8 +174,11 @@ module.exports = async function handler(req, res) {
       return res.status(403).json({ ok: false, error: "Only managers can clear swap requests." });
     }
     try {
-      await saveSwapRequests([]);
-      return res.status(200).json({ ok: true, cleared: true });
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+      const all = await loadSwapRequests();
+      const updated = ids ? all.filter(r => !ids.includes(r.id)) : [];
+      await saveSwapRequests(updated);
+      return res.status(200).json({ ok: true, cleared: ids ? ids.length : all.length });
     } catch (error) {
       console.error("Swap requests clear failed:", error);
       return res.status(500).json({ ok: false, error: "Failed to clear swap requests." });

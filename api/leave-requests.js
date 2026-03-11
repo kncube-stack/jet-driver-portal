@@ -1,6 +1,6 @@
 const { verifyRequestSession, verifySignedActionToken, createSignedActionToken, getRequestOrigin, parseRequestBody } = require("./_auth");
 const { asCleanString, asPositiveInt, buildLeaveRequestActionEmails, buildDriverLeaveDecisionEmail, sendConfiguredPortalEmail } = require("./_request-email");
-const { loadAndSyncLeaveRequests, saveLeaveRequests, createLeaveRequestRecord, getRelevantLeaveRequests, sortLeaveRequests } = require("./_leave-requests");
+const { loadLeaveRequests, loadAndSyncLeaveRequests, saveLeaveRequests, createLeaveRequestRecord, getRelevantLeaveRequests, sortLeaveRequests } = require("./_leave-requests");
 const { sendPushToDriver } = require("./_push");
 
 // Only these managers can view all requests, approve, and decline
@@ -253,8 +253,11 @@ module.exports = async function handler(req, res) {
       return res.status(403).json({ ok: false, error: "Only managers can clear leave requests." });
     }
     try {
-      await saveLeaveRequests([]);
-      return res.status(200).json({ ok: true, cleared: true });
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+      const all = await loadLeaveRequests();
+      const updated = ids ? all.filter(r => !ids.includes(r.id)) : [];
+      await saveLeaveRequests(updated);
+      return res.status(200).json({ ok: true, cleared: ids ? ids.length : all.length });
     } catch (error) {
       console.error("Leave requests clear failed:", error);
       return res.status(500).json({ ok: false, error: "Failed to clear leave requests." });

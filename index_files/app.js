@@ -1164,6 +1164,8 @@ function App() {
   const [leaveRequestsLoading, setLeaveRequestsLoading] = React.useState(false);
   const [leaveRequestsError, setLeaveRequestsError] = React.useState("");
   const [leaveActionPending, setLeaveActionPending] = React.useState("");
+  const [selectedLeaveIds, setSelectedLeaveIds] = React.useState(new Set());
+  const [selectedSwapIds, setSelectedSwapIds] = React.useState(new Set());
   const [leavePendingCount, setLeavePendingCount] = React.useState(0);
   const [myLeaveRequests, setMyLeaveRequests] = React.useState([]);
   const [myLeaveRequestsLoading, setMyLeaveRequestsLoading] = React.useState(false);
@@ -3917,7 +3919,29 @@ function App() {
           justifyContent: "space-between",
           gap: "10px"
         }
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "8px"
+        }
+      }, LEAVE_MANAGERS.includes(actionDriver) && /*#__PURE__*/React.createElement("input", {
+        type: "checkbox",
+        checked: selectedSwapIds.has(request.id),
+        onChange: function(e) {
+          setSelectedSwapIds(function(prev) {
+            var next = new Set(prev);
+            e.target.checked ? next.add(request.id) : next.delete(request.id);
+            return next;
+          });
+        },
+        style: {
+          marginTop: "2px",
+          accentColor: C.accent,
+          cursor: "pointer",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: "12px",
           fontWeight: 700,
@@ -3929,7 +3953,7 @@ function App() {
           color: C.textMuted,
           marginTop: "2px"
         }
-      }, request.dayName, " · ", formatSwapWeekLabel(request.weekCommencing))), /*#__PURE__*/React.createElement("span", {
+      }, request.dayName, " · ", formatSwapWeekLabel(request.weekCommencing)))), /*#__PURE__*/React.createElement("span", {
         style: {
           display: "inline-flex",
           alignItems: "center",
@@ -4168,25 +4192,30 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement("button", {
       onClick: async () => {
-        if (!confirm("Clear ALL swap requests? This cannot be undone.")) return;
+        if (selectedSwapIds.size === 0) return;
+        if (!confirm(`Clear ${selectedSwapIds.size} selected swap request(s)?`)) return;
         await fetch("/api/swap-requests", {
           method: "DELETE",
-          credentials: "same-origin"
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: [...selectedSwapIds] })
         });
-        setSwapRequests([]);
+        setSwapRequests(prev => prev.filter(r => !selectedSwapIds.has(r.id)));
+        setSelectedSwapIds(new Set());
       },
+      disabled: selectedSwapIds.size === 0,
       style: {
         background: "none",
-        border: "1px solid #ef4444",
+        border: `1px solid ${selectedSwapIds.size > 0 ? "#ef4444" : C.border}`,
         borderRadius: "8px",
-        color: "#ef4444",
+        color: selectedSwapIds.size > 0 ? "#ef4444" : C.textDim,
         fontSize: "11px",
         fontWeight: 600,
         padding: "8px 12px",
-        cursor: "pointer",
+        cursor: selectedSwapIds.size > 0 ? "pointer" : "not-allowed",
         fontFamily: "inherit"
       }
-    }, "Clear All Swaps")), /*#__PURE__*/React.createElement("div", {
+    }, selectedSwapIds.size > 0 ? `Clear (${selectedSwapIds.size})` : "Clear")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -4509,7 +4538,29 @@ function App() {
           justifyContent: "space-between",
           gap: "10px"
         }
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "8px"
+        }
+      }, isLeaveManager && /*#__PURE__*/React.createElement("input", {
+        type: "checkbox",
+        checked: selectedLeaveIds.has(request.id),
+        onChange: function(e) {
+          setSelectedLeaveIds(function(prev) {
+            var next = new Set(prev);
+            e.target.checked ? next.add(request.id) : next.delete(request.id);
+            return next;
+          });
+        },
+        style: {
+          marginTop: "2px",
+          accentColor: C.accent,
+          cursor: "pointer",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: "12px",
           fontWeight: 700,
@@ -4521,7 +4572,7 @@ function App() {
           color: C.textMuted,
           marginTop: "2px"
         }
-      }, fromLabel, " \u2192 ", toLabel, " \u00B7 ", request.totalDays, " ", request.totalDays === 1 ? "day" : "days")), /*#__PURE__*/React.createElement("span", {
+      }, fromLabel, " \u2192 ", toLabel, " \u00B7 ", request.totalDays, " ", request.totalDays === 1 ? "day" : "days"))), /*#__PURE__*/React.createElement("span", {
         style: {
           display: "inline-flex",
           alignItems: "center",
@@ -4631,25 +4682,30 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement("button", {
       onClick: async () => {
-        if (!confirm("Clear ALL leave requests? This cannot be undone.")) return;
+        if (selectedLeaveIds.size === 0) return;
+        if (!confirm(`Clear ${selectedLeaveIds.size} selected leave request(s)?`)) return;
         await fetch("/api/leave-requests", {
           method: "DELETE",
-          credentials: "same-origin"
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: [...selectedLeaveIds] })
         });
-        setLeaveRequests([]);
+        setLeaveRequests(prev => prev.filter(r => !selectedLeaveIds.has(r.id)));
+        setSelectedLeaveIds(new Set());
       },
+      disabled: selectedLeaveIds.size === 0,
       style: {
         background: "none",
-        border: "1px solid #ef4444",
+        border: `1px solid ${selectedLeaveIds.size > 0 ? "#ef4444" : C.border}`,
         borderRadius: "8px",
-        color: "#ef4444",
+        color: selectedLeaveIds.size > 0 ? "#ef4444" : C.textDim,
         fontSize: "11px",
         fontWeight: 600,
         padding: "8px 12px",
-        cursor: "pointer",
+        cursor: selectedLeaveIds.size > 0 ? "pointer" : "not-allowed",
         fontFamily: "inherit"
       }
-    }, "Clear All"), /*#__PURE__*/React.createElement("button", {
+    }, selectedLeaveIds.size > 0 ? `Clear (${selectedLeaveIds.size})` : "Clear"), /*#__PURE__*/React.createElement("button", {
       onClick: loadLeaveRequestsForManager,
       disabled: leaveRequestsLoading,
       style: {
