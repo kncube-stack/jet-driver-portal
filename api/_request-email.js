@@ -303,6 +303,7 @@ function buildTimesheetMessage(payload) {
   return {
     to: TIMESHEET_EMAIL_TO,
     subject: `Driver Timesheet - ${driverName} - ${weekCommencing}`,
+    ...(process.env.TIMESHEET_EMAIL_FROM ? { from: process.env.TIMESHEET_EMAIL_FROM } : {}),
     ...(replyTo ? { replyTo } : {}),
     text
   };
@@ -342,7 +343,9 @@ async function sendConfiguredPortalEmail(email) {
   }
   // In testing mode, force every email to relief.controller regardless of the `to` field
   const effectiveEmail = TESTING ? { ...email, to: TEST_ONLY } : email;
-  return await sendWithResend(apiKey, fromAddress, effectiveEmail);
+  // Allow individual email builders to override the from address (e.g. timesheets@jetportal.co)
+  const effectiveFrom = effectiveEmail.from || fromAddress;
+  return await sendWithResend(apiKey, effectiveFrom, effectiveEmail);
 }
 
 module.exports = {
