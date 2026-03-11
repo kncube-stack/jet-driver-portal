@@ -1211,6 +1211,8 @@
     const LONG_PRESS_MS = 5000;
     const routeUrl = React.useMemo(() => buildSegmentRouteUrl(segment, duty), [segment, duty]);
 
+    const titleRef = React.useRef(null);
+
     const startPress = React.useCallback(() => {
       if (!routeUrl) return;
       setHolding(true);
@@ -1229,7 +1231,24 @@
       }
     }, []);
 
-    React.useEffect(() => () => { if (timerRef.current !== null) clearTimeout(timerRef.current); }, []);
+    // Attach touch events as non-passive so we can call preventDefault(),
+    // which suppresses the iOS native long-press callout/text-selection.
+    React.useEffect(() => {
+      const el = titleRef.current;
+      if (!el || !routeUrl) return;
+      const onTouchStart = e => { e.preventDefault(); startPress(); };
+      const onTouchEnd = () => cancelPress();
+      const onTouchCancel = () => cancelPress();
+      el.addEventListener("touchstart", onTouchStart, { passive: false });
+      el.addEventListener("touchend", onTouchEnd);
+      el.addEventListener("touchcancel", onTouchCancel);
+      return () => {
+        el.removeEventListener("touchstart", onTouchStart);
+        el.removeEventListener("touchend", onTouchEnd);
+        el.removeEventListener("touchcancel", onTouchCancel);
+        if (timerRef.current !== null) clearTimeout(timerRef.current);
+      };
+    }, [routeUrl, startPress, cancelPress]);
 
     const stops = Array.isArray(segment?.stops) ? segment.stops : [];
 
@@ -1239,12 +1258,11 @@
       h(
         "div",
         {
+          ref: titleRef,
           onMouseDown: startPress,
           onMouseUp: cancelPress,
           onMouseLeave: cancelPress,
-          onTouchStart: startPress,
-          onTouchEnd: cancelPress,
-          onTouchCancel: cancelPress,
+          onContextMenu: e => e.preventDefault(),
           style: {
             color: holding ? "#d97706" : C.accent,
             fontWeight: 700,
@@ -1253,6 +1271,7 @@
             letterSpacing: "0.4px",
             userSelect: "none",
             WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
             cursor: routeUrl ? "pointer" : "default",
             transition: "color 200ms ease, opacity 200ms ease",
             opacity: holding ? 0.75 : 1
