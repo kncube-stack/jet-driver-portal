@@ -1783,7 +1783,7 @@ function App() {
         marginBottom: "20px"
       }
     }, /*#__PURE__*/React.createElement("img", {
-      src: "/icon.svg",
+      src: "/icon-192.png",
       alt: "JP",
       style: {
         width: "44px",
@@ -1992,7 +1992,7 @@ function App() {
         marginBottom: "32px"
       }
     }, /*#__PURE__*/React.createElement("img", {
-      src: "/icon.svg",
+      src: "/icon-192.png",
       alt: "JP",
       style: {
         width: "44px",
