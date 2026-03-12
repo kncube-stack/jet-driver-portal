@@ -1,6 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="110" fill="#F59E0B"/>
-  <text x="256" y="345" font-family="system-ui,-apple-system,'Helvetica Neue',sans-serif"
-        font-size="248" font-weight="800" fill="white"
-        text-anchor="middle" letter-spacing="-6">JP</text>
+  <g fill="none" stroke="white" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+    <!-- "d" bowl: CCW arc from top-right to bottom-right going via the left -->
+    <path d="M 248 158 A 90 90 0 1 0 248 338"/>
+    <!-- "d" stem: extends above the bowl -->
+    <line x1="248" y1="96" x2="248" y2="338"/>
+    <!-- "d" descender hook -->
+    <path d="M 248 338 Q 260 394 291 383"/>
+  </g>
+  <!-- "d" hook terminal dot -->
+  <circle cx="294" cy="381" r="23" fill="white"/>
+  <g fill="none" stroke="white" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+    <!-- "P" stem -->
+    <line x1="330" y1="96" x2="330" y2="418"/>
+    <!-- "P" bowl: D-shape, control points kept inside canvas -->
+    <path d="M 330 124 C 494 124 494 296 330 296"/>
+  </g>
 </svg>
