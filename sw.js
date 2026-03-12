@@ -1,10 +1,13 @@
-const CACHE_NAME = 'jet-portal-v13';
+const CACHE_NAME = 'jet-portal-v14';
 const ASSETS = [
   '/',
   '/index.html',
   '/duty-cards/',
   '/duty-cards/index.html',
   '/manifest.json',
+  '/favicon.ico',
+  '/icon-192.png',
+  '/icon-512.png',
   '/index_files/jet-data.js',
   '/index_files/jet-data-layer.js',
   '/index_files/jet-ui-helpers.js',
