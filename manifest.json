@@ -1,8 +1,8 @@
 {
   "id": "co.jetportal.staff",
-  "name": "JET Driver Portal",
-  "short_name": "JET",
-  "description": "Jason Edwards Travel — Driver Duty Portal",
+  "name": "JetPortal",
+  "short_name": "JetPortal",
+  "description": "Jason Edwards Travel — Staff Portal",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

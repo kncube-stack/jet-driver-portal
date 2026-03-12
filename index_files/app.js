@@ -1777,21 +1777,38 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: "14px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "12px",
+        marginBottom: "20px"
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: "/icon.svg",
+      alt: "JP",
+      style: {
+        width: "44px",
+        height: "44px",
+        borderRadius: "10px",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "left"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "22px",
         fontWeight: 700,
-        letterSpacing: "3px",
-        color: "#ef4444",
-        marginBottom: "2px"
+        color: C.text,
+        lineHeight: 1.1
       }
     }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: "9px",
-        letterSpacing: "1.5px",
+        fontSize: "10px",
         color: C.textMuted,
-        textTransform: "uppercase",
-        marginBottom: "20px"
+        marginTop: "2px"
       }
-    }, BRAND_CONFIG.loginSubtitle), /*#__PURE__*/React.createElement("div", {
+    }, BRAND_CONFIG.loginSubtitle))), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "13px",
         color: C.white,
@@ -1969,21 +1986,38 @@ function App() {
       rel: "stylesheet"
     }), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: "14px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "12px",
+        marginBottom: "32px"
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: "/icon.svg",
+      alt: "JP",
+      style: {
+        width: "44px",
+        height: "44px",
+        borderRadius: "10px",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "left"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "22px",
         fontWeight: 700,
-        letterSpacing: "3px",
-        color: "#ef4444",
-        marginBottom: "2px"
+        color: C.text,
+        lineHeight: 1.1
       }
     }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: "9px",
-        letterSpacing: "1.5px",
+        fontSize: "10px",
         color: C.textMuted,
-        textTransform: "uppercase",
-        marginBottom: "32px"
+        marginTop: "2px"
       }
-    }, BRAND_CONFIG.loginSubtitle), /*#__PURE__*/React.createElement("div", {
+    }, BRAND_CONFIG.loginSubtitle))), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: "11px",
         color: C.accent,
@@ -2918,24 +2952,39 @@ function App() {
     }
   }, "\u2190 Back"), /*#__PURE__*/React.createElement("div", {
     style: {
-      flex: 1
+      flex: 1,
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "/icon.svg",
+    alt: "JP",
+    style: {
+      width: "32px",
+      height: "32px",
+      borderRadius: "7px",
+      flexShrink: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: "14px",
+      fontSize: "16px",
       fontWeight: 700,
-      letterSpacing: "3px",
-      color: "#ef4444"
+      color: C.text,
+      lineHeight: 1.1
     }
-  }, "JET"), /*#__PURE__*/React.createElement("div", {
+  }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: "9px",
-      letterSpacing: "1.5px",
       color: C.textMuted,
-      textTransform: "uppercase",
       marginTop: "1px"
     }
-  }, "Jason Edwards Travel \u2014 Staff Portal")), /*#__PURE__*/React.createElement("div", {
+  }, BRAND_CONFIG.loginSubtitle))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: "11px",
       color: C.textMuted,

@@ -6,10 +6,10 @@
 const BRAND_CONFIG = {
   id: "jet",
   companyName: "Jason Edwards Travel",
-  brandName: "JET",
+  brandName: "JetPortal",
   portalName: "Staff Portal",
   accentColor: "#f59e0b",
-  loginSubtitle: "Jason Edwards Travel \u2014 Staff Portal",
+  loginSubtitle: "Staff Portal",
   timesheetFooter: "Submitted via JET Driver Portal"
 };
 const DUTY_CARDS = {
