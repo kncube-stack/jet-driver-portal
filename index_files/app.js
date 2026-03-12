@@ -2959,7 +2959,7 @@ function App() {
       minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/icon.svg",
+    src: "/icon-192.png",
     alt: "JP",
     style: {
       width: "32px",
