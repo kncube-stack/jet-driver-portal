@@ -27,12 +27,41 @@ async function upsertSubscription(driverName, subscription) {
   await saveSubs(subs);
 }
 
+const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas", "Kennedy Ncube"];
+
+async function calculateDriverBadgeCount(driverName) {
+  let count = 0;
+  try {
+    const { loadAndSyncSwapRequests } = require("./_swap-requests");
+    const swaps = await loadAndSyncSwapRequests();
+    count += swaps.filter(r => r.status === "pending" && r.targetDriver === driverName).length;
+  } catch (e) {
+    console.warn("Badge swap count failed:", e.message);
+  }
+
+  if (LEAVE_MANAGERS.includes(driverName)) {
+    try {
+      const { loadAndSyncLeaveRequests } = require("./_leave-requests");
+      const leaves = await loadAndSyncLeaveRequests();
+      count += leaves.filter(r => r.status === "pending").length;
+    } catch (e) {
+      console.warn("Badge leave count failed:", e.message);
+    }
+  }
+
+  return Math.max(1, count);
+}
+
 async function sendPushToDriver(driverName, payload) {
   const subs = await loadSubs();
   const targets = subs.filter(s => s.driverName === driverName);
   if (!targets.length) return;
+
+  const badgeCount = await calculateDriverBadgeCount(driverName);
+  const finalPayload = { ...payload, badgeCount };
+
   const results = await Promise.allSettled(
-    targets.map(sub => webPush.sendNotification(sub, JSON.stringify(payload)))
+    targets.map(sub => webPush.sendNotification(sub, JSON.stringify(finalPayload)))
   );
   // Remove subscriptions that are gone (device unsubscribed)
   const dead = new Set();
