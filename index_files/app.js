@@ -1946,7 +1946,7 @@ function App() {
         fontWeight: 600,
         color: C.accent
       }
-    }, "\u00A9 2026 Kennedy Ncube \u00B7 Powered by JetPortal.co"))));
+    }, /*#__PURE__*/React.createElement("span", { style: { display: "block", fontWeight: 700, color: C.text, marginBottom: "2px" } }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("span", null, "\u00A9 2026 Kennedy Ncube"))));
   }
   const handlePrint = () => {
     const el = printRef.current;
@@ -5889,17 +5889,9 @@ function App() {
       borderTop: `1px solid ${C.border}`,
       marginTop: "auto"
     }
-  }, "\u00A9 2026 Kennedy Ncube \u00B7 All Rights Reserved", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("a", {
-    href: "https://jetportal.co",
-    target: "_blank",
-    style: {
-      color: C.accent,
-      textDecoration: "none",
-      marginTop: "4px",
-      display: "inline-block",
-      fontWeight: 600
-    }
-  }, "Powered by JetPortal.co"))));
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 600, color: C.text, marginBottom: "2px" }
+  }, BRAND_CONFIG.brandName), /*#__PURE__*/React.createElement("div", null, "\u00A9 2026 Kennedy Ncube"))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 })(window);
