@@ -4929,7 +4929,7 @@ const STAFF_DIRECTORY = [{
 }, {
   key: "early_network",
   label: "Early Network",
-  drivers: ["Volito Rebello", "Umair Akram", "Mansoor Edris", "Mark Eke", "Hacene Brinis", "Chris Small", "Oneil Thomas", "Michael Jara"]
+  drivers: ["Volito Rebello", "Umair Akram", "Mansoor Edris", "Mark Eke", "Hacene Brinis", "Chris Small", "Oneil Thomas", "Michael Jara", "Sabrina Kirton"]
 }, {
   key: "late_network",
   label: "Late Network",
