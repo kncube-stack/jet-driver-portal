@@ -4701,7 +4701,8 @@ function App() {
     };
     const isRestDay = (i) => {
       const val = myRota[i];
-      return !val || val === "\u2014" || String(val).trim().toUpperCase() === "R";
+      const upper = String(val || "").trim().toUpperCase();
+      return !val || val === "\u2014" || upper === "R" || upper === "REST";
     };
     const selectedDayIndex = overtimeForm.dayIndex === "" ? null : parseInt(overtimeForm.dayIndex, 10);
     const inputStyle = {
