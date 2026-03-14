@@ -3926,6 +3926,13 @@ function App() {
     const targetRota = swapForm.targetDriver ? ROTA[swapForm.targetDriver] || [] : [];
     const targetDayDuty = selectedDayIndex !== null && swapForm.targetDriver ? targetRota[selectedDayIndex] || "—" : null;
     const weekCommencing = parseWeekTabNameToIso(currentTabName);
+    const isDayInPast = (dayIndex) => {
+      if (!weekCommencing || dayIndex === null) return false;
+      const shiftDate = new Date(weekCommencing);
+      shiftDate.setDate(shiftDate.getDate() + dayIndex);
+      const todayStart = new Date(new Date().toDateString());
+      return shiftDate < todayStart;
+    };
     const inputStyle = {
       width: "100%",
       padding: "12px 14px",
@@ -3969,6 +3976,10 @@ function App() {
     const resolvedRequests = swapRequests.filter(request => request.status !== "pending");
     const handleSwapSubmit = () => {
       if (selectedDayIndex === null || !swapForm.targetDriver || swapSending) return;
+      if (isDayInPast(selectedDayIndex)) {
+        setSwapError("You can't request a swap for a shift that has already passed.");
+        return;
+      }
       setSwapSending(true);
       setSwapError("");
       createSwapRequest({
@@ -4352,10 +4363,12 @@ function App() {
       value: ""
     }, "Select a day..."), DAYS.map((day, i) => {
       const val = myRota[i] || "—";
+      const past = isDayInPast(i);
       return /*#__PURE__*/React.createElement("option", {
         key: i,
-        value: i
-      }, day, " \u2014 ", val);
+        value: i,
+        disabled: past
+      }, day, past ? " (past)" : "", " \u2014 ", val);
     }))), selectedDayDuty && /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#06b6d411",
