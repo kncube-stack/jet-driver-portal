@@ -175,7 +175,7 @@ function findHeaderRow(texts: string[][]): HeaderInfo | null {
 }
 
 interface AllocationRow {
-  duty: number;
+  duty: string;
   vehicle: string;
   driver: string;
   signOn: string;
@@ -183,7 +183,9 @@ interface AllocationRow {
 
 /**
  * Read data rows below the header row.
- * Skips any row where the duty cell is empty or not a plain number.
+ * Skips any row where the duty cell is empty, or where vehicle/driver/signOn
+ * are missing. Duty identifiers can be numeric ("101"), decimal ("101.00"),
+ * alphanumeric ("101A"), or any other non-empty format the sheet uses.
  */
 function parseRows(texts: string[][], header: HeaderInfo): AllocationRow[] {
   const rows: AllocationRow[] = [];
@@ -194,15 +196,10 @@ function parseRows(texts: string[][], header: HeaderInfo): AllocationRow[] {
     const driver  = (row[header.driverCol]  ?? "").trim();
     const signOn  = (row[header.signOnCol]  ?? "").trim();
 
-    if (!dutyRaw || !/^\d+$/.test(dutyRaw)) continue;
+    if (!dutyRaw) continue;
     if (!vehicle || !driver || !signOn) continue;
 
-    rows.push({
-      duty: parseInt(dutyRaw, 10),
-      vehicle,
-      driver,
-      signOn,
-    });
+    rows.push({ duty: dutyRaw, vehicle, driver, signOn });
   }
   return rows;
 }
@@ -212,8 +209,8 @@ interface DutyEntry {
   driver: string;
   signOn: string;
   type?: string; // "PH", "AVR", "NX" — only present for private hire entries
-  handoverTo?: { duty: number; driver: string; signOn: string };
-  takeoverFrom?: { duty: number; driver: string; signOn: string };
+  handoverTo?: { duty: string; driver: string; signOn: string };
+  takeoverFrom?: { duty: string; driver: string; signOn: string };
 }
 
 /**
@@ -227,7 +224,7 @@ function buildAllocation(rows: AllocationRow[]): Record<string, DutyEntry> {
   // Build base entries
   const allocation: Record<string, DutyEntry> = {};
   for (const row of rows) {
-    allocation[String(row.duty)] = {
+    allocation[row.duty] = {
       vehicle: row.vehicle,
       driver: row.driver,
       signOn: row.signOn,
@@ -257,12 +254,12 @@ function buildAllocation(rows: AllocationRow[]): Record<string, DutyEntry> {
     const morning   = group[0];
     const afternoon = group[1];
 
-    allocation[String(morning.duty)].handoverTo = {
+    allocation[morning.duty].handoverTo = {
       duty: afternoon.duty,
       driver: afternoon.driver,
       signOn: afternoon.signOn,
     };
-    allocation[String(afternoon.duty)].takeoverFrom = {
+    allocation[afternoon.duty].takeoverFrom = {
       duty: morning.duty,
       driver: morning.driver,
       signOn: morning.signOn,
