@@ -121,6 +121,8 @@ const AUTH_LOGOUT_ENDPOINT = "/api/auth-session";
 const ALLOCATION_READ_ENDPOINT = "/api/allocation-read";
 const SWAP_REQUESTS_ENDPOINT = "/api/swap-requests";
 const SWAP_REQUEST_ACTION_ENDPOINT = "/api/swap-request-action";
+const OVERTIME_REQUESTS_ENDPOINT = "/api/overtime-requests";
+const OVERTIME_REQUEST_ACTION_ENDPOINT = "/api/overtime-request-action";
 const SEND_REQUEST_ENDPOINT = "/api/send-request";
 const LEAVE_REQUESTS_ENDPOINT = "/api/leave-requests";
 const LEAVE_MANAGERS = ["Alfie Hoque", "Errol Thomas"];
@@ -651,6 +653,46 @@ async function updateSwapRequestAction(id, action) {
   }
   return data.request;
 }
+async function fetchOvertimeRequests() {
+  const response = await fetch(OVERTIME_REQUESTS_ENDPOINT, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !Array.isArray(data.requests)) {
+    throw new Error(data?.error || "Unable to load overtime requests right now.");
+  }
+  return data.requests;
+}
+async function createOvertimeRequest(payload) {
+  const response = await fetch(OVERTIME_REQUESTS_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    cache: "no-store",
+    body: JSON.stringify({ payload })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !data?.request) {
+    throw new Error(data?.error || "Unable to create overtime request right now.");
+  }
+  return data.request;
+}
+async function updateOvertimeRequestAction(id, action) {
+  const response = await fetch(OVERTIME_REQUEST_ACTION_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    cache: "no-store",
+    body: JSON.stringify({ id, action })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !data?.request) {
+    throw new Error(data?.error || "Unable to update overtime request right now.");
+  }
+  return data.request;
+}
 async function fetchLeaveRequests() {
   const response = await fetch(LEAVE_REQUESTS_ENDPOINT, {
     method: "GET",
@@ -1161,6 +1203,14 @@ function App() {
   const [swapRequestsLoading, setSwapRequestsLoading] = React.useState(false);
   const [swapRequestsError, setSwapRequestsError] = React.useState("");
   const [swapActionPending, setSwapActionPending] = React.useState("");
+  const [overtimeForm, setOvertimeForm] = React.useState({ dayIndex: "", shiftTime: "", notes: "", email: "" });
+  const [overtimeSubmitted, setOvertimeSubmitted] = React.useState(false);
+  const [overtimeSending, setOvertimeSending] = React.useState(false);
+  const [overtimeError, setOvertimeError] = React.useState("");
+  const [overtimeRequests, setOvertimeRequests] = React.useState([]);
+  const [overtimeRequestsLoading, setOvertimeRequestsLoading] = React.useState(false);
+  const [overtimeRequestsError, setOvertimeRequestsError] = React.useState("");
+  const [overtimeActionPending, setOvertimeActionPending] = React.useState("");
   const [leaveRequests, setLeaveRequests] = React.useState([]);
   const [leaveRequestsLoading, setLeaveRequestsLoading] = React.useState(false);
   const [leaveRequestsError, setLeaveRequestsError] = React.useState("");
@@ -1268,6 +1318,23 @@ function App() {
       setSwapBadgeCount(0);
     }
   }, [currentUser]);
+  const loadOvertimeRequestsForActionDriver = React.useCallback(async () => {
+    if (!actionDriver) {
+      setOvertimeRequests([]);
+      setOvertimeRequestsError("");
+      return;
+    }
+    setOvertimeRequestsLoading(true);
+    setOvertimeRequestsError("");
+    try {
+      const requests = await fetchOvertimeRequests();
+      setOvertimeRequests(Array.isArray(requests) ? requests : []);
+    } catch (error) {
+      setOvertimeRequestsError(error?.message || "Unable to load overtime requests right now.");
+    } finally {
+      setOvertimeRequestsLoading(false);
+    }
+  }, [actionDriver]);
   const loadLeaveRequestsForManager = React.useCallback(async () => {
     setLeaveRequestsLoading(true);
     setLeaveRequestsError("");
@@ -1664,6 +1731,10 @@ function App() {
     if (screen !== "swap") return;
     setSwapBadgeCount(countPendingSwapApprovals(swapRequests, currentUser));
   }, [screen, swapRequests, currentUser]);
+  React.useEffect(() => {
+    if (!authed || screen !== "overtime" || !actionDriver) return;
+    loadOvertimeRequestsForActionDriver();
+  }, [authed, screen, actionDriver, loadOvertimeRequestsForActionDriver]);
   React.useEffect(() => {
     if (!authed || screen !== "leave-manager" || !isLeaveManager) return;
     loadLeaveRequestsForManager();
@@ -2181,6 +2252,14 @@ function App() {
     });
     setScreen("swap");
   };
+  const openOvertimeRequestScreen = () => {
+    setShowWeekMenu(false);
+    setOvertimeSubmitted(false);
+    setOvertimeSending(false);
+    setOvertimeError("");
+    setOvertimeForm({ dayIndex: "", shiftTime: "", notes: "", email: "" });
+    setScreen("overtime");
+  };
   const openLeaveManagerScreen = () => {
     setShowWeekMenu(false);
     setLeaveActionPending("");
@@ -2380,7 +2459,12 @@ function App() {
     style: weekPrimaryActionStyle,
     onMouseEnter: handleWeekPrimaryActionMouseEnter,
     onMouseLeave: handleWeekPrimaryActionMouseLeave
-  }, "\uD83E\uDDFE Generate Timesheet"), isLeaveManager && /*#__PURE__*/React.createElement("button", {
+  }, "\uD83E\uDDFE Generate Timesheet"), /*#__PURE__*/React.createElement("button", {
+    onClick: openOvertimeRequestScreen,
+    style: weekPrimaryActionStyle,
+    onMouseEnter: handleWeekPrimaryActionMouseEnter,
+    onMouseLeave: handleWeekPrimaryActionMouseLeave
+  }, "\u23F0 Overtime Request"), isLeaveManager && /*#__PURE__*/React.createElement("button", {
     onClick: openLeaveManagerScreen,
     style: {
       ...weekPrimaryActionStyle,
@@ -2921,6 +3005,10 @@ function App() {
           targetDriver: "",
           notes: ""
         });
+      } else if (screen === "overtime") {
+        setScreen("week");
+        setOvertimeSubmitted(false);
+        setOvertimeForm({ dayIndex: "", shiftTime: "", notes: "", email: "" });
       } else if (screen === "timesheet") {
         setScreen("week");
         setTimesheetSubmitted(false);
@@ -4602,6 +4690,223 @@ function App() {
         margin: "2px 0 0"
       }
     }, swapRequestsError)));
+  })(), screen === "overtime" && actionDriver && (() => {
+    const myRota = ROTA[actionDriver] || [];
+    const weekCommencing = parseWeekTabNameToIso(currentTabName);
+    const isDayInPast = (dayIndex) => {
+      if (!weekCommencing || dayIndex === null) return false;
+      const shiftDate = new Date(weekCommencing);
+      shiftDate.setDate(shiftDate.getDate() + dayIndex);
+      return shiftDate < new Date(new Date().toDateString());
+    };
+    const isRestDay = (i) => {
+      const val = myRota[i];
+      return !val || val === "\u2014";
+    };
+    const selectedDayIndex = overtimeForm.dayIndex === "" ? null : parseInt(overtimeForm.dayIndex, 10);
+    const inputStyle = {
+      width: "100%",
+      padding: "12px 14px",
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: "8px",
+      color: C.white,
+      fontSize: "13px",
+      fontFamily: "inherit",
+      outline: "none",
+      boxSizing: "border-box"
+    };
+    const statusStyles = {
+      pending: { background: "#f59e0b22", color: "#fbbf24" },
+      registered: { background: "#f9731622", color: "#fb923c" },
+      approved: { background: "#22c55e22", color: "#4ade80" },
+      declined: { background: "#ef444422", color: "#f87171" },
+      cancelled: { background: C.textDim + "22", color: C.textDim }
+    };
+    const myOvertimeRequests = overtimeRequests.filter(r => r.driverName === actionDriver);
+    const pendingManagerRequests = isLeaveManager ? overtimeRequests.filter(r => r.status === "pending") : [];
+    const handleOvertimeSubmit = () => {
+      if (selectedDayIndex === null || !overtimeForm.shiftTime || overtimeSending) return;
+      if (isDayInPast(selectedDayIndex)) {
+        setOvertimeError("This day has already passed.");
+        return;
+      }
+      if (!isRestDay(selectedDayIndex)) {
+        setOvertimeError("You can only request overtime on a rest day.");
+        return;
+      }
+      setOvertimeSending(true);
+      setOvertimeError("");
+      createOvertimeRequest({
+        driverName: actionDriver,
+        weekCommencing,
+        dayIndex: selectedDayIndex,
+        dayName: DAYS[selectedDayIndex],
+        shiftTime: overtimeForm.shiftTime,
+        notes: overtimeForm.notes || "",
+        driverEmail: overtimeForm.email || ""
+      }).then(request => {
+        setOvertimeRequests(prev => [request, ...prev]);
+        setOvertimeSubmitted(true);
+      }).catch(err => {
+        setOvertimeError(err?.message || "Unable to send your overtime request right now.");
+      }).finally(() => {
+        setOvertimeSending(false);
+      });
+    };
+    const handleOvertimeAction = (id, action) => {
+      if (!id || overtimeActionPending) return;
+      setOvertimeActionPending(`${action}:${id}`);
+      setOvertimeError("");
+      updateOvertimeRequestAction(id, action).then(updatedRequest => {
+        setOvertimeRequests(prev => prev.map(r => r.id === updatedRequest.id ? updatedRequest : r));
+      }).catch(err => {
+        setOvertimeError(err?.message || "Unable to update this overtime request right now.");
+      }).finally(() => {
+        setOvertimeActionPending("");
+      });
+    };
+    if (overtimeSubmitted) return /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: "center", padding: "40px 20px" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: "48px", marginBottom: "16px" }
+    }, "\u23F0"), /*#__PURE__*/React.createElement("h2", {
+      style: { fontSize: "18px", fontWeight: 600, color: C.white, margin: "0 0 8px" }
+    }, "Overtime Request Sent"), /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: "12px", color: C.textMuted, margin: "0 0 4px", lineHeight: 1.5 }
+    }, DAYS[selectedDayIndex] || "Your selected day", " \u2014 ", overtimeForm.shiftTime), /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: "12px", color: C.textMuted, margin: "0 0 24px", lineHeight: 1.5 }
+    }, "Your request has been sent to operations."), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setOvertimeSubmitted(false);
+        setOvertimeError("");
+        setOvertimeSending(false);
+        setOvertimeForm({ dayIndex: "", shiftTime: "", notes: "", email: "" });
+      },
+      style: { background: "#06b6d4", color: C.bg, border: "none", borderRadius: "8px", padding: "12px 24px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }
+    }, "Back to Overtime"));
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: "20px" }
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: { fontSize: "17px", fontWeight: 600, margin: "0 0 2px", color: C.white }
+    }, "Request Overtime"), /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: "11px", color: C.textMuted, margin: 0, lineHeight: 1.5 }
+    }, "Select a rest day and preferred shift time.")), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", flexDirection: "column", gap: "14px", marginBottom: "24px" }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: { display: "block", fontSize: "11px", color: C.textMuted, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px" }
+    }, "WHICH REST DAY?"), /*#__PURE__*/React.createElement("select", {
+      value: overtimeForm.dayIndex,
+      onChange: e => setOvertimeForm(f => ({ ...f, dayIndex: e.target.value })),
+      style: { ...inputStyle, colorScheme: "dark", appearance: "auto" }
+    }, /*#__PURE__*/React.createElement("option", { value: "" }, "Select a day..."), DAYS.map((day, i) => {
+      const past = isDayInPast(i);
+      const rest = isRestDay(i);
+      const dutyLabel = past ? " (past)" : !rest ? ` \u2014 ${myRota[i]} (working)` : " \u2014 Rest Day";
+      return /*#__PURE__*/React.createElement("option", { key: i, value: i, disabled: past || !rest }, day, dutyLabel);
+    }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: { display: "block", fontSize: "11px", color: C.textMuted, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px" }
+    }, "PREFERRED SHIFT TIME"), /*#__PURE__*/React.createElement("select", {
+      value: overtimeForm.shiftTime,
+      onChange: e => setOvertimeForm(f => ({ ...f, shiftTime: e.target.value })),
+      style: { ...inputStyle, colorScheme: "dark", appearance: "auto" }
+    }, /*#__PURE__*/React.createElement("option", { value: "" }, "Select shift time..."), /*#__PURE__*/React.createElement("option", { value: "Morning" }, "Morning"), /*#__PURE__*/React.createElement("option", { value: "Afternoon" }, "Afternoon"), /*#__PURE__*/React.createElement("option", { value: "Full Day" }, "Full Day"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: { display: "block", fontSize: "11px", color: C.textMuted, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px" }
+    }, "REASON / NOTES (OPTIONAL)"), /*#__PURE__*/React.createElement("textarea", {
+      value: overtimeForm.notes,
+      onChange: e => setOvertimeForm(f => ({ ...f, notes: e.target.value })),
+      rows: 3,
+      style: { ...inputStyle, resize: "vertical" },
+      placeholder: "Why are you available / any extra info?"
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: { display: "block", fontSize: "11px", color: C.textMuted, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px" }
+    }, "YOUR EMAIL (OPTIONAL)"), /*#__PURE__*/React.createElement("input", {
+      type: "email",
+      value: overtimeForm.email,
+      onChange: e => setOvertimeForm(f => ({ ...f, email: e.target.value })),
+      style: inputStyle,
+      placeholder: "So operations can follow up"
+    })), /*#__PURE__*/React.createElement("button", {
+      onClick: handleOvertimeSubmit,
+      disabled: selectedDayIndex === null || !overtimeForm.shiftTime || overtimeSending,
+      style: {
+        width: "100%",
+        padding: "14px",
+        borderRadius: "8px",
+        border: "none",
+        background: selectedDayIndex === null || !overtimeForm.shiftTime || overtimeSending ? C.textDim + "44" : "#06b6d4",
+        color: selectedDayIndex === null || !overtimeForm.shiftTime || overtimeSending ? C.textDim : C.bg,
+        fontSize: "14px",
+        fontWeight: 600,
+        fontFamily: "inherit",
+        cursor: selectedDayIndex === null || !overtimeForm.shiftTime || overtimeSending ? "not-allowed" : "pointer"
+      }
+    }, overtimeSending ? "Sending..." : "Send Overtime Request"), overtimeError && /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: "10px", color: "#be123c", lineHeight: 1.5, margin: "2px 0 0" }
+    }, overtimeError)), isLeaveManager && pendingManagerRequests.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: "24px" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: "11px", color: C.textMuted, fontWeight: 600, letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: `1px solid ${C.border}` }
+    }, "PENDING OVERTIME REQUESTS"), overtimeRequestsLoading ? /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: "10px", color: C.textDim, padding: "12px 0" }
+    }, "Loading...") : pendingManagerRequests.map(r => {
+      const actionDisabled = !!overtimeActionPending;
+      return /*#__PURE__*/React.createElement("div", {
+        key: r.id,
+        style: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px 14px", marginBottom: "8px" }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: "13px", fontWeight: 600, color: C.white }
+      }, r.driverName), /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: "11px", color: C.textMuted, marginLeft: "8px" }
+      }, r.dayName, " \u00B7 ", r.shiftTime, r.weekCommencing ? " \u00B7 w/c " + r.weekCommencing : "")), /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "999px", ...(statusStyles[r.status] || statusStyles.pending), whiteSpace: "nowrap" }
+      }, r.status.charAt(0).toUpperCase() + r.status.slice(1))), r.notes ? /*#__PURE__*/React.createElement("p", {
+        style: { fontSize: "11px", color: C.textMuted, margin: "0 0 8px", lineHeight: 1.4 }
+      }, r.notes) : null, /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", gap: "8px", flexWrap: "wrap" }
+      }, /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleOvertimeAction(r.id, "approve"),
+        disabled: actionDisabled,
+        style: { padding: "6px 14px", borderRadius: "6px", border: "none", background: actionDisabled ? "#22c55e44" : "#22c55e", color: "#ffffff", fontSize: "11px", fontWeight: 700, cursor: actionDisabled ? "not-allowed" : "pointer", fontFamily: "inherit" }
+      }, overtimeActionPending === `approve:${r.id}` ? "Approving..." : "Approve"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleOvertimeAction(r.id, "register"),
+        disabled: actionDisabled,
+        style: { padding: "6px 14px", borderRadius: "6px", border: "none", background: actionDisabled ? "#f9731644" : "#f97316", color: "#ffffff", fontSize: "11px", fontWeight: 700, cursor: actionDisabled ? "not-allowed" : "pointer", fontFamily: "inherit" }
+      }, overtimeActionPending === `register:${r.id}` ? "Registering..." : "Register"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleOvertimeAction(r.id, "decline"),
+        disabled: actionDisabled,
+        style: { padding: "6px 14px", borderRadius: "6px", border: "none", background: actionDisabled ? "#ef444444" : "#ef4444", color: "#ffffff", fontSize: "11px", fontWeight: 700, cursor: actionDisabled ? "not-allowed" : "pointer", fontFamily: "inherit" }
+      }, overtimeActionPending === `decline:${r.id}` ? "Declining..." : "Decline")));
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: "11px", color: C.textMuted, fontWeight: 600, letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: `1px solid ${C.border}` }
+    }, "MY OVERTIME REQUESTS"), overtimeRequestsLoading ? /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: "10px", color: C.textDim, padding: "12px 0" }
+    }, "Loading...") : myOvertimeRequests.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: "10px", color: C.textDim, padding: "12px 0" }
+    }, "No overtime requests yet.") : myOvertimeRequests.map(r => {
+      const canCancel = ["pending", "registered"].includes(r.status) && r.driverName === actionDriver;
+      const actionDisabled = !!overtimeActionPending;
+      return /*#__PURE__*/React.createElement("div", {
+        key: r.id,
+        style: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px 14px", marginBottom: "8px" }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "4px" }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: "13px", fontWeight: 600, color: C.white }
+      }, r.dayName, " \u2014 ", r.shiftTime), /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "999px", ...(statusStyles[r.status] || statusStyles.pending), whiteSpace: "nowrap" }
+      }, r.status.charAt(0).toUpperCase() + r.status.slice(1))), /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: "10px", color: C.textDim, marginBottom: canCancel ? "8px" : "0" }
+      }, r.weekCommencing ? "w/c " + r.weekCommencing + " \u00B7 " : "", formatSwapDateTime(r.createdAt)), canCancel && /*#__PURE__*/React.createElement("button", {
+        onClick: () => handleOvertimeAction(r.id, "cancel"),
+        disabled: actionDisabled,
+        style: { padding: "5px 12px", borderRadius: "6px", background: "transparent", color: actionDisabled ? C.textDim : C.text, border: `1px solid ${C.border}`, fontSize: "11px", fontWeight: 700, cursor: actionDisabled ? "not-allowed" : "pointer", fontFamily: "inherit" }
+      }, overtimeActionPending === `cancel:${r.id}` ? "Cancelling..." : "Cancel"));
+    }), overtimeRequestsError && /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: "10px", color: "#be123c", lineHeight: 1.5, margin: "2px 0 0" }
+    }, overtimeRequestsError)));
   })(), screen === "leave-manager" && isLeaveManager && (() => {
     const pendingRequests = leaveRequests.filter(r => r.status === "pending");
     const resolvedRequests = leaveRequests.filter(r => r.status !== "pending");

@@ -20,6 +20,9 @@ const SWAP_REQUEST_TO = TESTING ? TEST_ONLY : [
 const TIMESHEET_EMAIL_TO = TESTING ? TEST_ONLY : [
   "errol@jasonedwardstravel.co.uk"
 ];
+const OVERTIME_REQUEST_TO = TESTING ? TEST_ONLY : [
+  "operations@jasonedwardstravel.co.uk"
+];
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 function asCleanString(value, maxLength = 4000) {
@@ -320,6 +323,76 @@ function buildTimesheetMessage(payload) {
   };
 }
 
+function buildOvertimeRequestEmail(request, approveUrl, registerUrl, declineUrl) {
+  const driverName = asCleanString(request.driverName, 120) || "Unknown driver";
+  const dayName = asCleanString(request.dayName, 40) || "Unknown day";
+  const weekCommencing = asCleanString(request.weekCommencing, 20);
+  const shiftTime = asCleanString(request.shiftTime, 40) || "Full Day";
+  const notes = asCleanString(request.notes, 1200);
+  const submittedAt = formatSubmittedAt(request.createdAt);
+  const safeDriverName = escapeHtml(driverName);
+  const safeDayName = escapeHtml(dayName);
+  const safeWeek = weekCommencing ? escapeHtml(`w/c ${weekCommencing}`) : "";
+  const safeShift = escapeHtml(shiftTime);
+  const safeNotes = escapeHtml(notes || "None");
+  const safeSubmittedAt = escapeHtml(submittedAt);
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;">
+      <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:16px;padding:24px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#475569;margin-bottom:16px;">Overtime Request</div>
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">
+          <strong>${safeDriverName}</strong> has requested overtime.
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;width:120px;">Day</td><td style="padding:6px 0;font-size:14px;"><strong>${safeDayName}${safeWeek ? " &mdash; " + safeWeek : ""}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Shift Time</td><td style="padding:6px 0;font-size:14px;"><strong>${safeShift}</strong></td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;vertical-align:top;">Notes</td><td style="padding:6px 0;font-size:14px;line-height:1.5;">${safeNotes}</td></tr>
+          <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Submitted</td><td style="padding:6px 0;font-size:14px;">${safeSubmittedAt}</td></tr>
+        </table>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0 12px;">
+          <tr>
+            <td style="border-radius:10px;background:#16a34a;">
+              <a href="${escapeHtml(approveUrl)}" style="display:block;padding:14px 20px;border-radius:10px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Arial,sans-serif;white-space:nowrap;">Approve</a>
+            </td>
+            <td style="width:10px;"></td>
+            <td style="border-radius:10px;background:#d97706;">
+              <a href="${escapeHtml(registerUrl)}" style="display:block;padding:14px 20px;border-radius:10px;background:#d97706;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Arial,sans-serif;white-space:nowrap;">Register Interest</a>
+            </td>
+            <td style="width:10px;"></td>
+            <td style="border-radius:10px;background:#dc2626;">
+              <a href="${escapeHtml(declineUrl)}" style="display:block;padding:14px 20px;border-radius:10px;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Arial,sans-serif;white-space:nowrap;">Decline</a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">These links expire in 14 days and only work while the request is still pending.</p>
+      </div>
+    </div>
+  `.trim();
+  return {
+    to: OVERTIME_REQUEST_TO,
+    subject: `Overtime Request - ${driverName} (${dayName})`,
+    ...(request.driverEmail ? { replyTo: request.driverEmail } : {}),
+    text: [
+      "OVERTIME REQUEST",
+      "",
+      `Driver: ${driverName}`,
+      `Day: ${dayName}${weekCommencing ? " — w/c " + weekCommencing : ""}`,
+      `Shift Time: ${shiftTime}`,
+      notes ? `Notes: ${notes}` : "Notes: None",
+      "",
+      `Submitted: ${submittedAt}`,
+      "",
+      `Approve: ${approveUrl}`,
+      `Register Interest: ${registerUrl}`,
+      `Decline: ${declineUrl}`,
+      "",
+      "These links expire in 14 days and only work while the request is still pending.",
+      "Submitted via JET Driver Portal"
+    ].join("\n"),
+    html
+  };
+}
+
 async function sendWithResend(apiKey, from, email) {
   const response = await fetch(RESEND_ENDPOINT, {
     method: "POST",
@@ -369,6 +442,7 @@ module.exports = {
   buildSwapMessage,
   buildApprovedSwapMessage,
   buildSwapOfficeActionEmail,
+  buildOvertimeRequestEmail,
   buildTimesheetMessage,
   sendConfiguredPortalEmail
 };
